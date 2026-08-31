@@ -1,0 +1,53 @@
+# KsCollectionView v1 立ち上げ
+
+SwiftUI / Jetpack Compose で同じ書き味のリスト・グリッド部品を提供する2プラットフォームライブラリの初版開発。
+
+## ゴール / 非ゴール
+
+### ゴール
+
+- リスト・グリッドの定型機能を SwiftUI / Compose の対称 DSL で提供する: ローディング表示・無限スクロール (ページング状態機械)・Pull to Refresh・仮想化・セクション/グループ化 (sticky ヘッダ)・D&D 並べ替え・ソート連携
+- データ型によるテンプレート切り替え (異種セル)。再利用 (contentType / CellRegistration) と両立する宣言形式で提供する
+- グループ化 + 画面向き (ポートレイト/ランドスケープ) で列数が変わる可変グリッド (自社実績機能)
+- iOS は UICollectionView エンジン + `UIHostingConfiguration` セル、Android は Compose Lazy 系ラッパー (core/ADR-0001)
+- 大量件数グリッドでの仮想化・再利用の成立 (必須要件)
+
+### 非ゴール
+
+- MAUI 対応 (cross/ADR-0001)
+- KMP / CMP 対応 (Native UI 層から使う前提。ライブラリ自体は純ネイティブパッケージ)
+- セクションごとに異なるレイアウトの混在 (横カルーセル埋め込み等の Compositional Layout フル活用) — プラットフォーム間の共通化が困難なため対象外
+- 水平無限循環 (旧 HCollectionView の `IsInfinite` 相当) — ニッチのため対象外
+
+## 前提 / 制約
+
+- 最低対応 OS: **iOS 16+** (`UIHostingConfiguration` 依存) / **Android minSdk 29** (Android 10)
+- 利用者: ネイティブアプリ開発者、または KMP 経由でネイティブ UI を書く開発者。主目的は自社 KMP アプリ量産時の UI 記述コスト削減、OSS 公開は副次 (cross/ADR-0001)
+- リポジトリ構成: `../KsSettingsView/` と同型の monorepo (`ios/` `android/` ビルドルート)。CI (verify-ios / verify-android)・lockstep 単一バージョン・skills/ 方式ドキュメントを踏襲
+- 配布: iOS = Swift Package Manager / Android = Maven (KsSettingsView の package-distribution 設計を流用)
+- 先行資産: iOS エンジンは KsSettingsViewUI (diffable + Compositional Layout) と旧 `../AiForms.CollectionView/` の `ContentCellContainer` が先行実装参照。探索の経緯は [exploration.md](../../changes/revival-feasibility/exploration.md)
+
+## 全体図
+
+```mermaid
+graph LR
+    P1[phase-1<br/>対称DSL仕様<br/>research] --> P2[phase-2<br/>iOSエンジン基盤]
+    P1 --> P3[phase-3<br/>Androidラッパー基盤]
+    P2 --> P4[phase-4<br/>セクション/グループ化]
+    P3 --> P4
+    P4 --> P5[phase-5<br/>ページング状態機械]
+    P5 --> P6[phase-6<br/>D&D並べ替え]
+    P6 --> P7[phase-7<br/>サンプル/配布]
+```
+
+## フェーズ一覧
+
+| ID | 状態 | 種別 | フェーズ詳細 | Change |
+|---|---|---|---|---|
+| phase-1-symmetric-dsl-spec | pending | research | [agenda](phases/phase-1-symmetric-dsl-spec/agenda.md) | — |
+| phase-2-ios-engine-foundation | pending | change | [agenda](phases/phase-2-ios-engine-foundation/agenda.md) | — |
+| phase-3-android-wrapper-foundation | pending | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | — |
+| phase-4-sections-grouping | pending | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | — |
+| phase-5-paging-state-machine | pending | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | — |
+| phase-6-drag-reorder | pending | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | — |
+| phase-7-samples-distribution | pending | change | [agenda](phases/phase-7-samples-distribution/agenda.md) | — |
