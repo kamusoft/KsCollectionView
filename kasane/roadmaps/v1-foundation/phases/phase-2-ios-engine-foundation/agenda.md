@@ -11,6 +11,7 @@ UICollectionView + diffable data source + `UIHostingConfiguration` によるエ�
 - SwiftUI DSL ラッパー: `UIViewControllerRepresentable` 構成 (KsSettingsViewSwiftUI のパターン踏襲)
 - 旧 `../../../../../AiForms.CollectionView/CollectionView.iOS/` (ContentCellContainer 等) から参照する先行実装
 - 大量件数での性能検証方法 (実機・件数・計測手順)
+- `UICollectionViewDataSourcePrefetching` の口を基盤段階から開けておく (画像プリフェッチ接続は phase-8-image-loading が使う)
 
 ## 決定事項
 

@@ -33,8 +33,9 @@ SwiftUI / Jetpack Compose で同じ書き味のリスト・グリッド部品を
 graph LR
     P1[phase-1<br/>対称DSL仕様<br/>research] --> P2[phase-2<br/>iOSエンジン基盤]
     P1 --> P3[phase-3<br/>Androidラッパー基盤]
-    P2 --> P4[phase-4<br/>セクション/グループ化]
-    P3 --> P4
+    P2 --> P8[phase-8<br/>画像ロード統合]
+    P3 --> P8
+    P8 --> P4[phase-4<br/>セクション/グループ化]
     P4 --> P5[phase-5<br/>ページング状態機械]
     P5 --> P6[phase-6<br/>D&D並べ替え]
     P6 --> P7[phase-7<br/>サンプル/配布]
@@ -47,6 +48,7 @@ graph LR
 | phase-1-symmetric-dsl-spec | pending | research | [agenda](phases/phase-1-symmetric-dsl-spec/agenda.md) | — |
 | phase-2-ios-engine-foundation | pending | change | [agenda](phases/phase-2-ios-engine-foundation/agenda.md) | — |
 | phase-3-android-wrapper-foundation | pending | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | — |
+| phase-8-image-loading | pending | change | [agenda](phases/phase-8-image-loading/agenda.md) | — |
 | phase-4-sections-grouping | pending | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | — |
 | phase-5-paging-state-machine | pending | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | — |
 | phase-6-drag-reorder | pending | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | — |

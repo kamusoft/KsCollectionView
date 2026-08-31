@@ -11,6 +11,7 @@ SwiftUI / Compose の両言語でサンプルコードを書きながら、公�
 - レイアウト指定の DSL: リスト / 固定列グリッド / adaptive グリッド / 画面向き可変の宣言方法
 - ソートの表現: データ層の並べ替え + 差分アニメで足りるか、DSL に何か要るか
 - スクロール制御 (VM からのスクロール命令) の API 形
+- 画像プリフェッチ用のリソース宣言 (`prefetchResources` 的なデータ層 hook) と専用画像コンポーネントの位置づけ (詳細は phase-8-image-loading。ここでは DSL 上の外形だけ)
 - 旧 AiForms.CollectionView の公開契約 (`../../../../../AiForms.CollectionView/README-ja.md`) から引き継ぐ語彙・捨てる語彙
 
 ## 決定事項
