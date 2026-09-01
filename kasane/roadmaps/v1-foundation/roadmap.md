@@ -49,7 +49,7 @@ graph LR
 
 | ID | 状態 | 種別 | フェーズ詳細 | Change |
 |---|---|---|---|---|
-| phase-1-symmetric-dsl-spec | pending | research | [agenda](phases/phase-1-symmetric-dsl-spec/agenda.md) | — |
+| phase-1-symmetric-dsl-spec | completed | research | [agenda](phases/phase-1-symmetric-dsl-spec/agenda.md) | — |
 | phase-2-ios-engine-foundation | pending | change | [agenda](phases/phase-2-ios-engine-foundation/agenda.md) | — |
 | phase-3-android-wrapper-foundation | pending | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | — |
 | phase-8-image-loading | pending | change | [agenda](phases/phase-8-image-loading/agenda.md) | — |

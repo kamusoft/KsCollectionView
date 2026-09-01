@@ -11,6 +11,12 @@
 - Pull to Refresh: `.refreshable` / `PullToRefreshBox` の対称ラップ
 - 表示部品: 末尾ローディング・エラー + 再試行・empty ビューの提供範囲 (shimmer/skeleton を含めるか)
 
+### phase-1 からの申し送り (2026-09-01)
+
+- 公開契約は core/ADR-0005 で確定: 5状態 enum `KsPagingState` を利用者 (VM) が所有し、DSL に状態 + `onLoadMore` を渡す。ライブラリはトリガー発火・多重発火抑止・標準フッター (差し替え可)・Pull to Refresh 接続。利用形は [dsl-samples.md](../phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) シナリオ3
+- 論点「Paging 3 依存か自前か」は ADR-0005 の帰結として自前が既定路線 (状態機械はライブラリ内包でなく利用者所有のため Paging 3 のデータ所有モデルと不整合)
+- 残課題: `failed` にエラー内容を持たせるか / 発火しきい値 (旧 `LoadMoreMargin` 相当) を paging 設定に持つか
+
 ## 決定事項
 
 (議論で確定したらここに移動)
