@@ -11,7 +11,7 @@ UICollectionView + diffable data source + `UIHostingConfiguration` によるエ�
 - レイアウト: リスト / 固定列グリッド / adaptive グリッドの Compositional Layout 実装
 - SwiftUI DSL ラッパー: `UIViewControllerRepresentable` 構成 (KsSettingsViewSwiftUI のパターン踏襲)
 - 旧 `../../../../../AiForms.CollectionView/CollectionView.iOS/` (ContentCellContainer 等) から参照する先行実装
-- 大量件数での性能検証方法 (実機・件数・計測手順)
+- 大量件数での性能検証方法 (実機・件数・計測手順)。規約化の参考: `../KsSettingsView/kasane/handbook/maui/performance-verification.md` (kasane-initial-assets の申し送り — スクロール性能計測の規約として同種の必要性)
 - `UICollectionViewDataSourcePrefetching` の口を基盤段階から開けておく (画像プリフェッチ接続は phase-8-image-loading が使う)
 
 ## 決定事項
