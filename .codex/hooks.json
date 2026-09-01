@@ -13,6 +13,11 @@
             "type": "command",
             "command": "python3 scripts/identity-lint.py --hook",
             "statusMessage": "識別子検査"
+          },
+          {
+            "type": "command",
+            "command": "python3 scripts/comment-policy-lint.py --hook",
+            "statusMessage": "コメント規約検査"
           }
         ]
       }
