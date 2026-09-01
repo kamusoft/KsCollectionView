@@ -6,12 +6,11 @@ context: |
   本プロジェクトは UI コントロールライブラリであり、公開 API の契約と利用コード例は製品知識として価値を持つため、concepts の記述対象とする。
   内部実装フローや単なるファイル一覧は、コードから再導出できる情報として concepts へ記載しない。
 
-# ドメイン軸 (KsSettingsView と同型: core + platform)
+# ドメイン軸 (core + platform。cross は予約ドメイン)
 domains:
   core: "全 platform が共有する契約 (core-model / cells / styling / 共通 architecture)"
-  ios: "iOS 系統 (ios/ ビルドルート)"
-  android: "Android 系統 (android/ ビルドルート)"
-  maui: ".NET MAUI 系統 (maui/ ビルドルート)"
+  ios: "iOS 系統 (ios/ ビルドルート)。UICollectionView ベースのエンジンを持ち、セル中身は UIHostingConfiguration で SwiftUI として記述する (core/ADR-0001)"
+  android: "Android 系統 (android/ ビルドルート)。独自エンジンを持たず Compose Lazy 系 (LazyColumn / LazyVerticalGrid) の薄いラッパー (core/ADR-0001)"
 
 # 用途別スキルマッピング (全ドメイン共通。platform 固有スキルは domain-skills 側へ)
 skills:
@@ -32,10 +31,6 @@ domain-skills:
     ui-impl: [jetpack-compose-impl-skill]
     code-review: [kotlin-impl-skill]
     # test: Android 専用のテストスキルは存在しない (キーは定義しない)
-  maui:
-    impl: [csharp-impl-skill, maui-skill, maui-native-binding-skill]
-    ui-impl: [maui-skill]
-    test: [dotnet-test-skill]
 
 # ワーカーエージェントの起動先 (references/worker-dispatch.md が参照)
 # host = 自プラットフォームのサブエージェント / counterpart = 相方 CLI (ksn-counterpart 経由)
@@ -61,7 +56,12 @@ second-opinion:
 lint:
   exclude: []                    # 全 lint 共通の除外: リポジトリ相対パスの先頭セグメントまたは glob
   identity:
-    scope: [kasane]              # 検査範囲 (ソースには正当な UUID 定数があり得るため含めない)
+    # 検査範囲。本体ソースは含めない (正当な UUID 定数があり誤検出になるため)。
+    # samples は例外として含める — Xcode の実機ビルドが DEVELOPMENT_TEAM 等の
+    # 開発者識別子を samples 配下のプロジェクトファイルへ書き戻すため、その捕捉が目的。
+    # skills / samples はまだ存在しない (samples は各プラットフォームの基盤フェーズ、skills は
+    # 配布・ドキュメントのフェーズで作られる予定) が、先に検査範囲へ入れておく。
+    scope: [kasane, skills, samples]
     allow: ["@kamusoft.jp"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
     disable: []                  # 無効化する検出群: device / developer / network / personal / secret
   internal-hosts: []             # 未公開サーバのホスト名

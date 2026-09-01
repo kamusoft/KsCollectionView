@@ -4,6 +4,7 @@ Compose Lazy 系 (`LazyColumn` / `LazyVerticalGrid`) の薄いラッパー。リ
 
 ## 論点
 
+- Sample scaffold (初手): `samples/android/` の器 — composite build (`includeBuild`) で本体をソース参照、`SampleScreen` / `SampleTheme` / ルートメニューの対称構造 (iOS 側 phase-2 と sample-parity 準拠で一致させる)
 - ラッパー構成: DSL → Lazy DSL への変換層の設計 (ks-settingsview-compose の DSL 変換パターン参照)
 - テンプレート種別 → `contentType` のマッピング (phase-1 の宣言形式を受ける)
 - レイアウト: `GridCells.Fixed` / `GridCells.Adaptive` の対応、画面向き可変の下準備

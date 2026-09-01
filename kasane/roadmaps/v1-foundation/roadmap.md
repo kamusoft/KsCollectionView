@@ -23,9 +23,13 @@ SwiftUI / Jetpack Compose で同じ書き味のリスト・グリッド部品を
 
 - 最低対応 OS: **iOS 16+** (`UIHostingConfiguration` 依存) / **Android minSdk 29** (Android 10)
 - 利用者: ネイティブアプリ開発者、または KMP 経由でネイティブ UI を書く開発者。主目的は自社 KMP アプリ量産時の UI 記述コスト削減、OSS 公開は副次 (cross/ADR-0001)
-- リポジトリ構成: `../KsSettingsView/` と同型の monorepo (`ios/` `android/` ビルドルート)。CI (verify-ios / verify-android)・lockstep 単一バージョン・skills/ 方式ドキュメントを踏襲
-- 配布: iOS = Swift Package Manager / Android = Maven (KsSettingsView の package-distribution 設計を流用)
-- 先行資産: iOS エンジンは KsSettingsViewUI (diffable + Compositional Layout) と旧 `../AiForms.CollectionView/` の `ContentCellContainer` が先行実装参照。探索の経緯は [exploration.md](../../changes/revival-feasibility/exploration.md)
+- リポジトリ構成: `../KsSettingsView/` と同型の monorepo (`ios/` `android/` ビルドルート)。skills/ 方式の利用者ドキュメントを踏襲
+- CI (verify-ios / verify-android)・lockstep 単一バージョン・配布 (SPM / Maven、package-distribution 設計) は踏襲候補 — phase-7 で確定する
+- 先行実装参照: iOS エンジンは KsSettingsViewUI (diffable + Compositional Layout) と旧 `../AiForms.CollectionView/` の `ContentCellContainer`
+- 立ち上げ探索の経緯は [exploration.md](../../changes/revival-feasibility/exploration.md)
+- Sample は各フェーズのパリティ検証装置とする (根拠: [cross/ADR-0004](../../decisions/cross/0004-sample-cross-platform-parity.md)、規約: [sample-parity](../../handbook/cross/sample-parity.md))
+- phase-2 / phase-3 は各自の Sample scaffold (`SampleScreen` / `SampleTheme` / メニュー構造) と対向プラットフォームへの追随タスクを責務とし、両フェーズ完了時を最初のパリティ収束ゲートとする
+- phase-4〜6 および phase-8 の機能フェーズは「デモ画面を両プラットフォームの Sample に sample-parity 準拠で追加」を完了条件に含める (phase-7 は配布・ドキュメント専業で対象外)
 
 ## 全体図
 
@@ -38,7 +42,7 @@ graph LR
     P8 --> P4[phase-4<br/>セクション/グループ化]
     P4 --> P5[phase-5<br/>ページング状態機械]
     P5 --> P6[phase-6<br/>D&D並べ替え]
-    P6 --> P7[phase-7<br/>サンプル/配布]
+    P6 --> P7[phase-7<br/>配布/ドキュメント]
 ```
 
 ## フェーズ一覧

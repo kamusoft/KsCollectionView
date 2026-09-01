@@ -4,6 +4,7 @@ UICollectionView + diffable data source + `UIHostingConfiguration` によるエ�
 
 ## 論点
 
+- Sample scaffold (初手): `samples/ios/` の器 — Local Swift Package 参照、`SampleScreen` / `SampleTheme` / ルートメニューの対称構造 (Android 側 phase-3 と sample-parity 準拠で一致させる)
 - エンジン構成: `UICollectionViewDiffableDataSource` + `UICollectionViewCompositionalLayout` の構成。KsSettingsViewUI (`../../../../../KsSettingsView/ios/Sources/KsSettingsViewUI/`) からの流用範囲
 - セルホスティング: `UIHostingConfiguration` の適用方針 (state 保持・再利用時の挙動・セル自己サイズ)
 - テンプレート種別 → `CellRegistration` のマッピング機構 (phase-1 の宣言形式を受ける)

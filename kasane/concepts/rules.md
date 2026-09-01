@@ -2,14 +2,14 @@
 type: policy
 title: concepts 配置ルール
 description: ドメイン導出規則と、この concepts/ のカテゴリ定義・配置基準
-timestamp: 2026-08-26
+timestamp: 2026-09-01
 ---
 
 ## ドメイン定義
 
-ドメイン一覧の正は `kasane/config.yaml` の `domains` (core / ios / android / maui。`cross` は予約ドメインとして常に存在する)。知識・決定の行き先は次で判定する:
+ドメイン一覧の正は `kasane/config.yaml` の `domains` (core / ios / android。`cross` は予約ドメインとして常に存在する)。知識・決定の行き先は次で判定する:
 
-- 単一 platform のビルドルート (`ios/` `android/` `maui/`) に閉じる知識・決定 → その platform ドメイン
+- 単一 platform のビルドルート (`ios/` `android/`) に閉じる知識・決定 → その platform ドメイン
 - 全 platform が共有する契約 (コレクションモデル・Cell 意味論・styling 規則・共通 architecture) → `core`
 - リポジトリ構成・命名規約・ハーネス運用などリポジトリ横断のメタ事項 → `cross`
 - 新しい platform・パッケージ系統が増えた場合: 既存系統に属するなら該当ドメインへ。属さないならユーザー合意の上で `config.yaml` の `domains` に追加する
@@ -26,7 +26,7 @@ timestamp: 2026-08-26
 | cells/ | Cell 共通契約・各 Cell の公開 API・利用例 | concept, reference |
 | styling/ | Theme・CellStyle・レイアウト・視覚的契約 | concept, design-tokens, reference |
 
-### ios/ / android/ / maui/
+### ios/ / android/
 
 | カテゴリ | 対象 | 主な type |
 |---|---|---|
