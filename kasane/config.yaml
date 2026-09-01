@@ -37,6 +37,20 @@ domain-skills:
     ui-impl: [maui-skill]
     test: [dotnet-test-skill]
 
+# ワーカーエージェントの起動先 (references/worker-dispatch.md が参照)
+# host = 自プラットフォームのサブエージェント / counterpart = 相方 CLI (ksn-counterpart 経由)
+# counterpart の実装系 (impl / ui-impl / extract / live) は書き込み+ネットワーク許可の sandbox で動く
+# — 外部への持ち出し経路になり得るため、そのリスクを受容できるプロジェクトのみ counterpart を選ぶ
+workers:
+  impl: host
+  ui-impl: host        # counterpart は未検証 (視覚照合ループに画面操作が要る。codex の computer use で成立する可能性あり — 実績が出たら見直す)
+  review: host         # impl を counterpart にする場合、host に残すと単独レビューもクロスモデルになる
+                       # (counterpart にすると second-opinion 該当級で両レビューが相方モデルに揃い、ホスト視点が消える)
+  verify: host
+  scout: host
+  extract: host
+  live: host           # UI 調整でも counterpart 可 (結果確認はユーザーの目で行うため)
+
 # クロスモデル・セカンドオピニオン (ksn-second-opinion / ksn-counterpart が参照)
 second-opinion:
   code-review: [m, l]            # 実装レビューに相方レビューを並走させる級 (空リストで無効)
@@ -51,6 +65,13 @@ lint:
     allow: ["@kamusoft.jp"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
     disable: []                  # 無効化する検出群: device / developer / network / personal / secret
   internal-hosts: []             # 未公開サーバのホスト名
+  doc-structure:                 # 育つ文書の構造 lint (references/doc-structure.md)。hook には登録しない
+    scope: [kasane/concepts, kasane/handbook, kasane/roadmaps]  # 検査範囲 (index.md / log.md / rules.md は対象外)
+    item-chars: 200              # 箇条書き 1 項目の上限字数 (超えたら段落・表の行・小節へ移す)
+    section-items: 10            # 1 見出し配下のトップレベル項目数の上限 (超えたら小節へ割る)
+    nest-depth: 3                # 違反となるネスト段数 (3 なら 2 段まで許す)
+    heading-chars: 1200          # 見出しあたり散文字数の警告閾値 (表・コード・図は数えない)
+    file-chars: 10000            # 1 ファイルの散文字数の警告閾値 (分割の検討トリガー)
 
 drift:
   timestamp-threshold-days: 90
