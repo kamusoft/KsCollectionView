@@ -1,7 +1,7 @@
 ---
 id: 0002
 title: 対称性の粒度 — 語彙・構造は1対1対応、記法は各プラットフォームの流儀
-status: proposed
+status: accepted
 date: 2026-09-01
 ---
 

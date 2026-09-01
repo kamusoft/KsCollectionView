@@ -1,7 +1,7 @@
 ---
 id: 0005
 title: ページング契約の外形 — 利用者所有の5状態 enum + コールバック、ライブラリはトリガーと標準フッター
-status: proposed
+status: accepted
 date: 2026-09-01
 ---
 

@@ -1,7 +1,7 @@
 ---
 id: 0008
 title: 画像プリフェッチの DSL 外形 — prefetchResources クロージャ + 専用 KsImage の対
-status: proposed
+status: accepted
 date: 2026-09-01
 ---
 

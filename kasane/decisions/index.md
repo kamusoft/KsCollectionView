@@ -5,7 +5,7 @@ ADR はドメイン別に管理する。参照の正式形は `<domain>/ADR-NNNN
 | ドメイン | 説明 |
 |---|---|
 | [core](core/index.md) | 全 platform が共有する契約の決定 |
-| ios | iOS 固有の決定 |
+| [ios](ios/index.md) | iOS 固有の決定 |
 | android | Android 固有の決定 |
 | [cross](cross/index.md) | リポジトリ横断のメタ決定 (リポジトリ構成・命名・ハーネス運用) |
 

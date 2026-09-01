@@ -1,7 +1,7 @@
 ---
 id: 0007
 title: スクロール制御 — plain な KsScrollController を両プラットフォーム同名で提供、所有位置は自由
-status: proposed
+status: accepted
 date: 2026-09-01
 ---
 

@@ -1,7 +1,7 @@
 ---
 id: 0009
 title: 旧 AiForms.CollectionView 公開契約の棚卸し — 引き継ぐ語彙と捨てる語彙
-status: proposed
+status: accepted
 date: 2026-09-01
 ---
 
@@ -18,7 +18,9 @@ date: 2026-09-01
 - `PortraitColumns` / `LandscapeColumns` → `.fixed(portrait:landscape:)`、`AutoSpacingGrid` + `ColumnWidth` → `.adaptive(minItemWidth:)` (core/ADR-0006)
 - Pull to Refresh 系 → 各流儀 + `refreshing` 状態 (core/ADR-0005)
 - `ItemTapCommand` / `ItemLongTapCommand` / `TouchFeedbackColor`: `onItemTap { }` / `onItemLongTap { }` (型付きアイテムが渡る) + フィードバック色指定として継承 (既定はプラットフォーム標準の ripple / ハイライト)。iOS は UICollectionView のセル選択・ハイライト機構の正道で提供する — セル内 `onTapGesture` では得られない価値
-- グループ化一式 (`IsGroupingEnabled` / `GroupHeaderTemplate` / `GroupHeaderHeight` / `IsGroupHeaderSticky`): phase-4 の議論素材として申し送り
+- `RowSpacing` / `ColumnSpacing`: layout 値のパラメータ `rowSpacing` / `columnSpacing` として継承 (core/ADR-0006)。旧の「特定 GridType のみ有効」の制約は撤廃 (初版の棚卸しでこの 2 語彙が表から漏れており、iOS エンジン基盤フェーズのオーナーレビューで検出・追記)
+- `BothSidesMargin`: コンポーネントレベルの `contentPadding` (左右のみ → 4 辺に一般化、レイアウト制限撤廃) として継承 (core/ADR-0006)
+- グループ化一式 (`IsGroupingEnabled` / `GroupHeaderTemplate` / `GroupHeaderHeight` / `IsGroupHeaderSticky`) と `GroupFirstSpacing` / `GroupLastSpacing` (セクション単位の余白): phase-4 の議論素材として申し送り
 
 **捨てる**:
 
@@ -27,7 +29,7 @@ date: 2026-09-01
 - `CachingStrategy`: 再利用戦略は内部責務化し公開しない
 - `ContentCell`: `UIHostingConfiguration` で不要
 - `ColumnHeight` / `AdditionalHeight` / `ComputedWidth` / `ComputedHeight`: 旧 XF の手動サイズ計算の名残。セル自己サイズ計測で不要 (phase-2 の要件として申し送り)
-- `GroupFirstSpacing` / `GroupLastSpacing` / `BothSidesMargin` / `SpacingType`: contentPadding / spacing の各流儀へ簡素化 (詳細は phase-4)
+- `SpacingType` (Between/Center): adaptive グリッドは「列間は指定値で固定、余りを均等配分」(Between 相当) のみ提供し、Center は採用しない。需要が出たら後付けできる
 
 ## Alternatives Considered
 
@@ -41,4 +43,4 @@ date: 2026-09-01
 - 正: 旧のコールバック地獄 (`SetLoadMoreCompletion`) や手動サイズ指定 (`ColumnHeight` 系) が構造的に消える
 - 負: 水平×大量件数のユースケースは v1 では両プラットフォームとも提供手段がない (iOS は素の `LazyHStack` の再利用なしで妥協)
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 旧 AiForms.CollectionView 公開契約の棚卸し) / ../AiForms.CollectionView/README-ja.md / core/ADR-0005 / core/ADR-0006 / core/ADR-0007
+出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 旧 AiForms.CollectionView 公開契約の棚卸し) / kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: スペーシングと余白の DSL) / ../AiForms.CollectionView/README-ja.md / core/ADR-0005 / core/ADR-0006 / core/ADR-0007

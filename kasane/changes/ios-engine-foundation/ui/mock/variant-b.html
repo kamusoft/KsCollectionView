@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>ios-engine-foundation mock B — ブランド調</title>
+<style>
+  :root{
+    --accent:#0FA3A3; --bg:#FAFAF7; --cell:#FFFFFF; --text:#1C1D1F; --text2:#75767C; --sep:#E3E3DD;
+  }
+  body{font-family:-apple-system,'Hiragino Sans',sans-serif;background:#444;margin:0;padding:24px;display:flex;gap:28px;justify-content:center;flex-wrap:wrap}
+  .phone{width:320px;background:var(--bg);border-radius:28px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .nav{background:var(--accent);padding:14px 16px 10px}
+  .nav .title{font-size:17px;font-weight:700;color:#fff;text-align:center}
+  .screen{height:560px;overflow:auto;position:relative}
+  .cell{background:var(--cell);display:flex;align-items:center;padding:13px 16px;color:var(--text);font-size:16px}
+  .cell .chev{margin-left:auto;color:var(--accent)}
+  .sep{height:1px;background:var(--sep);margin-left:16px}
+  .caption{color:#fff;font-size:12px;text-align:center;margin-top:8px}
+  .sub{color:var(--text2);font-size:13px;margin-top:2px}
+  .toggle{margin-left:auto;width:44px;height:26px;border-radius:13px;background:var(--accent);position:relative}
+  .toggle::after{content:'';position:absolute;right:2px;top:2px;width:22px;height:22px;border-radius:50%;background:#fff}
+  .bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--cell);border-bottom:1px solid var(--sep);font-size:14px;color:var(--text)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px}
+  .gcell{background:var(--cell);aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .swatch{width:44px;height:44px;border-radius:10px;margin-bottom:6px}
+  .gcell span{font-size:12px;color:var(--text)}
+  .seg{margin-left:auto;display:flex;border:1px solid var(--accent);border-radius:7px;overflow:hidden;font-size:12px}
+  .seg div{padding:3px 10px;color:var(--accent)} .seg .on{background:var(--accent);color:#fff}
+  .hl{background:#0FA3A322}
+  .tokens{color:#eee;font-size:12px;max-width:960px;margin:16px auto 0;text-align:center;width:100%}
+</style></head><body>
+
+<div>
+  <div class="phone">
+    <div class="nav"><div class="title">KsCollectionView Samples</div></div>
+    <div class="screen">
+      <div class="cell">リスト<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">グリッド (固定列)<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">グリッド (adaptive)<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">向きで列数変更<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">テンプレート切り替え<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">ルートヘッダー/フッター<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">スクロール制御<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">スペーシングと余白<span class="chev">›</span></div><div class="sep"></div>
+      <div class="cell">大量件数<span class="chev">›</span></div>
+    </div>
+  </div>
+  <div class="caption">ルートメニュー</div>
+</div>
+
+<div>
+  <div class="phone">
+    <div class="nav"><div class="title">リスト</div></div>
+    <div class="bar">区切り線<div class="toggle"></div></div>
+    <div class="screen">
+      <div class="cell"><div>Apple<div class="sub">ID: 1</div></div></div><div class="sep"></div>
+      <div class="cell hl"><div>Banana (タップ中)<div class="sub">ID: 2</div></div></div><div class="sep"></div>
+      <div class="cell"><div>Cherry<div class="sub">ID: 3</div></div></div><div class="sep"></div>
+      <div class="cell"><div>Durian<div class="sub">ID: 4</div></div></div><div class="sep"></div>
+      <div class="cell"><div>Elderberry<div class="sub">ID: 5</div></div></div><div class="sep"></div>
+      <div class="cell"><div>Fig<div class="sub">ID: 6</div></div></div>
+    </div>
+  </div>
+  <div class="caption">リスト (区切り線既定表示・タップハイライト)</div>
+</div>
+
+<div>
+  <div class="phone">
+    <div class="nav"><div class="title">グリッド (固定列)</div></div>
+    <div class="bar">レイアウト<div class="seg"><div>list</div><div class="on">grid</div></div></div>
+    <div class="screen">
+      <div class="grid">
+        <div class="gcell"><div class="swatch" style="background:#0FA3A3"></div><span>Item 1</span></div>
+        <div class="gcell"><div class="swatch" style="background:#E8604C"></div><span>Item 2</span></div>
+        <div class="gcell"><div class="swatch" style="background:#3BA55D"></div><span>Item 3</span></div>
+        <div class="gcell"><div class="swatch" style="background:#E5A50A"></div><span>Item 4</span></div>
+        <div class="gcell"><div class="swatch" style="background:#8E5BD8"></div><span>Item 5</span></div>
+        <div class="gcell"><div class="swatch" style="background:#2A7DB3"></div><span>Item 6</span></div>
+        <div class="gcell"><div class="swatch" style="background:#D3557F"></div><span>Item 7</span></div>
+        <div class="gcell"><div class="swatch" style="background:#6B7280"></div><span>Item 8</span></div>
+        <div class="gcell"><div class="swatch" style="background:#B4562E"></div><span>Item 9</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">グリッド (固定列 3・カード調・角丸)</div>
+</div>
+
+<div class="tokens">
+  案 B「ブランド調」 — SampleTheme: accent #0FA3A3 / bg #FAFAF7 / cell #FFFFFF / text #1C1D1F / text2 #75767C / separator #E3E3DD (ナビバー着色・グリッドはカード調)
+</div>
+</body></html>
