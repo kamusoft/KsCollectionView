@@ -4,15 +4,15 @@ applies-when:
   always: false
   tasks: [環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
 title: ローカル開発環境と Sample の実行
-description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。実構成の確定前のため、現時点では章立てと原則のみを持つ骨格
-timestamp: 2026-09-01
+description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。iOS は確定済み手順、Android は構成確定前の骨格を持つ
+timestamp: 2026-09-02
 ---
 
 # ローカル開発環境と Sample の実行
 
 この文書は、リポジトリを clone した開発者が iOS・Android の Sample を開いて実行し、本体をビルドし、本体 source へデバッガでステップインするまでの手順をまとめる。
 
-**本文書は現時点では骨格である。** 実構成 (SwiftPM パッケージ・Gradle ビルド・Sample プロジェクト) がまだ存在しないため、具体的なコマンド・版・パスは書かない。iOS エンジン基盤 / Android ラッパー基盤の実装時に、実際に動かして確かめた手順で各節を埋める。**未検証の手順を現行の手引きとして書かないこと** — 動かない手順は、無い手順より読み手の時間を奪う。
+iOS の SwiftPM パッケージと Sample プロジェクトは成立済みであり、本書には実際に確認した手順を記す。Android はビルド構成の成立後に追記する。**未検証の手順を現行の手引きとして書かないこと** — 動かない手順は、無い手順より読み手の時間を奪う。
 
 [cross/ADR-0002](../../decisions/cross/0002-monorepo-platform-build-roots.md) を先に読むと、プラットフォームごとに独立したビルドルートを持つ理由が分かる。
 
@@ -39,6 +39,11 @@ timestamp: 2026-09-01
 
 定義元の表 (対象 / 定義元ファイル) は、各プラットフォームのビルド構成が成立した時点でこの節へ追加する。
 
+| 対象 | 定義元ファイル |
+|---|---|
+| Swift tools version・iOS 最低対応版・product / target | `ios/Package.swift` |
+| iOS Sample の最低対応版・bundle ID | `samples/ios/KsCollectionViewSamples.xcodeproj/project.pbxproj` |
+
 ## 環境変数と SDK ロケーション
 
 Android SDK の解決方法 (環境変数を使う場合と、ビルドルートごとの設定ファイルを使う場合)、および複数の Xcode を併用する環境での選択の固定方法をここに書く。実構成の確定後に追記する。
@@ -47,25 +52,28 @@ Sample と本体を別のビルドルートとして構成する場合、ビル�
 
 ## Sample を開く / 実行する
 
-iOS Sample・Android Sample それぞれについて、IDE で開く手順と CLI でビルド・インストール・起動する手順をここに書く。実構成の確定後に追記する。
+iOS Sample は `samples/ios/KsCollectionViewSamples.xcodeproj` を Xcode で開き、scheme `KsCollectionViewSamples` と利用可能な iOS Simulator を選んで実行する。本体は `../../ios` の Local Package として解決される。
+
+CLI のビルドは `samples/ios/` で `xcodebuild build -project KsCollectionViewSamples.xcodeproj -scheme KsCollectionViewSamples -destination 'platform=iOS Simulator,name=<利用可能な機種名>,OS=<利用可能な版>' -configuration Debug CODE_SIGNING_ALLOWED=NO` を実行する。
 
 Sample の識別子は [cross/ADR-0003](../../decisions/cross/0003-public-identifier-namespace.md) の `jp.kamusoft.kscollectionview.samples.ios` / `.android` に従う。
 
 ## 本体をビルドする
 
-Sample ではなく本体だけをビルド・静的解析したいときの手順をここに書く。実構成の確定後に追記する。
+Sample ではなく本体だけをビルドする場合は `ios/` で `xcodebuild build -scheme KsCollectionView -destination 'generic/platform=iOS Simulator' -configuration Debug CODE_SIGNING_ALLOWED=NO` を実行する。
 
 テストの実行方法と完了判定は [テスト実行規約](test-execution.md) が正であり、本節はビルドのみを扱う。本節にテスト実行コマンドを書かないこと (二重管理になり、片方だけが更新される)。
 
 ## 本体 source へステップインする
 
-Sample から本体を source 参照する経路と、breakpoint を置いてステップインする手順をここに書く。実構成の確定後に追記する。
+iOS Sample の Xcode project navigator で Package Dependencies の `KsCollectionView` を開くと、`ios/Sources/KsCollectionView/` の source を直接参照できる。そこへ breakpoint を置き、Sample scheme を Debug 実行してステップインする。
 
 ## デモ画面一覧はどこを見るか
 
 画面の集合・表示名・遷移先は、**各 Sample の `SampleScreen` 実装が正である**。一覧を書き写した資料は増減に追随しないので、実装ファイルを直接見る。
 
 - 定義元ファイル (iOS / Android それぞれの `SampleScreen`) のパスは、Sample scaffold の成立時にここへ追記する
+- iOS の定義元は `samples/ios/KsCollectionViewSamples/SampleScreen.swift`
 - プラットフォーム間で揃える範囲と例外は [Sample のプラットフォーム間一致](sample-parity.md) を参照する
 
 ## 関連

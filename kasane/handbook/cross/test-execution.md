@@ -4,15 +4,15 @@ applies-when:
   always: false
   tasks: [テスト実行, テスト結果の報告]
 title: テスト実行規約
-description: テストを「実際に全件走らせた」と言える条件 — 実行件数の確認と収束を待つアサーションの書き方。プラットフォーム別の実行手順と空振り範囲は実装時に確定する
-timestamp: 2026-09-01
+description: テストを「実際に全件走らせた」と言える条件 — 実行件数の確認、収束を待つアサーション、確認済みの iOS 実行手順
+timestamp: 2026-09-02
 ---
 
 # テスト実行規約
 
 この文書は、各プラットフォームのテストを「実際に全件走らせる」ための規律と、**実行や検証が黙って空振りする範囲**の扱いを定める。読むと、何をもって検証したと言えるか、どんな書き方が「待ったつもり」になるかが分かる。
 
-本文書の**現行規範はプラットフォーム非依存の 2 節** (実行件数の確認・収束を待つアサーション) である。プラットフォーム別の節は翻案元での実測知見であり、KsCollectionView ではまだ検証していない (下記「翻案元での実測知見」を参照)。
+本文書の現行規範は、プラットフォーム非依存の 2 節と、実構成で確認済みの iOS 実行手順である。Android の節はまだ翻案元での知見に留まる。
 
 ## 実行件数の確認までが検証
 
@@ -36,20 +36,27 @@ timestamp: 2026-09-01
 
 リスト・グリッドの検証はこの誤りに特に当たりやすい。行の生成・再利用、差分適用、レイアウトの反映はいずれも呼び出した時点では完了せず、フレームまたはバックグラウンドスレッドをまたいで確定するためである。
 
-## 翻案元での実測知見 (KsCollectionView では未検証)
+## プラットフォーム別の実行手順
 
-以下は翻案元プロジェクト `../KsSettingsView/` で実測された落とし穴である。KsCollectionView では実構成が未成立のため未検証であり、**現行規範ではない**。iOS エンジン基盤 / Android ラッパー基盤の実装時に自プロジェクトで検証し、成立したものを現行規範の節へ引き上げる。実測していない手順を確定した手順として書かないこと。
+実測していない手順を確定した手順として書かない。iOS は本プロジェクトで確認済み、Android は未検証である。
 
-### iOS: macOS 上の `swift test` で失われるテスト
+### iOS: Simulator で SwiftPM 全件を実行する
 
 - Swift Package のテストのうち `#if canImport(UIKit)` でガードされたものは、macOS 上の `swift test` では**コンパイル対象から外れ、失敗ではなく最初から存在しないものとして扱われる**
 - UIKit のセル・レイアウト・Renderer に関わる検証はガードされた側に集まるため、`swift test` だけで完了と判断すると変更の中核が 1 件も検証されないまま「全 pass」と報告されうる
-- 翻案元では Simulator 実行 (`xcodebuild test -scheme <パッケージ全体の scheme> -destination 'platform=iOS Simulator,name=<機種名>'`) を完了判定に使い、`swift test` は使わない運用を取っている
+- `ios/` で `xcodebuild test -scheme KsCollectionView -destination 'platform=iOS Simulator,name=<利用可能な機種名>,OS=<利用可能な版>' -configuration Debug` を実行する
+- Release は `ENABLE_TESTABILITY=YES` を付ける。付けないと `@testable import KsCollectionView` を解決できず、テストバンドルのコンパイル前に失敗する
 - 実行件数は `xcodebuild` 出力末尾の `Executed N tests, with M failures` で確認できる。Simulator の機種名は `xcrun simctl list devices available` で得る
 
-KsCollectionView の scheme 名・テストターゲット構成は iOS エンジン基盤の実装時に確定する。確定後、この節を自プロジェクトの実測手順へ書き換える。
+### iOS: Sample の UI テストと計測ドライバを分けて実行する
 
-### Android: 差分なし再実行と Robolectric の描画限界
+Sample (`samples/ios/`) の UI テストターゲットには、アサーションを持たない計測ドライバ (Instruments の接続窓を開くための固定待機を含む) が同居する。計測ドライバを通常の検証に混ぜると、実行時間が伸びるうえ「収束を待つアサーション」を欠いたテストが緑の一部として数えられる。
+
+- 通常の検証は `xcodebuild test -project KsCollectionViewSamples.xcodeproj -scheme KsCollectionViewSamples` で実行する。このスキームは計測ドライバを除外する
+- 計測ドライバは `-scheme KsCollectionViewSamplesPerformance` でのみ実行する。実行そのものが計測手順の一部であり、合否ではなく Instruments 側の記録で判定する
+- どちらのスキームも実行件数を報告する。通常スキームの件数に計測ドライバが含まれていないことが、分離が効いている確認になる
+
+### Android: 差分なし再実行と Robolectric の描画限界 (未検証)
 
 - Gradle は up-to-date なテストタスクをスキップするため、**差分なしの再実行は「テスト 0 件で BUILD SUCCESSFUL」になり得る**。全件を回し直して件数を確認するときは `--rerun-tasks` を付ける
 - 実行件数はコンソールに出ない。`build/test-results/<タスク名>/TEST-*.xml` の `tests` / `failures` 属性の合計、または `build/reports/tests/<タスク名>/index.html` で確認する

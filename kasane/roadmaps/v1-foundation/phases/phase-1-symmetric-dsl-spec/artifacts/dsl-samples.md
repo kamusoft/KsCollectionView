@@ -21,11 +21,15 @@ struct FruitList: View {
     let fruits: [Fruit]
 
     var body: some View {
-        KsCollectionView(fruits, layout: .list) {
-            Template(for: Fruit.self) { fruit in
-                Text(fruit.name)
-            }
+        KsCollectionView(
+            fruits,
+            layout: .list(rowSpacing: 4),
+            contentPadding: EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        ) { fruit in
+            Text(fruit.name)
         }
+        .header { Text("果物") }
+        .footer { Text("全 \(fruits.count) 件") }
         .onItemTap { (fruit: Fruit) in print("tapped: \(fruit.name)") }
         .touchFeedback(color: .yellow)   // 省略時はプラットフォーム標準のハイライト
     }
@@ -40,7 +44,15 @@ fun FruitList(fruits: List<Fruit>) {
     KsCollectionView(
         items = fruits,
         key = { it.id },
-        layout = KsLayout.List,
+        layout = KsLayout.List(rowSpacing = 4.dp),
+        contentPadding = PaddingValues(
+            top = 8.dp,
+            start = 16.dp,
+            bottom = 8.dp,
+            end = 16.dp,
+        ),
+        header = { Text("果物") },
+        footer = { Text("全 ${fruits.size} 件") },
         onItemTap = { fruit: Fruit -> println("tapped: ${fruit.name}") },
         touchFeedbackColor = Color.Yellow,   // 省略時は標準 ripple
     ) {
@@ -51,41 +63,82 @@ fun FruitList(fruits: List<Fruit>) {
 }
 ```
 
-対称性チェック: `items` / `layout` / テンプレート / `onItemTap` / フィードバック色 — 語彙5点が1対1。
+対称性チェック: `items` / `layout` / `contentPadding` / テンプレート / header / footer / `onItemTap` / フィードバック色 — 語彙8点が1対1。
 ID 宣言だけ流儀差 (Swift: `Identifiable` 準拠 / Kotlin: `key` ラムダ)。
 
-## 2. 異種セル + 向き可変グリッド
+Swift でも KMP 共有モデルなど `Identifiable` に準拠しない型は、専用 protocol を追加せず `id:` で安定 ID を指定できる。
+
+```swift
+struct SharedFruit: Equatable {
+    let itemId: String
+    let name: String
+}
+
+KsCollectionView(sharedFruits, id: \.itemId) { fruit in
+    Text(fruit.name)
+}
+```
+
+list の区切り線は既定で表示される。非表示にする場合だけ `.listSeparators(false)` を指定し、grid では指定にかかわらず表示されない。
+
+## 2. 値キーによるセル切り替え + 向き可変グリッド
 
 ADR-0004 (複数テンプレート) / ADR-0006 (向き別列数)。
 
 ```swift
+struct FeedItem: Identifiable, Equatable {
+    enum Kind: Hashable { case message, ad }
+
+    let id: String
+    let kind: Kind
+    let text: String
+}
+
 struct FeedScreen: View {
-    let items: [any Identifiable]   // Message と AdBanner が混在 (実型の表現は実装フェーズで確定)
+    let items: [FeedItem]
 
     var body: some View {
-        KsCollectionView(items, layout: .grid(columns: .fixed(portrait: 2, landscape: 4))) {
-            Template(for: Message.self) { msg in MessageCard(msg) }
-            Template(for: AdBanner.self) { ad in AdCard(ad) }
+        KsCollectionView(
+            items,
+            template: \.kind,
+            layout: .grid(
+                columns: .fixed(portrait: 2, landscape: 4),
+                rowSpacing: 8,
+                columnSpacing: 8
+            )
+        ) {
+            Template(FeedItem.Kind.message) { (item: FeedItem) in MessageCard(item) }
+            Template(FeedItem.Kind.ad) { (item: FeedItem) in AdCard(item) }
         }
     }
 }
 ```
 
 ```kotlin
+enum class FeedKind { Message, Ad }
+data class FeedItem(val id: String, val kind: FeedKind, val text: String)
+
 @Composable
-fun FeedScreen(items: List<Any>) {   // Message と AdBanner が混在 (実型の表現は実装フェーズで確定)
+fun FeedScreen(items: List<FeedItem>) {
     KsCollectionView(
         items = items,
-        key = { it.stableId },       // 混在型の ID 取り出し方は実装フェーズで確定
-        layout = KsLayout.Grid(KsColumns.Fixed(portrait = 2, landscape = 4)),
+        key = { it.id },
+        template = { it.kind },
+        layout = KsLayout.Grid(
+            columns = KsColumns.Fixed(portrait = 2, landscape = 4),
+            rowSpacing = 8.dp,
+            columnSpacing = 8.dp,
+        ),
     ) {
-        template<Message> { msg -> MessageCard(msg) }
-        template<AdBanner> { ad -> AdCard(ad) }
+        template(FeedKind.Message) { item -> MessageCard(item) }
+        template(FeedKind.Ad) { item -> AdCard(item) }
     }
 }
 ```
 
-**申し送り (phase-2/3)**: 混在配列の要素型と安定 ID の取り出し方 (Swift `any Identifiable` の制約 / Kotlin マーカー interface の要否) は基盤実装で確定する。未登録型が現れた場合の挙動 (debug 警告 + 空セル等) も同時に決める (ADR-0004 の残課題)。
+型ベースの混在配列は v1 の対象外。単一の要素型に enum 等の値キーを持たせてテンプレートを切り替える。未登録キーは debug では assertion、release では最小高の空セルと警告ログになる。
+
+テンプレートキーはセルの表示種別を表す**有限集合**にする。item の ID や毎要素で異なる値をキーにすると、キーごとにセルの再利用種別が作られてセルの再利用が働かなくなる。
 
 ## 3. 無限スクロール + Pull to Refresh
 
@@ -125,9 +178,7 @@ struct FeedList: View {
     @State var vm = FeedViewModel()
 
     var body: some View {
-        KsCollectionView(vm.items, layout: .list) {
-            Template(for: Message.self) { msg in MessageRow(msg) }
-        }
+        KsCollectionView(vm.items, layout: .list) { msg in MessageRow(msg) }
         .paging(vm.pagingState) { await vm.loadNextPage() }
         .refreshable { await vm.refresh() }
     }
@@ -186,7 +237,7 @@ struct ProductGrid: View {
 
     var body: some View {
         KsCollectionView(products, layout: .grid(columns: .adaptive(minItemWidth: 120))) {
-            Template(for: Product.self) { p in ProductCard(p) }
+            ProductCard($0)
         }
         .scrollController(scroller)
         .toolbar {
@@ -260,10 +311,8 @@ struct PhotoGrid: View {
     let photos: [Photo]
 
     var body: some View {
-        KsCollectionView(photos, layout: .grid(columns: .fixed(portrait: 3, landscape: 5))) {
-            Template(for: Photo.self) { photo in
-                KsImage(photo.thumbnailURL)   // プリフェッチと同一ローダ・キャッシュ
-            }
+        KsCollectionView(photos, layout: .grid(columns: .fixed(portrait: 3, landscape: 5))) { photo in
+            KsImage(photo.thumbnailURL)   // プリフェッチと同一ローダ・キャッシュ
         }
         .prefetchResources { (photo: Photo) in [photo.thumbnailURL] }
     }
@@ -329,9 +378,11 @@ class RankingViewModel : ViewModel() {
 | 語彙 | Swift | Kotlin | 出典 ADR |
 |---|---|---|---|
 | コンポーネント | `KsCollectionView(_:layout:)` | `KsCollectionView(items, key, layout, ...)` | 0002 |
-| テンプレート登録 | `Template(for:)` | `template<T> { }` | 0004 |
-| レイアウト | `.list` / `.grid(columns:)` | `KsLayout.List` / `KsLayout.Grid(...)` | 0006 |
+| テンプレート登録 | `Template(_:)` (値キー) / 単一クロージャ | `template(key) { }` / 単一クロージャ | 0004 |
+| レイアウト | `.list` / `.list(rowSpacing:)` / `.grid(columns:rowSpacing:columnSpacing:)` | `KsLayout.List(rowSpacing =)` / `KsLayout.Grid(columns =, rowSpacing =, columnSpacing =)` | 0006 |
 | 列指定 | `.fixed(_)` / `.fixed(portrait:landscape:)` / `.adaptive(minItemWidth:)` | `KsColumns.Fixed(...)` / `KsColumns.Adaptive(...)` | 0006 |
+| 余白・区切り線 | `contentPadding:` / `.listSeparators(_)` | `contentPadding =` / `listSeparators =` | 0006 |
+| ルート補助表示 | `.header { }` / `.footer { }` | `header =` / `footer =` | 0006 |
 | ページング | `.paging(_:onLoadMore:)` + `KsPagingState` | `paging = KsPaging(state, onLoadMore)` + `KsPagingState` | 0005 |
 | スクロール | `KsScrollController` + `.scrollController(_)` | `KsScrollController` / `rememberKsScrollController()` + `scrollController =` | 0007, 0009 |
 | タップ | `.onItemTap { }` / `.onItemLongTap { }` / `.touchFeedback(color:)` | `onItemTap =` / `onItemLongTap =` / `touchFeedbackColor =` | 0009 |
@@ -339,10 +390,13 @@ class RankingViewModel : ViewModel() {
 
 ## 実装フェーズへの申し送り
 
-- 混在配列の要素型と安定 ID の取り出し方 (Swift `any Identifiable` / Kotlin マーカー interface の要否) — phase-2 / phase-3
-- 未登録テンプレート型の挙動 (debug 警告 + 空セル等) — phase-2 / phase-3 (ADR-0004 残課題)
 - Compose の Pull to Refresh 接続の最終形 (`onRefresh` 引数 vs 標準 `PullToRefreshBox` との住み分け) — phase-3
 - `KsPagingState.failed` にエラー内容を持たせるか — phase-5 (ADR-0005 残課題)
 - `LoadMoreMargin` 相当 (発火しきい値設定) — phase-5
-- セル自己サイズ計測 (旧 `ColumnHeight` 系の廃止根拠) — phase-2 要件
 - グループ化・sticky ヘッダの DSL — phase-4 (旧語彙の申し送りは core/ADR-0009)
+
+## iOS セル再利用の注意
+
+iOS はセルが再利用されるたびに SwiftUI のホスティング内容を作り直すため、テンプレート内部の `@State` は画面外へのスクロールと再利用をまたいで保持されない。展開状態や選択状態など、残す必要がある値は項目モデルまたは画面の状態へ持たせる。
+
+`id:` / `template:` の指定と `Template` の登録集合は、表示中に差し替えない前提の宣言として扱う。項目の配列が同じままこれらだけを差し替えても、その変更は表示へ反映されない。

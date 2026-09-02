@@ -38,3 +38,21 @@ concepts/ に UI トークンは未登録 (プロジェクト初期)。SampleThe
 mock/variant-a.html (案 A「システム調」) を採用 (approved.png、2026-09-01 オーナー承認)。
 
 SampleTheme トークン (確定値): accent #2F6FED / bg #F2F2F7 / cell #FFFFFF / text #111214 / text2 #6E7076 / separator #D9D9DE。variant-b.html は不採用案として保持。
+
+## 実装者による視覚照合
+
+`ui/verification/root-menu-normal.png`、`ui/verification/list-normal.png`、`ui/verification/list-separators-off.png`、`ui/verification/fixed-grid-normal.png`、`ui/verification/fixed-grid-list-after-scroll.png` を `mock/approved.png` と再照合し、2026-09-02 にオーナーが最終承認した。向き別動作は `evidence/orientation-portrait.png`、`evidence/orientation-landscape-left.png`、`evidence/orientation-landscape-right.png` に保存した。Simulator のデモデータと標準ステータス表示のみを撮影し、保存後に個人情報・端末固有の識別情報が写っていないことを目視確認した。
+
+- 構造: ルートメニューの 9 項目・順序・文言、リストの操作列と 6 行、固定列グリッドの操作列と 3 列 × 3 行が一致
+- トークン: SampleTheme の accent / background / cell / text / secondaryText / separator を全対象画面から参照
+- 状態: brief で要求された通常状態を 3 画面で確認。リストは 1 pt の Top 区切り線、左右全幅の全行間線、最終行 Bottom を確認し、ON→OFF→ON の切り替えで全線が即時に消失・復帰した。固定列は grid→list 切り替え後に上下操作し、全可視セルが list 幅を維持した
+- 動的操作: スペーシングと余白の Slider は step 属性を持たない。物理 drag は Simulator 操作ツールから値変更まで届かなかったため、AX でスペーシング `0.31→0.347`、余白 `0.41→0.463` の小刻みな連続値を投入し、4 刻みに丸められないこと、つまみとグリッド描画の追従、表示安定を確認した。物理 drag の最終確認はオーナー承認時に残す
+- 向き: iPhone Sample の対応宣言は portrait / landscape left / landscape right の 3 方向で、portrait は 2 列、左右 landscape は 4 列へ切り替わることを確認した。portrait upside down は対応宣言に含めない
+- 意図: OS 標準ナビゲーションの中で、操作列よりデモ内容を主情報とする優先順位を維持
+- 照合ラウンド: 3 周。第 1 周でルートメニューの grouped 表現と本体セル登録の実行時例外を修正し、第 2 周で固定列グリッドをモックどおり 9 件へ揃え、第 3 周で区切り線の重なり順・1 pt 視認性・最終行 Bottom、連続 Slider、iPhone の対応 3 方向を再照合して収束
+- 合意済み妥協: 見た目の妥協なし。OS 標準 chrome・フォント・segmented control の描画差は sample-parity で許容されたプラットフォーム差として扱う。物理 drag のツール制約は上記へ検証制約として記録し、区切り線の 1 pt 化、Slider の連続値化、iPhone の対応向き変更は `deviation.md` に記録済み
+
+## トークン候補
+
+- レイアウト: `horizontalPadding` / `rowVerticalPadding` / `controlVerticalPadding` / `swatchSize` / `gridMinimumHeight` (`SampleTheme` が定義元)
+- グリッド色: `swatches` (mock/variant-a.html の色見本群、`SampleTheme` が定義元)

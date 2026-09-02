@@ -51,6 +51,8 @@ captures/
 # ----- iOS / Swift / Xcode -----
 .build/
 DerivedData/
+# -derivedDataPath で作業ディレクトリ内に作られた派生名 (DerivedDataRelease 等) も除外する
+DerivedData*/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
