@@ -6,6 +6,10 @@ internal final class KsHostingCell: UICollectionViewCell {
     private let bottomSeparatorView = UIView()
     private(set) var lastHitWasInteractive = false
 
+    /// 自己サイズの計測結果を受け取るハンドラ。推定高さを実測へ寄せるために使う。
+    /// 高さは測ったときの行の幅と対で意味を持つため、サイズごと渡す。
+    var onMeasuredSize: ((CGSize) -> Void)?
+
     var isTopSeparatorVisible: Bool {
         !topSeparatorView.isHidden
     }
@@ -69,6 +73,14 @@ internal final class KsHostingCell: UICollectionViewCell {
         fatalError("init(coder:) は使用しません")
     }
 
+    override func preferredLayoutAttributesFitting(
+        _ layoutAttributes: UICollectionViewLayoutAttributes
+    ) -> UICollectionViewLayoutAttributes {
+        let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
+        onMeasuredSize?(attributes.size)
+        return attributes
+    }
+
     override func layoutSubviews() {
         super.layoutSubviews()
         touchFeedbackView.frame = bounds
@@ -102,6 +114,8 @@ internal final class KsHostingCell: UICollectionViewCell {
         super.prepareForReuse()
         contentConfiguration = nil
         backgroundConfiguration = nil
+        // 内容を適用したセルの計測だけが推定高さに入るよう、内容と一緒に解除する。
+        onMeasuredSize = nil
         touchFeedbackView.isHidden = true
         topSeparatorView.isHidden = true
         bottomSeparatorView.isHidden = true

@@ -31,6 +31,14 @@ iOS エンジン基盤 ([ios-engine-foundation](../../../../changes/ios-engine-f
 - **値キーテンプレートの推論形が書けない**: core/ADR-0004 と dsl-samples の Swift 例 `Template(.message) { item in ... }` は、result builder 文脈で `Item` / `Key` が同時に未確定になり型推論が失敗する (コンパイラの内部エラー)。iOS 実装は暫定で明示形 `Template(TemplateDemoKind.message) { (item: TemplateDemoItem) in ... }` に揃えたが、これはオーナーの本意ではない。推論形を成立させる API の候補: builder のクロージャに型を渡す初期化子 / `Template` を `KsCollectionView` の入れ子型にして親から型を引き継ぐ / 明示形を正式化して ADR-0004 と dsl-samples を改訂。Kotlin の `template(Kind.Message) { }` との対称性を軸に決める
 - **`Template` の無接頭辞命名**: 他の公開型はすべて `Ks` 接頭辞だが `Template` だけ無接頭辞で、利用者側の同名型と衝突しやすい (phase-1 の確定語彙)。上記と同じタイミングで `KsTemplate` にするかを決める (dsl-samples・ADR-0004 の例・Sample の追随で済む)
 
+### phase-2 ライブ調整からの申し送り (2026-09-03)
+
+iOS 側に「検証: 行の高さ変化」画面 (行タップで展開/折りたたみ、親 state / テンプレート内 state の 2 経路、list / grid 切替) を追加し、`UIHostingConfiguration` のはみ出し検出と対策の A/B に使った (ios-engine-foundation の evidence/height-change-*)。オーナー示唆: Android にも同種の画面があった方がよい。
+
+- **行の高さ変化の検証画面を Android にも置くか**: Compose Lazy 系で item の高さ変化のアニメーション (`animateItem` / `animateContentSize`) を確認する場になる
+- 親 state の観測は iOS 側の論点 [template-parent-state-observation](../../../../changes/template-parent-state-observation/exploration.md) と対称性を見る
+- 置き方: sample-parity の「プラットフォーム固有の技術検証画面」とするか、両 platform 共通のデモに昇格させるかを決める
+
 ## 決定事項
 
 (議論で確定したらここに移動)

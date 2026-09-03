@@ -38,6 +38,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var hasAppliedSnapshot = false
     private var isCommandFlushScheduled = false
     private var lastContainerSize: CGSize = .zero
+    // 推定高さは固定値ではなく実測から決める。固定値だと推定と実測の差がそのまま
+    // 行位置の飛びとスクロールインジケータのずれになる。
+    private var estimatedHeight = KsEstimatedHeight()
     private(set) var lastScrollTargetIdentifier: AnyHashable?
     private(set) var processedCommandCount = 0
     #if DEBUG
@@ -258,8 +261,17 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private func applyContent(to cell: KsHostingCell, item: Item) {
         let key = configuration.templateKey(item)
         let content = configuration.registry.content(for: key, item: item)
-        cell.contentConfiguration = UIHostingConfiguration { content }
-            .margins(.all, 0)
+        // 内容を適用したセルの計測だけを推定高さに数えるため、content と対で設定する
+        // (prepareForReuse で内容と一緒に解除される)。
+        cell.onMeasuredSize = { [weak self] size in
+            self?.estimatedHeight.record(height: size.height, width: size.width)
+        }
+        // 行の高さが content のサイズ変化に 1 パス遅れて追いつく間、ホスト View の既定の
+        // 中央配置だと content が上方向にもはみ出す。KsRowContentPlacement で上端へ固定する。
+        cell.contentConfiguration = UIHostingConfiguration {
+            KsRowContentPlacement { content }
+        }
+        .margins(.all, 0)
     }
 
     private func configure(cell: KsHostingCell, at indexPath: IndexPath) {
@@ -443,12 +455,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
 
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1 / CGFloat(columnCount)),
-                heightDimension: .estimated(44)
+                heightDimension: .estimated(estimatedHeight.value)
             )
             let item = NSCollectionLayoutItem(layoutSize: itemSize)
             let groupSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1),
-                heightDimension: .estimated(44)
+                heightDimension: .estimated(estimatedHeight.value)
             )
             let group = NSCollectionLayoutGroup.horizontal(
                 layoutSize: groupSize,
@@ -485,7 +497,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         NSCollectionLayoutBoundarySupplementaryItem(
             layoutSize: NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1),
-                heightDimension: .estimated(44)
+                heightDimension: .estimated(KsEstimatedHeight.defaultValue)
             ),
             elementKind: kind,
             alignment: alignment

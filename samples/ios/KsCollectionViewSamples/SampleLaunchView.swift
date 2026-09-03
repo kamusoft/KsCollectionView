@@ -16,6 +16,9 @@ struct SampleLaunchView: View {
     private let verifiesTapOnly = ProcessInfo.processInfo.arguments.contains(
         "--verify-tap-only"
     )
+    private let verifiesHeightChange = ProcessInfo.processInfo.arguments.contains(
+        "--verify-height-change"
+    )
     private let requestedScreen = ProcessInfo.processInfo.arguments
         .drop { $0 != "--screen" }
         .dropFirst()
@@ -26,6 +29,11 @@ struct SampleLaunchView: View {
             InteractiveControlVerificationView()
         } else if verifiesLongPress || verifiesTapOnly {
             LongPressVerificationView(declaresLongTap: verifiesLongPress)
+        } else if verifiesHeightChange {
+            NavigationStack {
+                VerificationDestinationView(screen: .heightChange)
+            }
+            .tint(SampleTheme.accent)
         } else if verifiesPerformance || automaticallyVerifiesPerformance {
             PerformanceVerificationView(automaticallyRuns: automaticallyVerifiesPerformance)
         } else if let requestedScreen,
