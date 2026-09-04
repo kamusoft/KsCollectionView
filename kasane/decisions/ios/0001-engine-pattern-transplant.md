@@ -31,3 +31,4 @@ KsSettingsViewUI の設計パターンとコードを**翻案移植** (コピー
 - 負: 翻案時の汎用化 (Theme 依存の除去・データモデルの置き換え) の品質はこのリポジトリ側で新たに検証する必要がある
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: エンジン構成)
+現行照合: 2026-09-03 確認。ios/Sources/KsCollectionView/ を ../KsSettingsView/ios/Sources/KsSettingsViewUI/ と突き合わせ (ios-engine-foundation の蒸留時)。identity/内容分離の diffable (KsSnapshotPlanner) と実行時参照レイアウト (KsCollectionViewController) は翻案済み、型解決機構は遅延登録キャッシュのみ翻案し宣言的テンプレート値へ作り替え。「Store 経由で流す SwiftUI ラッパー」は ios/ADR-0004 で不採用 (薄い Coordinator)。ホスティングの自己サイズ補正は固定行高契約を持たないため不要、中央配置はみ出し対策は KsRowContentPlacement として翻案 (ios-engine-foundation deviation.md 2026-09-03)。判定: 乖離あり (骨格リストの Store 経由のみ — 決定本体は維持)

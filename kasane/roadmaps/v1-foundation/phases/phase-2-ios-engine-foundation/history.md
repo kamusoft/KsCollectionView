@@ -74,7 +74,7 @@
 
 ## 2026-09-01: 提案化 (ksn-propose) と spec-review 由来の追加決定
 
-- change [ios-engine-foundation](../../../../changes/ios-engine-foundation/proposal.md) を L 級で作成 (proposal / design / specs 3 能力 / tasks / ui)。モックは案 A「システム調」を承認 (SampleTheme トークン確定)
+- change [ios-engine-foundation](../../../../changes/archive/2026-09-04-ios-engine-foundation/proposal.md) を L 級で作成 (proposal / design / specs 3 能力 / tasks / ui)。モックは案 A「システム調」を承認 (SampleTheme トークン確定)
 - ksn-second-opinion (codex / spec-review) が NEEDS_DISCUSSION — 仕様の穴 9 件を採用して spec に反映 (詳細は change の second-opinion-spec-001.md)。オーナー判断 3 件:
   1. **前提 ADR 12 件 (core/0002〜0009・ios/0001〜0004) を accepted に一括昇格** (内容は phase-1/2 の議論でオーナー承認済みのため)
   2. **型ベーステンプレート変種は v1 実装から除外** (存在型の設計がまるごと必要になる一方、値キー + enum で全て書ける。API の将来余地としてのみ残す — proposal の Non-Goals)

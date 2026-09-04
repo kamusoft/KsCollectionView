@@ -11,5 +11,7 @@
 | [0007](0007-scroll-controller.md) | スクロール制御 — plain な `KsScrollController` を同名提供 | accepted | ID ベース命令の plain ハンドル。所有位置自由 (View / VM / イベント)、未接続 no-op + データ反映後実行の順序保証。 |
 | [0008](0008-prefetch-resources-and-ksimage.md) | 画像プリフェッチの DSL 外形 — `prefetchResources` + `KsImage` の対 | accepted | アイテム → リソースをクロージャ宣言し、同一キャッシュを見る専用画像コンポーネントを対で提供。詳細は phase-8。 |
 | [0009](0009-legacy-vocabulary-inventory.md) | 旧 AiForms.CollectionView 公開契約の棚卸し | accepted | ScrollController・向き別列数・タップ系等を継承、IsInfinite・HCollectionView・手動サイズ指定等を廃止。v1 は縦のみ。 |
+| [0010](0010-list-separator-default-appearance.md) | list の区切り線の既定外観 — 先頭行の上端・行間・最終行の下端に全幅 1pt の固定色で描く | proposed | hairline・行間のみ・インセット・semantic color を却下。両プラットフォーム同じ実値。色は DSL で設定可能にする方向で Android 実装時に確定 — それまで proposed (オーナー判断 2026-09-04)。 |
+| [0011](0011-invalid-input-release-behavior.md) | 不正入力 (重複 ID・未登録テンプレートキー) は debug では assertion、release では表示を継続して警告ログを出す | proposed | 落とさず・消さず・黙らず。重複 ID と重複登録は後勝ち。Android 実装完了まで proposed (オーナー判断 2026-09-04)。 |
 
 採番規則は [../index.md](../index.md) を参照。

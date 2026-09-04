@@ -6,7 +6,7 @@ ios-engine-foundation のライブ調整 (2026-09-03、高さ変化の検証画�
 
 テンプレートのクロージャは `body` 評価の外 (UIKit 側のセル生成時) で実行されるため、そのクロージャの中でだけ読まれる親 View の `@State` (例: 展開中 ID の集合、選択中 ID) は SwiftUI の依存グラフに載らない。state が変化しても親 View の body は再評価されず、Representable の更新 (`updateUIViewController` → `KsCollectionViewController.update(configuration:)`) が届かないため、ライブラリの可視セル再構成 (ios-engine-foundation deviation.md「差分更新: 同値配列でも親の更新が来たら可視セルを再構成する (案 B)」) は一度も走らない。
 
-ワーカーの A/B (ログ実測): `body` 内で同じ state を 1 行読むだけで正常に更新される。読まなければタップ後に何も起きず、溜まった状態はレイアウト切替や別タップなど無関係なタイミングでまとめて反映される (grid では 1 タップで追従する非対称あり、内訳未計測)。証跡: `../ios-engine-foundation/evidence/height-change-before-*.png`、経緯: `../ios-engine-foundation/session.md`。
+ワーカーの A/B (ログ実測): `body` 内で同じ state を 1 行読むだけで正常に更新される。読まなければタップ後に何も起きず、溜まった状態はレイアウト切替や別タップなど無関係なタイミングでまとめて反映される (grid では 1 タップで追従する非対称あり、内訳未計測)。証跡: `archive/2026-09-04-ios-engine-foundation/evidence/height-change-before-*.png`、経緯: `archive/2026-09-04-ios-engine-foundation/session.md`。
 
 案 B の目的 (SwiftUI の親状態を捕捉するテンプレートを成立させ、Android と挙動を揃える) は「親の更新が来る」前提に依存しており、その前提が成り立たない使い方が普通にあり得る。
 

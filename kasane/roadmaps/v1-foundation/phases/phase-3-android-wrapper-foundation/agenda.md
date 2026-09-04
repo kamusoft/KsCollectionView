@@ -26,7 +26,7 @@ DSL の外形は core/ADR-0002〜0009 と [dsl-samples.md](../phase-1-symmetric-
 
 ### phase-2 からの申し送り (2026-09-02、着手前に対応する)
 
-iOS エンジン基盤 ([ios-engine-foundation](../../../../changes/ios-engine-foundation/proposal.md)) の実装で判明した、対称 DSL の外形に関わる 2 点。**本フェーズの着手前に対応する** (オーナー判断。iOS 側の暫定形は deviation.md に記録)。
+iOS エンジン基盤 ([ios-engine-foundation](../../../../changes/archive/2026-09-04-ios-engine-foundation/proposal.md)) の実装で判明した、対称 DSL の外形に関わる 2 点。**本フェーズの着手前に対応する** (オーナー判断。iOS 側の暫定形は deviation.md に記録)。
 
 - **値キーテンプレートの推論形が書けない**: core/ADR-0004 と dsl-samples の Swift 例 `Template(.message) { item in ... }` は、result builder 文脈で `Item` / `Key` が同時に未確定になり型推論が失敗する (コンパイラの内部エラー)。iOS 実装は暫定で明示形 `Template(TemplateDemoKind.message) { (item: TemplateDemoItem) in ... }` に揃えたが、これはオーナーの本意ではない。推論形を成立させる API の候補: builder のクロージャに型を渡す初期化子 / `Template` を `KsCollectionView` の入れ子型にして親から型を引き継ぐ / 明示形を正式化して ADR-0004 と dsl-samples を改訂。Kotlin の `template(Kind.Message) { }` との対称性を軸に決める
 - **`Template` の無接頭辞命名**: 他の公開型はすべて `Ks` 接頭辞だが `Template` だけ無接頭辞で、利用者側の同名型と衝突しやすい (phase-1 の確定語彙)。上記と同じタイミングで `KsTemplate` にするかを決める (dsl-samples・ADR-0004 の例・Sample の追随で済む)
@@ -38,6 +38,7 @@ iOS 側に「検証: 行の高さ変化」画面 (行タップで展開/折り�
 - **行の高さ変化の検証画面を Android にも置くか**: Compose Lazy 系で item の高さ変化のアニメーション (`animateItem` / `animateContentSize`) を確認する場になる
 - 親 state の観測は iOS 側の論点 [template-parent-state-observation](../../../../changes/template-parent-state-observation/exploration.md) と対称性を見る
 - 置き方: sample-parity の「プラットフォーム固有の技術検証画面」とするか、両 platform 共通のデモに昇格させるかを決める
+- **proposed のまま持ち越した core ADR の確定**: core/ADR-0010 (list 区切り線の既定外観) と core/ADR-0011 (不正入力の release 挙動)、ios/ADR-0007 (セル content の配置) は Android 実装で突き合わせてから accepted にする (オーナー判断 2026-09-04)。区切り線は色を DSL で設定できる公開 API を足す方向で、Android 側の描画調整と合わせて外形を決める
 
 ## 決定事項
 

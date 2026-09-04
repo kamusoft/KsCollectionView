@@ -4,11 +4,11 @@ concepts はドメイン別に分割して管理する。カテゴリ定義・�
 
 | ドメイン | 内容 |
 |---|---|
-| core | 全 platform が共有する契約 (architecture / core-model / cells / styling) |
-| ios | iOS 固有の公開 API・Bridge 境界 |
+| [core](core/index.md) | 全 platform が共有する契約 (architecture / core-model / cells / styling) |
+| [ios](ios/index.md) | iOS 固有の公開 API・エンジンの契約 |
 | android | Android 固有の公開 API・Bridge 境界 |
 | cross | リポジトリ横断のメタ事項 (リポジトリ構成・命名規約) |
 
-まだ概念はない。ドメインディレクトリと各ドメインの index は最初の概念が生まれるときに作成する。
+概念を持つドメインは名前がその index へのリンクになっている。ドメインディレクトリと各ドメインの index は最初の概念が生まれるときに作成する。
 
 [log.md](log.md) は全ドメイン共通の append-only 履歴。

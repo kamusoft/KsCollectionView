@@ -5,7 +5,7 @@
 | ドメイン | 説明 |
 |---|---|
 | core | 全 platform が共有する規約・ガイド |
-| ios | iOS 固有の規約・ガイド |
+| [ios](ios/index.md) | iOS 固有の規約・ガイド |
 | android | Android 固有の規約・ガイド |
 | [cross](cross/index.md) | リポジトリ横断の規約・ガイド (リポジトリ構成・命名・ハーネス運用) |
 

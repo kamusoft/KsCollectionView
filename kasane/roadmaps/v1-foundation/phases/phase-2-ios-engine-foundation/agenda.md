@@ -92,5 +92,28 @@ phase-1 の抜け (棚卸し ADR-0009 から `RowSpacing` / `ColumnSpacing` が�
 ## TODO
 
 - [x] 論点の解消 (2026-09-01 全 8 論点を決定事項へ昇格)
-- [ ] [dsl-samples.md](../phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) を改訂後の宣言形式 (値キー切り替え・`id:` 指定・区切り線オプション・ルートヘッダー/フッター・rowSpacing / columnSpacing / contentPadding) に追随させる
-- [ ] ksn-propose で変更提案を起こす
+- [x] [dsl-samples.md](../phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) を改訂後の宣言形式 (値キー切り替え・`id:` 指定・区切り線オプション・ルートヘッダー/フッター・rowSpacing / columnSpacing / contentPadding) に追随させる
+- [x] ksn-propose で変更提案を起こす (ios-engine-foundation、2026-09-01)
+
+## 実装結果 (2026-09-03 反映)
+
+change [ios-engine-foundation](../../../../changes/archive/2026-09-04-ios-engine-foundation/proposal.md) を L 級で実装し、独立レビュー 14 サイクル (本体 11 + ライブ調整 3) を経て完了。乖離の全文は同 change の deviation.md、ライブ調整の確定内容は summary.md。
+
+特筆する結果:
+
+- 公開 DSL は core/ADR-0002〜0009 の語彙どおりに成立したが、値キーテンプレートの宣言は推論形がコンパイルできず明示形 `Template(Kind.message) { (item: Item) in … }` で暫定確定
+- 性能は iPhone 15 実機で hitch 0.0 ms/s (3 試行)、メモリは Simulator で 4〜5 往復で定常化。基準機 iPhone 11 での計測は未実施
+- 翻案元の中央配置はみ出し対策は当初「不要」と判断したが実機で発現し、`KsRowContentPlacement` として翻案。推定高さは固定 44 から実測平均へ
+- 蒸留: ADR ios/0005 (product 単一)・ios/0006 (同値配列更新の再構成) を起票、handbook/ios/performance-verification.md を昇格、concepts (core-model / styling / ios architecture) を初起票
+
+申し送りと受け皿:
+
+| 申し送り | 受け皿 |
+|---|---|
+| 値キーテンプレートの推論形と `Template` の `Ks` 接頭辞 | [phase-3 agenda](../phase-3-android-wrapper-foundation/agenda.md) 「phase-2 からの申し送り」(着手前に対応) |
+| 行の高さ変化の検証画面を Android にも置くか | [phase-3 agenda](../phase-3-android-wrapper-foundation/agenda.md) 「phase-2 ライブ調整からの申し送り」 |
+| テンプレート内でだけ読まれる親 state の変更検知 (ios/ADR-0006 の前提) | 独立 change [template-parent-state-observation](../../../../changes/template-parent-state-observation/exploration.md) |
+| セクション導入時の区切り線二重化 (「全セルに下線」規則) と `rowSpacing` / `contentPadding` 下での区切り線の見え方 | [phase-4 agenda](../phase-4-sections-grouping/agenda.md) 「phase-2 からの申し送り」 |
+| 基準機 iPhone 11 での性能計測、メモリ絶対値 (Simulator 約 610 MB) の実機確認、grid の推定高さの残る乖離と移動平均の揺れの観測 | [phase-7 agenda](../phase-7-samples-distribution/agenda.md) 「phase-2 からの申し送り」 |
+| プリフェッチ接続口 (`UICollectionViewDataSourcePrefetching`) の実接続 | [phase-8 agenda](../phase-8-image-loading/agenda.md) の既存論点 (iOS の接続) |
+| cellProvider が item 引きに失敗したとき `nil` を返しうる (翻案元の「必ず Cell を返す」不変条件の喪失) | 見送り。`itemsByID` は snapshot と同時更新されるため到達しにくく、発現した時点で対応する |

@@ -16,6 +16,11 @@ sticky ヘッダ付きグループ化と、画面向きで列数が変わる可�
 - 旧語彙の申し送り (core/ADR-0009): `IsGroupingEnabled` / `GroupHeaderTemplate` / `GroupHeaderHeight` / `IsGroupHeaderSticky` (旧 iOS のみ → 両対応が論点)。`GroupFirstSpacing` / `GroupLastSpacing` / `BothSidesMargin` / `SpacingType` は contentPadding / spacing の流儀へ簡素化する方向
 - ソート連携は DSL 追加なしで確定 (データ層並べ替え + 自動差分 move — core/ADR-0003)。本フェーズでは差分 move アニメの動作確認のみ
 
+### phase-2 からの申し送り (2026-09-03)
+
+- list の区切り線は「先頭行の上端 + 全セルの下端」に全幅で描く規則 (ios-engine-foundation deviation.md)。セクションが入ると前セクション末尾の下線と次セクション先頭の上線が二重になるため、セクション境界での規則を決める
+- 区切り線はセル bounds の底辺に描かれ、幅はセル幅 (`contentPadding` の分だけ内側に寄る)。`rowSpacing > 0` の list では線が行間の中央ではなく各行の直下に出る。セクション単位の余白・装飾を設計する際にこの見え方を含めて決める
+
 ## 決定事項
 
 (議論で確定したらここに移動)

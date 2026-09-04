@@ -9,6 +9,12 @@
 - skills/ 方式の利用者ドキュメントの実制作 (方針は [cross/ADR-0005](../../../../decisions/cross/0005-user-docs-as-agent-skills-and-root-readme.md) で accepted 済み)
 - 大量件数の性能検証をリリース基準に含めるか (実機・件数・計測手順)
 
+### phase-2 からの申し送り (2026-09-03)
+
+- 性能検証の手順と合格基準は [handbook/ios/performance-verification.md](../../../../handbook/ios/performance-verification.md) に昇格済み。リリース基準に含めるかを決める際は次の未実施分を扱う: 基準機 iPhone 11 での hitch 計測 (phase-2 は iPhone 15 で代替)、メモリ絶対値 (Simulator で約 610 MB、内訳未解明) の実機確認
+- 推定高さ (`KsEstimatedHeight`) の既知の乖離を長いスクロールで観測する: grid では行高 = 列内最大セル高に対し実測がセル単位のため平均でも過小、直近 32 件の移動平均のため大量件数のスクロール中に contentSize が揺れうる (インジケータ・オフセットの安定性は未測定)
+- CI での性能自動化 (XCUITest + `XCTOSSignpostMetric`) は実機の受け皿ができた時点で再訪 (ios-engine-foundation design Decision 6 の代替案)
+
 ## 決定事項
 
 (議論で確定したらここに移動)

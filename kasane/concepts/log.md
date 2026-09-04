@@ -4,3 +4,6 @@
 
 ## 2026-09-01
 - distilled: kasane-initial-assets (ADR cross/0002〜0005 は変更内で accepted 済み / handbook/cross 5 本を変更内で設置 / concepts 本文の変更なし。rules.md は maui ドメイン除去の検証で timestamp 更新済み)
+
+## 2026-09-03
+- distilled: ios-engine-foundation (ADR ios/0005・ios/0006・ios/0007・core/0010・core/0011 を proposed で起票 / handbook/ios/performance-verification.md 新設 / concepts 初起票: core/core-model/collection-items.md・core/core-model/collection-interaction.md・core/styling/collection-layout.md・ios/architecture/collection-engine.md / core・ios のドメイン index 新設)
