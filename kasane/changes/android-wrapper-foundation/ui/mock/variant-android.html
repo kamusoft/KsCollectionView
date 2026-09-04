@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>android-wrapper-foundation mock — Material chrome (iOS 承認モックの翻案)</title>
+<style>
+  :root{
+    --accent:#2F6FED; --bg:#F2F2F7; --cell:#FFFFFF; --text:#111214; --text2:#6E7076; --sep:#D9D9DE;
+  }
+  body{font-family:Roboto,'Noto Sans JP','Hiragino Sans',sans-serif;background:#444;margin:0;padding:24px;display:flex;gap:28px;justify-content:center;flex-wrap:wrap}
+  .phone{width:320px;background:var(--bg);border-radius:20px;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .appbar{background:var(--bg);height:56px;display:flex;align-items:center;padding:0 16px;gap:16px;color:var(--text)}
+  .appbar .title{font-size:20px;font-weight:500}
+  .appbar .back{font-size:22px;line-height:1;color:var(--text)}
+  .screen{height:560px;overflow:auto;position:relative}
+  .cell{background:var(--cell);display:flex;align-items:center;padding:12px 16px;color:var(--text);font-size:16px;position:relative}
+  .sep{height:1px;background:var(--sep)}
+  .sepa{height:1px;background:var(--accent)}
+  .caption{color:#fff;font-size:12px;text-align:center;margin-top:8px}
+  .sub{color:var(--text2);font-size:13px;margin-top:2px}
+  .switch{margin-left:auto;width:52px;height:32px;border-radius:16px;background:var(--accent);position:relative}
+  .switch::after{content:'';position:absolute;right:4px;top:4px;width:24px;height:24px;border-radius:50%;background:#fff}
+  .bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:var(--cell);border-bottom:1px solid var(--sep);font-size:14px;color:var(--text)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0;padding:0}
+  .gcell{background:var(--cell);aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:22px;border:0.5px solid var(--bg)}
+  .swatch{width:44px;height:44px;border-radius:8px;margin-bottom:6px}
+  .gcell span{font-size:12px;color:var(--text)}
+  .seg{margin-left:auto;display:flex;border:1px solid var(--accent);border-radius:20px;overflow:hidden;font-size:12px}
+  .seg div{padding:5px 14px;color:var(--accent)} .seg .on{background:var(--accent);color:#fff}
+  .ripple{background:#2F6FED22}
+  .ripple::before{content:'';position:absolute;left:40%;top:50%;width:120px;height:120px;border-radius:50%;background:#2F6FED22;transform:translate(-50%,-50%)}
+  .tokens{color:#eee;font-size:12px;max-width:960px;margin:16px auto 0;text-align:center;width:100%}
+</style></head><body>
+
+<div>
+  <div class="phone">
+    <div class="appbar"><div class="title">KsCollectionView Samples</div></div>
+    <div class="screen">
+      <div class="sep"></div>
+      <div class="cell">リスト</div><div class="sep"></div>
+      <div class="cell">グリッド (固定列)</div><div class="sep"></div>
+      <div class="cell">グリッド (adaptive)</div><div class="sep"></div>
+      <div class="cell">向きで列数変更</div><div class="sep"></div>
+      <div class="cell">テンプレート切り替え</div><div class="sep"></div>
+      <div class="cell">ルートヘッダー/フッター</div><div class="sep"></div>
+      <div class="cell">スクロール制御</div><div class="sep"></div>
+      <div class="cell">スペーシングと余白</div><div class="sep"></div>
+      <div class="cell">大量件数</div><div class="sep"></div>
+      <div class="cell" style="color:var(--text2)">検証: 行の高さ変化 (Android 固有)</div><div class="sep"></div>
+    </div>
+  </div>
+  <div class="caption">ルートメニュー (TopAppBar、末尾に固有の検証画面)</div>
+</div>
+
+<div>
+  <div class="phone">
+    <div class="appbar"><div class="back">←</div><div class="title">リスト</div></div>
+    <div class="bar">区切り線<div class="seg"><div>なし</div><div>既定</div><div class="on">アクセント</div></div></div>
+    <div class="screen">
+      <div class="sepa"></div>
+      <div class="cell"><div>Apple<div class="sub">ID: 1</div></div></div><div class="sepa"></div>
+      <div class="cell ripple"><div>Banana (タップ中)<div class="sub">ID: 2</div></div></div><div class="sepa"></div>
+      <div class="cell"><div>Cherry<div class="sub">ID: 3</div></div></div><div class="sepa"></div>
+      <div class="cell"><div>Durian<div class="sub">ID: 4</div></div></div><div class="sepa"></div>
+      <div class="cell"><div>Elderberry<div class="sub">ID: 5</div></div></div><div class="sepa"></div>
+      <div class="cell"><div>Fig<div class="sub">ID: 6</div></div></div><div class="sepa"></div>
+    </div>
+  </div>
+  <div class="caption">リスト (区切り線 3 択: なし / 既定 #D9D9DE / アクセント #2F6FED。タップ中は ripple)</div>
+</div>
+
+<div>
+  <div class="phone">
+    <div class="appbar"><div class="back">←</div><div class="title">グリッド (固定列)</div></div>
+    <div class="bar">レイアウト<div class="seg"><div>list</div><div class="on">grid</div></div></div>
+    <div class="screen">
+      <div class="grid">
+        <div class="gcell"><div class="swatch" style="background:#2F6FED"></div><span>Item 1</span></div>
+        <div class="gcell"><div class="swatch" style="background:#E8604C"></div><span>Item 2</span></div>
+        <div class="gcell"><div class="swatch" style="background:#3BA55D"></div><span>Item 3</span></div>
+        <div class="gcell"><div class="swatch" style="background:#E5A50A"></div><span>Item 4</span></div>
+        <div class="gcell"><div class="swatch" style="background:#8E5BD8"></div><span>Item 5</span></div>
+        <div class="gcell"><div class="swatch" style="background:#2AA1B3"></div><span>Item 6</span></div>
+        <div class="gcell"><div class="swatch" style="background:#D3557F"></div><span>Item 7</span></div>
+        <div class="gcell"><div class="swatch" style="background:#6B7280"></div><span>Item 8</span></div>
+        <div class="gcell"><div class="swatch" style="background:#B4562E"></div><span>Item 9</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">グリッド (固定列 3 + 切替。content は上端固定・水平中央)</div>
+</div>
+
+<div class="tokens">
+  iOS 承認モック (案 A「システム調」) の翻案 — SampleTheme は同値: accent #2F6FED / bg #F2F2F7 / cell #FFFFFF / text #111214 / text2 #6E7076 / separator #D9D9DE。差異は Material chrome (TopAppBar・Switch・Segmented・ripple) のみ
+</div>
+</body></html>
