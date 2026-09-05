@@ -1,6 +1,10 @@
 import SwiftUI
 
 /// プレーンな配列をリストまたはグリッドとして表示します。
+///
+/// テンプレートのクロージャの中で配列の項目以外の状態 (展開中の ID の集合、選択中の ID など) を
+/// 読むときは、その状態を ``observedValue(_:)`` に渡してください。渡さないと、状態が変わっても
+/// 表示が追従しないことがあります。
 public struct KsCollectionView<Item: Equatable>: View {
     internal var configuration: KsCollectionConfiguration<Item>
 
@@ -103,8 +107,36 @@ public struct KsCollectionView<Item: Equatable>: View {
             onItemLongTap: nil,
             touchFeedbackColor: nil,
             scrollController: nil,
-            prefetcher: nil
+            prefetcher: nil,
+            observedValue: nil
         )
+    }
+
+    /// テンプレートの中で読む呼び出し側の状態を、観測する値として渡します。
+    ///
+    /// テンプレートのクロージャは表示するビューの `body` の評価が終わったあとに呼ばれるため、
+    /// クロージャの中だけで読んでいる `@State` などの状態は変化しても表示へ届きません。
+    /// その状態をこの modifier に渡すと、値が変わったときに表示中のセルの内容が作り直されます。
+    ///
+    /// 渡した値が変わったときだけ作り直すため、配列が同じ更新では、渡した値以外の変化
+    /// (テンプレートのクロージャの差し替えや、クロージャの中で読んでいる別の状態) は
+    /// 表示中のセルへ届きません。テンプレートの中で読む状態は、すべてこの値にまとめて渡してください。
+    /// 状態が複数あるときは、`Hashable` に準拠した 1 つの値 (構造体など) にまとめます。
+    ///
+    /// ```swift
+    /// KsCollectionView(items) { item in
+    ///     RowBody(item: item, isExpanded: expandedIDs.contains(item.id))
+    /// }
+    /// .observedValue(expandedIDs)
+    /// ```
+    ///
+    /// 渡さない場合は、配列が同じまま表示するビューが再評価されるたびに、表示中のセルの内容を作り直します
+    /// (配列が変わる更新では、内容の変わった項目だけが作り直されます)。
+    /// Jetpack Compose 版では合成が状態を自動で購読するため、対応する指定はありません。
+    public func observedValue<Value: Hashable>(_ value: Value) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.observedValue = AnyHashable(value)
+        return copy
     }
 
     /// コンテンツ全体の先頭に、コンテンツと一緒にスクロールするビューを追加します。

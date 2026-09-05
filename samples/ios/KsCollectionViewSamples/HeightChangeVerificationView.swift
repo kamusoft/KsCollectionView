@@ -45,16 +45,6 @@ struct HeightChangeVerificationView: View {
             .pickerStyle(.segmented)
             .accessibilityIdentifier("heightChange.layoutPicker")
 
-            // 展開中の行数を body で読む。テンプレートのクロージャは body の評価より後 (UIKit 側) で
-            // 実行されるため、そこでしか読まれない state は SwiftUI の依存グラフに載らず、
-            // 変化しても body が再評価されない = コレクションへ更新が届かない。
-            // body の中でも読むことで依存を張り、タップでの開閉が最初から効くようにしている。
-            Text("展開中: \(expandedIDs.count) 行")
-                .font(.footnote)
-                .foregroundStyle(SampleTheme.secondaryText)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier("heightChange.expandedCount")
-
             Text("行をタップして展開・折りたたみ、本文が行の上端より上へ出ないことを確認します。")
                 .font(.footnote)
                 .foregroundStyle(SampleTheme.secondaryText)
@@ -79,9 +69,11 @@ struct HeightChangeVerificationView: View {
         switch path {
         case .parentState:
             // 配列は同値のまま、親の展開状態でテンプレート内容だけが変わる経路です。
+            // 展開状態はテンプレートのクロージャの中でしか読まないため、観測する値として渡します。
             return KsCollectionView(items, layout: layout) { item in
                 HeightChangeRowBody(item: item, isExpanded: expandedIDs.contains(item.id))
             }
+            .observedValue(expandedIDs)
             .onItemTap { item in
                 if expandedIDs.contains(item.id) {
                     expandedIDs.remove(item.id)

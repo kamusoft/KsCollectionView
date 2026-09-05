@@ -98,6 +98,91 @@ final class KsSwiftUIIntegrationTests: XCTestCase {
         }
     }
 
+    private struct ObservedExpansionView: View {
+        @State private var expandedIDs: Set<Int> = []
+        let items: [Item]
+        let register: (@escaping (Int) -> Void) -> Void
+        let record: (Int, Bool) -> Void
+
+        var body: some View {
+            // 展開中 ID は body では読まず、テンプレートのクロージャの中だけで読む。
+            // 観測する値として渡すことで、その変化が可視セルへ届く。
+            KsCollectionView(items) { item in
+                let _ = record(item.id, expandedIDs.contains(item.id))
+                Text(item.title)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .observedValue(expandedIDs)
+            .onAppear { register { expandedIDs.insert($0) } }
+        }
+    }
+
+    private struct AppendAndExpandView: View {
+        @State private var items: [Item]
+        @State private var expandedIDs: Set<Int> = []
+        let register: (@escaping () -> Void) -> Void
+        let record: (Int, Bool) -> Void
+
+        init(
+            itemCount: Int,
+            register: @escaping (@escaping () -> Void) -> Void,
+            record: @escaping (Int, Bool) -> Void
+        ) {
+            _items = State(initialValue: (0..<itemCount).map {
+                Item(id: $0, title: "項目 \($0)")
+            })
+            self.register = register
+            self.record = record
+        }
+
+        var body: some View {
+            KsCollectionView(items) { item in
+                let _ = record(item.id, expandedIDs.contains(item.id))
+                Text(item.title)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .observedValue(expandedIDs)
+            .onAppear { register(appendAndExpand) }
+        }
+
+        // 配列の変化と展開状態の変化を 1 回の更新にまとめて届ける。
+        private func appendAndExpand() {
+            items.append(Item(id: 100, title: "追加 100"))
+            expandedIDs.insert(3)
+        }
+    }
+
+    private struct CombinedObservationView: View {
+        // 2 つの状態を 1 つの値にまとめて観測する値として渡す形。
+        private struct Observation: Hashable {
+            var expandedIDs: Set<Int>
+            var selectedID: Int?
+        }
+
+        @State private var expandedIDs: Set<Int> = []
+        @State private var selectedID: Int?
+        let items: [Item]
+        let register: (@escaping (Int?) -> Void) -> Void
+        let record: (Int, String) -> Void
+
+        var body: some View {
+            KsCollectionView(items) { item in
+                let _ = record(item.id, label(for: item))
+                Text(item.title)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .observedValue(Observation(expandedIDs: expandedIDs, selectedID: selectedID))
+            .onAppear { register { selectedID = $0 } }
+        }
+
+        private func label(for item: Item) -> String {
+            if selectedID == item.id {
+                return "選択"
+            }
+            return expandedIDs.contains(item.id) ? "展開" : "通常"
+        }
+    }
+
     func testState更新と同一Button処理の末尾命令が新snapshotへ到達する() async {
         let scrollController = KsScrollController()
         var actionCount = 0
@@ -130,6 +215,66 @@ final class KsSwiftUIIntegrationTests: XCTestCase {
         }) {
             $0.0 == AnyHashable(30) && $0.1 == AnyHashable(30)
         }
+    }
+
+    func test観測する値として渡した親のStateの変化を可視セルへ反映する() async {
+        var recorded: [Int: Bool] = [:]
+        var expand: ((Int) -> Void)?
+        let items = (0..<10).map { Item(id: $0, title: "項目 \($0)") }
+        let host = UIHostingController(rootView: ObservedExpansionView(
+            items: items,
+            register: { expand = $0 },
+            record: { recorded[$0] = $1 }
+        ))
+        let window = showInWindow(controller: host, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitUntil("初期セルの構成", value: { recorded[3] }) { $0 == false }
+        await waitUntil("展開操作の登録", value: { expand != nil }) { $0 }
+
+        expand?(3)
+
+        await waitUntil("展開中 ID を反映した可視セル", value: { recorded[3] }) { $0 == true }
+    }
+
+    func test配列の変化と同時に届いた観測する値の変化を既存の可視セルへ反映する() async {
+        var recorded: [Int: Bool] = [:]
+        var appendAndExpand: (() -> Void)?
+        let host = UIHostingController(rootView: AppendAndExpandView(
+            itemCount: 10,
+            register: { appendAndExpand = $0 },
+            record: { recorded[$0] = $1 }
+        ))
+        let window = showInWindow(controller: host, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitUntil("初期セルの構成", value: { recorded[3] }) { $0 == false }
+        await waitUntil("追加と展開の登録", value: { appendAndExpand != nil }) { $0 }
+
+        appendAndExpand?()
+
+        await waitUntil("追加と同時に届いた展開状態の反映", value: { recorded[3] }) { $0 == true }
+    }
+
+    func test複数の状態をまとめて観測する値として渡せる() async {
+        var recorded: [Int: String] = [:]
+        var select: ((Int?) -> Void)?
+        let items = (0..<10).map { Item(id: $0, title: "項目 \($0)") }
+        let host = UIHostingController(rootView: CombinedObservationView(
+            items: items,
+            register: { select = $0 },
+            record: { recorded[$0] = $1 }
+        ))
+        let window = showInWindow(controller: host, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitUntil("初期セルの構成", value: { recorded[2] }) { $0 == "通常" }
+        await waitUntil("選択操作の登録", value: { select != nil }) { $0 }
+
+        // まとめた値のうち選択中 ID だけを変える。
+        select?(2)
+
+        await waitUntil("選択中 ID を反映した可視セル", value: { recorded[2] }) { $0 == "選択" }
     }
 
     func test配列が同値でも親のState変更を可視セルへ反映する() async {

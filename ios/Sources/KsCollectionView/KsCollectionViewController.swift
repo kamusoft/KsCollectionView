@@ -91,6 +91,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let previousShowsSeparators = self.configuration.showsSeparators
         let previousSeparatorColor = self.configuration.separatorColor
         let previousController = self.configuration.scrollController
+        let previousObservedValue = self.configuration.observedValue
+        // 観測する値が宣言されているときは、その値が変わった更新でだけテンプレートを呼び直す。
+        // 宣言が無いときは配列が同値の更新が届くたびに呼び直す (ios/ADR-0006)。
+        let observedValueChanged = configuration.observedValue != nil
+            && configuration.observedValue != previousObservedValue
+        let rebuildsVisibleCellContent = configuration.observedValue == nil || observedValueChanged
         let supplementaryStructureChanged = (self.configuration.header == nil) != (configuration.header == nil)
             || (self.configuration.footer == nil) != (configuration.footer == nil)
         let layoutKindChanged = previousLayout.kind != configuration.layout.kind
@@ -122,7 +128,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         apply(
             items: configuration.items,
             animatingDifferences: true,
-            reconfiguringAllItems: layoutKindChanged
+            reconfiguringAllItems: layoutKindChanged,
+            rebuildingVisibleCellContentOnEqualItems: rebuildsVisibleCellContent,
+            rebuildingSurvivingVisibleCellContent: observedValueChanged
         )
     }
 
@@ -331,7 +339,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
 
     // 可視セルを現在の構成 (テンプレート・位置依存の表示・タッチ時の背景色) で作り直す。
     // 画面外のセルは表示されるときに最新の構成で作られるため対象にしない。
-    private func reconfigureVisibleCells() {
+    // `rebuildingContent` が false のときはテンプレートのクロージャを呼び直さず、
+    // 位置依存の表示とタッチ時の背景色だけを現在の構成に揃える。
+    private func reconfigureVisibleCells(rebuildingContent: Bool = true) {
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard
                 let cell = collectionView.cellForItem(at: indexPath) as? KsHostingCell,
@@ -340,8 +350,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             else {
                 continue
             }
-            _ = registration(for: configuration.templateKey(item))
-            applyContent(to: cell, item: item)
+            if rebuildingContent {
+                _ = registration(for: configuration.templateKey(item))
+                applyContent(to: cell, item: item)
+            }
             configure(cell: cell, at: indexPath)
         }
     }
@@ -349,12 +361,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private func apply(
         items: [Item],
         animatingDifferences: Bool,
-        reconfiguringAllItems: Bool = false
+        reconfiguringAllItems: Bool = false,
+        rebuildingVisibleCellContentOnEqualItems: Bool = true,
+        rebuildingSurvivingVisibleCellContent: Bool = false
     ) {
         // 項目もレイアウト種別も変わらない更新では、差分計算も snapshot 適用も行わない。
         // ただしテンプレートのクロージャは呼び出し側の状態を捕捉しうるため、可視セルは作り直す。
         if !reconfiguringAllItems, hasAppliedSnapshot, items == appliedItems {
-            reconfigureVisibleCells()
+            reconfigureVisibleCells(rebuildingContent: rebuildingVisibleCellContentOnEqualItems)
             settleAnchorIfNeeded()
             if !isApplyingSnapshot {
                 flushPendingCommands()
@@ -391,12 +405,27 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let identifiers = plan.identifiers.map(KsItemIdentifier.init)
         let currentIdentifiers = dataSource.snapshot().itemIdentifiers
         let positionsChanged = identifiers != currentIdentifiers
+        // 観測する値が変わった更新では、内容が同値のまま残る可視セルもテンプレートを呼び直す。
+        // 配列の変化と同時に届いた場合に、既存のセルが古い観測値のまま取り残されるのを防ぐ。
+        // 画面外のセルは表示されるときに最新の構成で作られるため対象にしない。
+        let survivingVisibleIdentifiers: Set<KsItemIdentifier>
+        if rebuildingSurvivingVisibleCellContent {
+            let newIdentifiers = Set(identifiers)
+            survivingVisibleIdentifiers = Set(
+                collectionView.indexPathsForVisibleItems
+                    .compactMap { dataSource.itemIdentifier(for: $0) }
+                    .filter(newIdentifiers.contains)
+            )
+        } else {
+            survivingVisibleIdentifiers = []
+        }
         // 初回は section を載せるために必ず適用する (項目が空でも header / footer を表示するため)。
         let hasSnapshotChanges = !hasAppliedSnapshot
             || positionsChanged
             || !plan.reconfigure.isEmpty
             || !plan.reload.isEmpty
             || reconfiguringAllItems
+            || !survivingVisibleIdentifiers.isEmpty
         guard hasSnapshotChanges else {
             settleAnchorIfNeeded()
             if !isApplyingSnapshot {
@@ -414,10 +443,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         // 位置の変化は再構成の理由にしない (位置依存の表示は apply 完了後の可視セル更新で揃える)。
         // 作り直す要素は再構成の対象から外す。同じ snapshot で同一要素の再構成と作り直しを
         // 同時に指示することはできない。
+        let planReconfigureIdentifiers = Set(plan.reconfigure.map(KsItemIdentifier.init))
         let reconfigureIdentifiers = (
             reconfiguringAllItems
                 ? identifiers.filter(existingIdentifiers.contains)
-                : plan.reconfigure.map(KsItemIdentifier.init).filter(existingIdentifiers.contains)
+                : identifiers.filter {
+                    (planReconfigureIdentifiers.contains($0) || survivingVisibleIdentifiers.contains($0))
+                        && existingIdentifiers.contains($0)
+                }
         ).filter { !reloadedIdentifiers.contains($0) }
         snapshot.reconfigureItems(reconfigureIdentifiers)
         snapshot.reloadItems(reloadIdentifiers)

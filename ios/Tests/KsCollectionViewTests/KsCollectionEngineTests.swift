@@ -902,6 +902,167 @@ final class KsCollectionEngineTests: XCTestCase {
         }
     }
 
+    func test観測する値の変化で同値配列でも可視セルを再構成する() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let builds = BuildRecorder()
+        var configuration = makeConfiguration(items: items) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        configuration.observedValue = AnyHashable(Set<Int>())
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        let buildsBeforeUpdate = builds.counts
+
+        configuration.observedValue = AnyHashable(Set([1]))
+        controller.update(configuration: configuration)
+        controller.collectionView.layoutIfNeeded()
+
+        for id in 0..<3 {
+            XCTAssertEqual(builds.counts[id], (buildsBeforeUpdate[id] ?? 0) + 1)
+        }
+    }
+
+    func test観測する値が同じなら可視セルを再構成しない() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let builds = BuildRecorder()
+        var configuration = makeConfiguration(items: items) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        configuration.observedValue = AnyHashable(Set([1]))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        let buildsBeforeUpdate = builds.counts
+        XCTAssertEqual(tryUnwrapCell(controller, item: 0).touchFeedbackColor, .systemFill)
+
+        // 観測する値に関係のない更新 (色の差し替え) だけが届いた状況。
+        configuration.touchFeedbackColor = .systemRed
+        controller.update(configuration: configuration)
+        controller.collectionView.layoutIfNeeded()
+
+        XCTAssertEqual(builds.counts, buildsBeforeUpdate)
+        // テンプレートは呼び直さない一方で、タッチ時の背景色は表示中のセルへ届く。
+        XCTAssertEqual(tryUnwrapCell(controller, item: 0).touchFeedbackColor, .systemRed)
+    }
+
+    func test観測する値の変化ではID解決もsnapshot適用も行わない() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let idCalls = BuildRecorder()
+        let builds = BuildRecorder()
+        var configuration = makeConfiguration(
+            items: items,
+            id: { item in
+                _ = idCalls.record(item.id)
+                return AnyHashable(item.id)
+            }
+        ) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        configuration.observedValue = AnyHashable(0)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        let idCallsBeforeUpdate = idCalls.counts
+        let buildsBeforeUpdate = builds.counts
+        let identifiersBeforeUpdate = controller.appliedItemIdentifiers
+
+        configuration.observedValue = AnyHashable(1)
+        controller.update(configuration: configuration)
+        controller.collectionView.layoutIfNeeded()
+
+        XCTAssertEqual(idCalls.counts, idCallsBeforeUpdate)
+        XCTAssertEqual(controller.appliedItemIdentifiers, identifiersBeforeUpdate)
+        for id in 0..<3 {
+            XCTAssertEqual(builds.counts[id], (buildsBeforeUpdate[id] ?? 0) + 1)
+        }
+    }
+
+    func test配列と観測する値が同時に変わった更新でも観測する値を記録する() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let builds = BuildRecorder()
+        var configuration = makeConfiguration(items: items) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        configuration.observedValue = AnyHashable(0)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+
+        configuration.items.append(Item(id: 3, title: "項目 3"))
+        configuration.observedValue = AnyHashable(1)
+        controller.update(configuration: configuration)
+        await settleAtStart(itemCount: 4, in: controller)
+        XCTAssertEqual(builds.counts[3], 1)
+        let buildsAfterInsert = builds.counts
+
+        // 観測する値を元へ戻す更新。直前の更新で新しい値が記録されていれば変化として扱われる。
+        configuration.observedValue = AnyHashable(0)
+        controller.update(configuration: configuration)
+        controller.collectionView.layoutIfNeeded()
+
+        for id in 0..<4 {
+            XCTAssertEqual(builds.counts[id], (buildsAfterInsert[id] ?? 0) + 1)
+        }
+    }
+
+    func test配列と観測する値が同時に変わった更新で既存の可視セルも再構成する() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let builds = BuildRecorder()
+        var configuration = makeConfiguration(items: items) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        configuration.observedValue = AnyHashable(Set<Int>())
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        let buildsBeforeUpdate = builds.counts
+
+        // 項目の追加と観測する値の変化が 1 回の更新で同時に届く状況。
+        configuration.items.append(Item(id: 3, title: "項目 3"))
+        configuration.observedValue = AnyHashable(Set([1]))
+        controller.update(configuration: configuration)
+        await settleAtStart(itemCount: 4, in: controller)
+
+        // 追加された項目だけでなく、内容が同値のまま残った可視セルも新しい観測する値で作り直される。
+        for id in 0..<3 {
+            XCTAssertEqual(builds.counts[id], (buildsBeforeUpdate[id] ?? 0) + 1)
+        }
+        XCTAssertEqual(builds.counts[3], 1)
+    }
+
+    func test観測する値を渡していなければ更新ごとに可視セルを再構成する() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        let builds = BuildRecorder()
+        let configuration = makeConfiguration(items: items) { item in
+            let _ = builds.record(item.id)
+            Text(item.title)
+        }
+        XCTAssertNil(configuration.observedValue)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        let buildsBeforeUpdate = builds.counts
+
+        controller.update(configuration: configuration)
+        controller.collectionView.layoutIfNeeded()
+
+        for id in 0..<3 {
+            XCTAssertEqual(builds.counts[id], (buildsBeforeUpdate[id] ?? 0) + 1)
+        }
+    }
+
     func testtouchFeedback色の変更を可視セルへ反映する() async {
         var configuration = makeConfiguration(items: [Item(id: 1, title: "A")])
         configuration.onItemTap = { _ in }

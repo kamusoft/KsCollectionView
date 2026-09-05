@@ -37,6 +37,7 @@ final class KsPublicAPITests: XCTestCase {
         .onItemLongTap { _ in }
         .touchFeedback(color: .yellow)
         .scrollController(controller)
+        .observedValue(Set([1, 2]))
 
         XCTAssertEqual(view.configuration.items.map(\.id), [1])
         XCTAssertEqual(view.configuration.layout.rowSpacing, 4)
@@ -48,6 +49,15 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertNotNil(view.configuration.onItemLongTap)
         XCTAssertNotNil(view.configuration.touchFeedbackColor)
         XCTAssertTrue(view.configuration.scrollController === controller)
+        XCTAssertEqual(view.configuration.observedValue, AnyHashable(Set([1, 2])))
+    }
+
+    func test観測する値を渡さなければ宣言なしのままになる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+
+        XCTAssertNil(view.configuration.observedValue)
     }
 
     func test値キーの複数テンプレートを組み立てられる() {
