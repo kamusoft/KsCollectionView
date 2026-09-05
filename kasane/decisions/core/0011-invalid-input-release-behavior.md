@@ -1,7 +1,7 @@
 ---
 id: 0011
 title: 不正入力 (重複 ID・未登録テンプレートキー) は debug では assertion、release では表示を継続して警告ログを出す
-status: proposed
+status: accepted
 date: 2026-09-02
 ---
 
@@ -17,9 +17,12 @@ date: 2026-09-02
 |---|---|---|
 | 未登録テンプレートキーの要素 | assertion | 該当位置に最小高の空セルを表示し、警告ログ (core/ADR-0004) |
 | 配列内の重複 ID | assertion | 後勝ち (後の要素を採用) で表示を継続し、警告ログ |
-| 同じキーへの `Template` の二重登録 | assertion | 後勝ちで登録を継続し、警告ログ |
+| 同じキーへの `KsTemplate` / `template(key)` の二重登録 | assertion | 後勝ちで登録を継続し、警告ログ |
+| `key` が状態保存 (Bundle) に載せられない型を返す (Android のみ。Compose の Lazy 系が識別子を状態保存の対象にするため) | assertion | ライブラリは警告ログを出して継続する。`key` を包まないため Compose 自身が初回表示時に例外を投げうる (利用契約で防ぐ) |
 
 「継続 + 警告ログ」に揃えるのは、release で利用者のアプリを落とさないこと、要素を黙って非表示にして件数整合を崩さないこと、そして開発中に気づける経路 (debug assertion) を残すことの 3 点を両立させるため。
+
+「debug ビルド」は、ライブラリの配布形態ではなく利用者が動かしているアプリのビルド種別を指す (Android は組み込み先アプリの debuggable フラグで判定する)。利用者が release ビルドのアプリで確かめる限り縮退挙動が働き、debug ビルドのアプリでは assertion で止まる。
 
 ## Alternatives Considered
 
@@ -30,8 +33,13 @@ date: 2026-09-02
 ## Consequences
 
 - 正: 不正入力の release 挙動が 3 種類とも同じ原則で説明でき、利用者向けドキュメントに 1 か所で書ける。
-- 正: Android 実装も同じ表で揃えられる。
+- 正: Android 実装も同じ表で揃えた (2026-09-05 突き合わせ。空セルの最小高は iOS の 1pt と同じ 1dp)。
 - 負: 後勝ちは「どの要素が表示されるか」を配列順に依存させる。重複 ID を出す利用者コードは release で気づきにくく、debug での確認に頼る。
-- 負: 警告ログの出力先・形式は現時点で規約化されていない (実装は OS 標準のログ)。
+- 負: 警告ログの出力先・形式は現時点で規約化されていない (実装は OS 標準のログ。Android は同じ内容の警告を再コンポジションのたびに繰り返さず 1 回だけ出す)。
 
-出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (重複 ID / 重複テンプレートキー、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/specs/collection-core/spec.md (未登録キーの挙動・プレーンな配列と安定 ID) / core/ADR-0003 / core/ADR-0004
+## Revisit When
+
+- 前提 (Context) が崩れたとき
+- 警告ログの出力先・形式を規約化するとき
+
+出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (重複 ID / 重複テンプレートキー、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/specs/collection-core/spec.md (未登録キーの挙動・プレーンな配列と安定 ID) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/specs/collection-core/spec.md (プレーンな配列と安定 ID による表示 (Android)) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/adr-alignment.md / core/ADR-0003 / core/ADR-0004

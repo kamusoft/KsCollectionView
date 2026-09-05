@@ -51,7 +51,7 @@ graph LR
 |---|---|---|---|---|
 | phase-1-symmetric-dsl-spec | completed | research | [agenda](phases/phase-1-symmetric-dsl-spec/agenda.md) | — |
 | phase-2-ios-engine-foundation | completed | change | [agenda](phases/phase-2-ios-engine-foundation/agenda.md) | [ios-engine-foundation](../../changes/archive/2026-09-04-ios-engine-foundation/proposal.md) |
-| phase-3-android-wrapper-foundation | in-progress | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | [android-wrapper-foundation](../../changes/android-wrapper-foundation/proposal.md) |
+| phase-3-android-wrapper-foundation | completed | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | [android-wrapper-foundation](../../changes/archive/2026-09-05-android-wrapper-foundation/proposal.md) |
 | phase-8-image-loading | pending | change | [agenda](phases/phase-8-image-loading/agenda.md) | — |
 | phase-4-sections-grouping | pending | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | — |
 | phase-5-paging-state-machine | pending | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | — |

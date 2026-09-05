@@ -23,6 +23,10 @@
 
 Pull to Refresh の Compose 側の流儀を確認済み (phase-3 agenda「決定事項」論点 6)。Android の外形は `onRefresh: (suspend () -> Unit)?` 引数で、Swift の `.refreshable { await }` と同じ「非同期処理が終わるまでインジケータを出す」意味論。ライブラリが `LazyVerticalGrid` を material3 `PullToRefreshBox` (1.4 系で stable) で内包し、`isRefreshing` は「`onRefresh` 実行中」または `KsPagingState.Refreshing`。`onRefresh` 未指定なら挟まない。利用者側で包む形は非対称のため不採用。実装は本フェーズで両プラットフォーム同時に行う。
 
+### phase-3 からの申し送り (2026-09-05 実装結果)
+
+`touchFeedbackColor` の意味論が両プラットフォームで非対称: iOS は渡された色をそのままセル全面の塗りにし、Android は material3 の `ripple` が渡された色に自前で不透明度を掛ける (android/ADR-0003 の帰結)。同じ生値を渡すと Android では不可視になるため、Sample「リスト」は描画結果を揃える別の生値を渡している (iOS は accent の 15%、Android は accent そのまま — `kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md` 4 件目)。本フェーズは両プラットフォームの DSL に同時に触るため、ここで統一の方向 (iOS が不透明度を掛ける側に寄せる / Android が生値をそのまま塗る / 語彙を分ける) を決めて sample-parity の生値一致を回復する。
+
 ## 決定事項
 
 (議論で確定したらここに移動)

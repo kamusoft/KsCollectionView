@@ -30,3 +30,4 @@ date: 2026-09-02
 - 負: 表示中にキーパスや登録集合を差し替えても反映されないことを、利用者向けドキュメントに明記する必要がある。
 
 出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (差分更新 2 件、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/session.md (親 state の観測、2026-09-03) / kasane/changes/template-parent-state-observation/exploration.md
+現行照合: 2026-09-05 確認。`Template` は `KsTemplate` に改名済み (android-wrapper-foundation、命名のみで決定は不変)。同値配列での可視セル再構成と登録集合の表示中不変は維持。 判定: 維持

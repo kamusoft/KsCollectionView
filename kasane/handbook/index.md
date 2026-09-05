@@ -6,7 +6,7 @@
 |---|---|
 | core | 全 platform が共有する規約・ガイド |
 | [ios](ios/index.md) | iOS 固有の規約・ガイド |
-| android | Android 固有の規約・ガイド |
+| [android](android/index.md) | Android 固有の規約・ガイド |
 | [cross](cross/index.md) | リポジトリ横断の規約・ガイド (リポジトリ構成・命名・ハーネス運用) |
 
 規約・ガイドを持つドメインは名前がその index へのリンクになっている。ドメインディレクトリと各ドメインの index は最初の文書が生まれるときに作成する。

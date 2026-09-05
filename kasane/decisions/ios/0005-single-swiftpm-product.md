@@ -27,3 +27,4 @@ package `KsCollectionView` に product を 1 つ (`KsCollectionView`) だけ置�
 - 負: エンジンを他ライブラリや利用者が直接使う経路が無い。将来エンジンだけを再利用したくなった場合は product の追加 (公開面の拡張) が必要になる。
 
 出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/design.md (Decision 1) / kasane/changes/archive/2026-09-04-ios-engine-foundation/proposal.md (What Changes) / cross/ADR-0003 / ios/ADR-0001
+現行照合: 2026-09-05 確認。公開型 `Template` は `KsTemplate` に改名済み (android-wrapper-foundation、命名のみで決定は不変)。product 単一・エンジン internal は維持。 判定: 維持

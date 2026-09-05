@@ -1,7 +1,7 @@
 ---
 id: 0001
 title: Android の描画は LazyVerticalGrid に統一し、list は 1 列グリッドとして扱う
-status: proposed
+status: accepted
 date: 2026-09-04
 ---
 
@@ -35,5 +35,12 @@ Compose Foundation の現状 (2026-09 時点、公式リファレンスで確認
 - 負: 1 列グリッドが `LazyColumn` と同等の性能かは実測に依存する。乖離があれば本決定を見直す
 - 負: `LazyColumn` 固有の補助 API (`fillParentMax*`、snap fling の簡易ヘルパー) を将来 DSL に載せたくなった場合、grid 向けに自前で用意する必要がある
 - 負: Compose Foundation 1.8.0 以上が前提になる (grid の `stickyHeader`)
+- 正 (実装結果): 1 列グリッドの性能は `LazyColumn` と測れるほどの差が無かった。基準機 Pixel 4a で 10,000 件の 1 列リストをフリックした計測で、フレームの CPU 時間 (P90 / P99) は `LazyColumn` に対して同等以内、フレーム超過時間の P99 は上限 0.0 ms に対して 6 ms 以上の余裕がある (kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/performance-measurement.md)
+- 正 (実装結果): list ⇔ grid の切替でスクロール位置が保たれることを Sample「グリッド (固定列)」で確認した
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ラッパー構成) / core/ADR-0006 / ios/ADR-0003
+## Revisit When
+
+- 1 列グリッドのスクロール性能が `LazyColumn` から 10% を超えて劣化したとき (handbook/android/performance-verification.md の相対基準)
+- `LazyColumn` 固有の補助 API (`fillParentMax*`・snap fling) を DSL に載せる必要が出たとき
+
+出典: kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ラッパー構成) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/design.md (Decision 1・2) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/performance-measurement.md (1 列リストの計測) / core/ADR-0006 / ios/ADR-0003

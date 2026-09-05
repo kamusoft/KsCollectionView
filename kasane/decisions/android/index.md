@@ -2,7 +2,9 @@
 
 | ID | タイトル | status | 概要 |
 |---:|---|---|---|
-| [0001](0001-unified-lazy-grid-rendering.md) | Android の描画は LazyVerticalGrid に統一し、list は 1 列グリッドとして扱う | proposed | `LazyColumn` 不使用。`LazyGridState` 1 種でスクロール制御を 1 経路にし、list ⇔ grid 切替で位置を保つ。iOS (ios/ADR-0003) と同型。 |
-| [0002](0002-single-module-latest-compose-bom.md) | Android は単一モジュール + explicitApi strict で組み、Compose BOM は最新安定版に追随する | proposed | 1 モジュール・minSdk 29・JDK 17・catalog 単一定義元。最低版固定と 2 モジュール構成を却下。 |
+| [0001](0001-unified-lazy-grid-rendering.md) | Android の描画は LazyVerticalGrid に統一し、list は 1 列グリッドとして扱う | accepted | `LazyColumn` 不使用。`LazyGridState` 1 種でスクロール制御を 1 経路にし、list ⇔ grid 切替で位置を保つ。iOS (ios/ADR-0003) と同型。1 列グリッドの性能は `LazyColumn` と同等 (実測)。 |
+| [0002](0002-single-module-latest-compose-bom.md) | Android は単一モジュール + explicitApi strict で組み、Compose BOM は利用者に未普及の SDK Platform を強いない範囲で最新安定版に追随する | accepted | 1 モジュール・minSdk 29・compileSdk 36・JDK 17・catalog 単一定義元。最低版固定と 2 モジュール構成を却下。Compose 1.12 は compileSdk 37 を強いるため 1.11 系 (2026-09-05 改訂)。 |
+| [0003](0003-material3-dependency-for-ripple.md) | ライブラリは material3 に依存し、タップのフィードバックは標準 ripple を既定にする | accepted | Foundation の `LocalIndication` だけでは `MaterialTheme` 無しのアプリで既定がデバッグ塗りになる。帰結: `touchFeedbackColor` の意味論が iOS と非対称 (統一は後続)。 |
+| [0004](0004-animate-row-height-change-by-default.md) | 行の高さ変化を既定でアニメーションさせ、補間中は content を行の高さで測り直して切り取る | accepted | 自前 modifier `ksAnimatedHeight`。`animateContentSize` (縮む向きで帯) と `animateItem` 併用 (P90 +19%) を却下。利用契約: テンプレートの根に高さの制約を渡す。 |
 
 採番規則は [../index.md](../index.md) を参照。

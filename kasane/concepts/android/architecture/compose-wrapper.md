@@ -1,0 +1,113 @@
+---
+type: concept
+title: Android Compose ラッパー
+description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策
+tags: [architecture, compose, lazy-grid]
+timestamp: 2026-09-05
+---
+
+# Android Compose ラッパー
+
+この文書を読むと、Android の `KsCollectionView` が Compose の Lazy 系にどう載っていて、core の契約 ([collection-items](../../core/core-model/collection-items.md) / [collection-layout](../../core/styling/collection-layout.md) / [collection-interaction](../../core/core-model/collection-interaction.md)) のどの部分をどの部品が担い、Compose のどの挙動を回避しているかが分かる。core の 3 文書を先に読むと分かりやすい。iOS の対応物は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)。
+
+## 目的
+
+Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ねる。
+
+## 構成
+
+```mermaid
+flowchart TD
+    KCV["KsCollectionView (@Composable)"]
+    SCOPE["KsCollectionViewScope<br/>content ラムダを毎コンポジションで評価し<br/>template(key) の登録をキー → Composable の表に集める"]
+    PLAN["resolveItems → KsItemsPlan<br/>配列の前処理: 重複 ID の後勝ち除去・未登録キー・<br/>状態保存 (Bundle) に載らない key の検出 (診断は値として集める)"]
+    DIAG["KsDiagnostics<br/>debug 停止 (利用者アプリのビルド種別 = debuggable フラグで判定)<br/>release は警告ログ (同じ内容は 1 回だけ)"]
+    BWC["BoxWithConstraints<br/>コンテナの縦横比で portrait / landscape を判定し<br/>KsLayout / KsColumns → GridCells を解決"]
+    CTRL["KsScrollController ⇄ KsScrollCommandReceiver<br/>命令キュー (snapshot state) を<br/>Composition 生存期間に 1 本の LaunchedEffect で消費"]
+    GRID["LazyVerticalGrid<br/>LazyGridState は 1 つ (list も 1 列グリッド)"]
+    HF["header / footer (全幅 span)"]
+    ITEMS["items(key, contentType = テンプレートキー)"]
+    SEP["ksListSeparator<br/>list のとき content の前面に線を描く"]
+    TAP["combinedClickable + ripple<br/>ハンドラ宣言時のみ"]
+    BOX["Box(propagateMinConstraints = true) + ksAnimatedHeight<br/>行の高さを補間し、補間中の高さを根まで制約として届ける"]
+    TPL["テンプレート (利用者の Composable)"]
+
+    KCV --> SCOPE
+    KCV --> PLAN --> DIAG
+    KCV --> BWC --> GRID
+    KCV --> CTRL -- 命令を解決して state を動かす --> GRID
+    SCOPE -. キー → Composable .-> ITEMS
+    GRID --> HF
+    GRID --> ITEMS
+    ITEMS -- 項目ラッパー: 外側から内側へ --> SEP --> TAP --> BOX --> TPL
+```
+
+list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed(1)` の 1 列グリッドである (android/ADR-0001)。`LazyColumn` は使わない。
+
+## 責務境界
+
+| 部品 | 責務 |
+|---|---|
+| `KsCollectionViewScope` (`@DslMarker`) | `template(key) { }` / `template { }` の登録をキー → `@Composable (Item) -> Unit` の表に集める。単一テンプレート形は、利用者からは見えない内部固定キーへの登録として同じ表に載る。同じキーへの二重登録は後勝ち (core/ADR-0011) |
+| `resolveItems` / `KsItemsPlan` | `items()` に渡す前に配列を走査し、重複 ID を後勝ちで除去、未登録テンプレートキーと Bundle に載らない `key` を診断として集める。未登録キーの要素は最小高 1dp の空 item として残し件数を保つ。`contentType` にはテンプレートキーをそのまま渡す |
+| `KsDiagnostics` | 診断を debug では `IllegalStateException` で止め、release では警告ログ (タグ `KsCollectionView`) にする。debug 判定は組み込み先アプリの debuggable フラグ。`WarnOnce` が同じ内容の警告を再コンポジションで繰り返さない |
+| `KsLayout` / `KsColumns` | layout 値の値型。不正値 (0 以下の列数・負の spacing) の debug assertion。`GridCells` への変換は `BoxWithConstraints` で列数を決めてから行う |
+| `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) に先頭項目の上端と全項目の下端の線を全幅 1dp で描く。色は `listSeparatorColor` 未指定なら `#D9D9DE` |
+| 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003) |
+| `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
+| `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID → index (ヘッダー分 +1 込み) を解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
+
+## 保証すること (実測で確かめた罠対策)
+
+### 命令は 1 本の LaunchedEffect で消費し、配列更新で再起動しない
+
+消費側は Composition の生存期間に 1 本だけ立てる `LaunchedEffect(receiver)` の coroutine で、`snapshotFlow` でキューの変化を待ち、命令を FIFO で 1 つずつ取り出して、その時点の最新の配列 (`rememberUpdatedState` 経由) で解決する。配列をキーにした `LaunchedEffect(items, …)` にすると配列更新のたびに実行中のアニメーションがキャンセルされ命令が消えうる。配列更新と命令が同じ再コンポジションで届くため、命令はコンポジション後に更新後の配列で解決される (core/ADR-0007 の「データ反映後に実行」)。
+
+### Center / End は 1 回の命令に集約し、逆向きの補正を入れない
+
+`animateScrollToItem(index, scrollOffset)` を 1 回だけ呼ぶ。`scrollOffset` は対象の高さの推定値 (可視なら実測、同じ `contentType` の可視項目の平均、無ければ可視項目全体の平均の順) から計算する。到着後の残差は、アニメーション時は進行方向と同じ向きで 4dp を超えるときだけ詰め、逆向きには補正しない。非アニメーション時は残差をそのまま詰める。「対象を先頭合わせで可視化してから `scrollBy` で中央へ寄せる」2 段階は、行き過ぎてから約 4 行分戻る動きになる。実機 A/B では、2 段階方式でスクロール方向が逆転するフレームが 15 あったのに対し、1 回集約では 0 になった。
+
+### 区切り線は content の前面に描く
+
+`drawBehind` (背面) では不透明な背景を持つテンプレートで線が 1 本も見えず、iOS 側 (区切り線は content の前面 — [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)) と食い違う。`drawWithContent { drawContent(); … }` で content の後に描く。項目単位の描画は `LazyVerticalGrid` の再利用と両立し、行間に区切り線用の item を挿入する形 (項目数が倍になり index 解決が複雑化) を避けられる。
+
+### 行の高さ変化は自前の補間で、補間中だけ測り直しと切り取りを行う
+
+`animateContentSize` は子を新しい自然高で測ってから報告するサイズだけを補間するため、縮む向きで content の下端が先に飛び、区切り線との間にページ背景の帯が出る (約 240 ms)。`ksAnimatedHeight` は補間中の高さで content を測り直し、渡した制約に従わない content が行の外へ描かれないよう補間中だけ描画を切り取る。切り取りは描画時に行い合成レイヤは作らない。最初の測定では補間せず、再利用で直前の項目の高さを持ち越さない。`animateItem` は重ねない (中間フレーム数は変わらず性能の上乗せだけ残る)。
+
+### 向きはコンテナ自身の縦横比で判定する
+
+`LocalConfiguration.current.orientation` (端末の向き) は分割画面・タブレット・折りたたみでコンテナの縦横比と食い違い、iOS (`KsLayoutMetrics`) とずれる。`BoxWithConstraints` の `maxHeight > maxWidth` を portrait とする。独自 `GridCells` の `calculateCrossAxisCellSizes` には幅しか渡らず高さが取れないため使えない。
+
+### 不正入力は Compose に届く前に縮退させる
+
+Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外にする。core/ADR-0011 の「落とさず・消さず・黙らず」を release で成立させるため、配列を `items()` に渡す前にライブラリが前処理する。診断は純粋な値として組み立ててから停止と報告に分け、再コンポジションのたびに同じ警告が繰り返されないようにする。
+
+### 仮想化と再利用が成立している
+
+10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。スクロール性能は、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (比較対象) との相対と、フレーム超過時間の絶対上限で判定する。合格基準と手順は [Android 性能検証](../../../handbook/android/performance-verification.md)。
+
+## してはいけないこと
+
+- list を `LazyColumn` で描かない。`LazyGridState` と別の state になり、切替でスクロール位置が失われ `KsScrollController` の接続が 2 経路になる (android/ADR-0001)。
+- content ラムダを `remember` して初回だけ評価しない。親の state を捕捉したテンプレートが更新されず、iOS (ios/ADR-0006) と食い違う。評価コストは登録数に比例するだけ。
+- スクロール命令の消費を配列をキーにした `LaunchedEffect` にしない (上記)。
+- 項目に `animateItem` を重ねない (上記)。
+- 計測用画面・テンプレート計数を release のソースセットに置かない。Sample の `measurement` / `counterEnabled` ソースセットの差し替えで release には空実装だけが入る。
+
+## 用語
+
+- **前処理 (`resolveItems`)**: 利用者の配列を Compose に渡す前に不正入力を縮退させる走査。
+- **receiver**: `KsScrollController` の接続先となる Composable 内部の状態オブジェクト。命令キューを持つ。
+- **補間中**: `ksAnimatedHeight` が行の高さを目標値へ向けて動かしている区間。この間だけ content の測り直しと切り取りが働く。
+- **比較対象**: 性能の相対基準で突き合わせる、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (Sample の計測用ソースセット)。
+- **Sample**: リポジトリ同梱 (`samples/android/`) の動作確認・パリティ検証用アプリ。計測用画面・テンプレート計数は debug / 計測構成のソースセットにだけ実体がある。
+
+## 関連
+
+- [collection-items](../../core/core-model/collection-items.md) — 実現している契約 (項目モデル・不正入力)
+- [collection-layout](../../core/styling/collection-layout.md) — 実現している契約 (layout 値・区切り線・content 配置・行の高さ変化)
+- [collection-interaction](../../core/core-model/collection-interaction.md) — 実現している契約 (タップ・スクロール命令)
+- [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
+- [Android 性能検証の手順と合格基準](../../../handbook/android/performance-verification.md)
+- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)、android/ADR-0004 (行の高さ変化の補間)、core/ADR-0007、core/ADR-0011、ios/ADR-0007

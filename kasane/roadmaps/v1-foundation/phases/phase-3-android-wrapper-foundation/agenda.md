@@ -97,3 +97,33 @@ iOS に対応物が無い (phase-2 の範囲外) ため、Android だけ先行�
 - [x] 提案化時: iOS の推論形対応 (`KsTemplateBuilder` の `buildExpression`)、`Template` → `KsTemplate` 改名、`listSeparatorColor` の iOS 側追加 (現状は内部固定値のみで未実装)、iOS Sample・dsl-samples の追随を tasks の最初のグループに載せる
 - [x] [dsl-samples.md](../phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) への `KsTemplate` 改名と `listSeparatorColor` の反映 → change の tasks 1.5 に移管 (2026-09-04)
 - [x] ksn-propose で変更提案を起こす (android-wrapper-foundation、2026-09-04。dsl-samples の追随と iOS 追随は change の tasks グループ 1 へ)
+
+## 実装結果 (2026-09-05 反映)
+
+change: [android-wrapper-foundation](../../../../changes/archive/2026-09-05-android-wrapper-foundation/proposal.md) (L 級。2026-09-05 マージ)。決定事項からの乖離は同 change の deviation.md (8 件 + 補足) に記録した。長命層への反映は次のとおり。
+
+| 決定事項との差 | 反映先 |
+|---|---|
+| 区切り線は項目の `drawBehind` ではなく content の前面に描く (不透明背景のテンプレートで線が消えるため) | core/ADR-0010 に追記して accepted |
+| Compose BOM は 1.12 系ではなく 1.11 系、compileSdk は 36。1.12 が利用者に compileSdk 37 (未普及の Platform) を強いたため | android/ADR-0002 を改訂して accepted |
+| 性能の相対判定は `frameDurationCpuMs`、絶対は `frameOverrunMs` P99 ≤ 0.0 ms。3 試行の集計で判定。比較対象にもライブラリと同じ既定機能を付ける | handbook/android/performance-verification.md へ規約化 |
+| 行の高さ変化をライブラリ既定でアニメーション (自前補間。`animateContentSize` は縮む向きで帯が出る) | android/ADR-0004 を起票して accepted |
+| material3 依存 (design の ADR 候補) | android/ADR-0003 を起票して accepted |
+| Center / End のスクロールは 2 段階補正ではなく 1 回の命令に集約 (行き過ぎて戻る動きの解消) | concepts/android/architecture/compose-wrapper.md に記載 (ADR 不要: core/ADR-0007 の実現方法) |
+| 再利用の確認は Layout Inspector ではなく debug カウンタ (同時生存数つき) | handbook/android/performance-verification.md の手順 |
+| proposed で持ち越した core/ADR-0010・0011・ios/ADR-0007 | Android 実装と突き合わせて accepted (evidence/adr-alignment.md) |
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| `touchFeedbackColor` の意味論統一 (iOS は生値をそのまま塗る / Android の material3 ripple は不透明度を掛ける。同じ生値が同じ見え方にならない) | [phase-5 agenda](../phase-5-paging-state-machine/agenda.md) に追記 (2026-09-05) |
+| Pull to Refresh | [phase-5 agenda](../phase-5-paging-state-machine/agenda.md) に 2026-09-04 に申し送り済み |
+| セクション境界の区切り線規則 (前面描画・項目単位描画の前提を追加) | [phase-4 agenda](../phase-4-sections-grouping/agenda.md) に追記 (2026-09-05) |
+| maven-publish の設定・verify-android CI | [phase-7 agenda](../phase-7-samples-distribution/agenda.md) の論点に既載 |
+| Android 性能検証をリリース基準に含めるか (基準機実測済み・相対 10% の但し書き) | [phase-7 agenda](../phase-7-samples-distribution/agenda.md) に追記 (2026-09-05) |
+| 行の高さ変化の検証画面の共通デモへの昇格 | 見送り。proposal の Non-Goals どおり「必要になったら改めて判断」(論点 8 の決定を維持) |
+| `LazyLayoutCacheWindow` の設定 | 見送り。実測でフレーム落ちが無く、v1 は Compose 既定に従う (android/ADR-0001 の Revisit When で拾う) |
+| 警告ログの出力先・形式の規約化 | 見送り。core/ADR-0011 の Revisit When に残す (現状は OS 標準ログ・タグ `KsCollectionView`) |
+| Sample 内で生値のまま使っている寸法 (ui/brief.md のトークン候補) | 見送り。Sample 固有の値で製品のデザイントークンではないため concepts へ昇格しない |
+

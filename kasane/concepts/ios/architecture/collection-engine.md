@@ -3,7 +3,7 @@ type: concept
 title: iOS コレクションエンジン
 description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・レイアウト・操作契約の実現方法と、その中で守っている仕組み
 tags: [ios, engine, uicollectionview, hosting]
-timestamp: 2026-09-03
+timestamp: 2026-09-05
 ---
 
 # iOS コレクションエンジン
@@ -30,7 +30,7 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 | 部品 | 責務 |
 |---|---|
 | `KsSnapshotPlanner` | 旧新の配列から「識別子だけの snapshot」と、再構成 (同 ID・内容変化・キー不変) / 置換 (同 ID・キー変化) の対象を計算する。重複 ID は debug assertion、release は後勝ち |
-| `KsTemplateRegistry` / `Template` | 値キーごとの `CellRegistration` を保持する。登録は snapshot 適用前に使用キー全てを準備する「登録準備の前倒し」(iOS 26 で初回セル取得中に登録を生成すると実行時例外になるため) |
+| `KsTemplateRegistry` / `KsTemplate` | 値キーごとの `CellRegistration` を保持する。登録は snapshot 適用前に使用キー全てを準備する「登録準備の前倒し」(iOS 26 で初回セル取得中に登録を生成すると実行時例外になるため) |
 | `KsCollectionViewController` | snapshot 適用、同値配列時の可視セル再構成 (ios/ADR-0006)、レイアウト生成、区切り線とタッチ feedback の表示切替、スクロール命令のキューと apply completion での flush、`applyingSnapshotCount` による再入防止 |
 | `KsHostingCell` | `UIHostingConfiguration` の適用、再利用時のホスティング破棄 (state 非保持、ios/ADR-0002)、上下の区切り線ビューとタッチ feedback ビュー、hitTest による「セル内の操作要素か」の判定、自己サイズ結果の通知 |
 | `KsRowContentPlacement` | セル content を包む `Layout`。行の高さの遅れによる中央配置はみ出しを防ぐ (後述) |
@@ -39,10 +39,21 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 
 ## 保証すること (実測で確かめた罠対策)
 
+### content は行の上端に固定し、水平は中央 (ios/ADR-0007)
+
+`UIHostingConfiguration` はホスト View が行の高さを提案して content を測り、content の方が高いとその高さで組み直して行の中央に置く。行の高さが content の変化に 1 レイアウトパス遅れる間、content が上下へ均等にはみ出す (実測: 行 44pt / content 142pt で −48.7pt 上へ)。`KsRowContentPlacement` は提案された高さをそのまま自分の高さとして返し、content を自然高のまま上端へ置くことでこれを消す。翻案元 `CustomCellRowPlacement` から核心だけを移植し、固定行高の概念は持ち込んでいない。帰結として content に行の高さを提案しないため、grid で背の低いセルは行高いっぱいに広がらない (Android も同じ規則で一致 — [collection-layout](../../core/styling/collection-layout.md))。
+
+### 推定高さは実測平均 (`KsEstimatedHeight`)
+
+compositional layout の `.estimated` は item 定義単位で index path ごとに変えられないため、コレクション全体で 1 つの値を使う。未計測なら 44pt、以後は直近 32 件の実測の平均。中央値ではなく平均なのは、推定値がコンテンツ全体の高さの見積もりに使われ、合計を言い当てる推定量が平均のため。実測は「測ったときの行の幅」と対で持ち、違う幅の実測が来た時点で前の幅の分を捨てる (幅が変わった瞬間に捨てると、その直後の再レイアウトが既定値を読んでしまう)。効果: 初回表示のコンテンツ高さの誤差 −27% → 0%、末尾へのスクロール中の contentSize 変化 25 回 → 1 回。
+
+### 区切り線はセルのサブビュー
+
+システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを content の前面に持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。色は `listSeparatorColor` 未指定なら固定値 (core/ADR-0010)。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
+
+### レイアウト切替・入力・命令
+
 - **レイアウトオブジェクトは差し替えない**。list ⇄ grid・列数・スペーシング・向き変更のいずれも、sectionProvider が `configuration.layout` を実行時参照し `invalidateLayout()` で反映する。`setCollectionViewLayout` を使うと全セルがバウンドして描画が乱れる (翻案元の実績。ios/ADR-0003)。
-- **content は行の上端に固定し、水平は中央**。`UIHostingConfiguration` はホスト View が行の高さを提案して content を測り、content の方が高いとその高さで組み直して行の中央に置くため、行の高さが content の変化に 1 レイアウトパス遅れる間、content が上下へ均等にはみ出す (実測: 行 44pt / content 142pt で −48.7pt 上へ)。`KsRowContentPlacement` は提案された高さをそのまま自分の高さとして返し、content を自然高のまま上端へ置くことでこれを消す。翻案元 `CustomCellRowPlacement` から核心だけを移植し、固定行高の概念は持ち込んでいない。帰結として content に行の高さを提案しないため、grid で背の低いセルは行高いっぱいに広がらない。
-- **推定高さは実測平均**。compositional layout の `.estimated` は item 定義単位で index path ごとに変えられないため、コレクション全体で 1 つの値を使う。未計測なら 44pt、以後は直近 32 件の実測の平均 (中央値ではなく平均なのは、推定値がコンテンツ全体の高さの見積もりに使われ、合計を言い当てる推定量が平均のため)。実測は「測ったときの行の幅」と対で持ち、違う幅の実測が来た時点で前の幅の分を捨てる (幅が変わった瞬間に捨てると、その直後の再レイアウトが既定値を読んでしまう)。効果: 初回表示のコンテンツ高さの誤差 −27% → 0%、末尾へのスクロール中の contentSize 変化 25 回 → 1 回。
-- **区切り線はセルのサブビュー**。システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
 - **セル内の操作要素はタップを奪わない**。`KsHostingCell` の hitTest で操作要素 (UIControl 系) に当たったタッチはセル選択に流さず、feedback も出さない。長押し認識器はハンドラ未宣言時は無効。
 - **スクロール命令は apply completion で flush**。データ差し替えと同時に来た命令は未完了の最後の apply が終わってから実行する。
 

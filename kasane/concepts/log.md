@@ -10,3 +10,4 @@
 
 ## 2026-09-05
 - distilled: revival-feasibility (ADR cross/0001・core/0001 は探索内で accepted 済み / handbook・concepts の変更なし — 探索のみの change でロードマップ v1-foundation へハンドオフ済み / lessons inbox に調査所見の訂正を 1 件捕捉)
+- distilled: android-wrapper-foundation (ADR android/0001・0002・core/0010・0011・ios/0007 を実装後の視点で見直して accepted / android/0003 (material3 依存)・android/0004 (行の高さ変化の補間) を起票して accepted / handbook/android/performance-verification.md 新設・handbook/cross/runtime-behavior-verification.md に Android 観測点を追記 / concepts: core の collection-items・collection-interaction・collection-layout を両プラットフォーム共通に改訂、ios/architecture/collection-engine.md を KsTemplate 改名に追随して節構造を整理、android/architecture/compose-wrapper.md を新設 (android ドメイン index 新設) / lessons inbox: reviewer-reproduces-evidence-numbers-by-probe を count 2 に)

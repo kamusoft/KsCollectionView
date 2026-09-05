@@ -1,7 +1,7 @@
 ---
 id: 0007
 title: セル content は行の上端に固定・水平は中央に置き、content へ行の高さを提案しない
-status: proposed
+status: accepted
 date: 2026-09-03
 ---
 
@@ -30,6 +30,11 @@ iOS エンジン基盤の実装では当初この対策を「翻案元の補正�
 - 正: content の高さが実行中に変わっても、本文が行の上から降りてくる動きが出ない (Sample の高さ変化検証画面で目視確認、offsetY の A/B で −48.7pt → 0)。
 - 正: 幅を明示しないテンプレートの見え方は従来どおり (素の hosting とスクリーンショットが画素一致)。
 - 負: content へ行の高さを提案しないため、grid で背の低いセルは行高いっぱいに広がらず自然高のまま上端に置かれる。`.frame(maxHeight: .infinity)` や `Spacer()` で行全体に背景を敷く書き方は効かない。行全体を塗りたい利用者は content 側で高さを揃える必要がある。
-- 負: Android (Compose Lazy 系) にはこの罠が無く、grid の行内でのセルの伸び方がプラットフォーム間で異なりうる。対称性の確認は Android 実装時の論点になる。
+- 正 (実装結果): Android (Compose Lazy 系) にはこの罠が無いが、同じ配置規則 (縦: 自然高で上端固定・行の高さを提案しない、横: 狭ければ中央・幅いっぱいなら先頭から) を項目の `Box(TopCenter)` で実装し、Sample「大量件数」の対向セルの見え方まで両プラットフォームで一致した (2026-09-05 突き合わせ)。配置規則は両プラットフォーム共通の契約として concepts/core/styling/collection-layout.md に記載する。
+- 負: Android では行の高さ変化の補間中に限り content がその時点の行の高さで測り直される (android/ADR-0004)。本 ADR の「content へ行の高さを提案しない」は静定時の契約として両プラットフォームで不変。
 
-出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (tasks 3.2 の自己サイズ補正、2026-09-03) / kasane/changes/archive/2026-09-04-ios-engine-foundation/summary.md (最終状態 1・採用値と根拠) / kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/height-change-after-ab-measurement.md / kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/row-placement-horizontal-measurement.md / ios/ADR-0001
+## Revisit When
+
+- 前提 (Context) が崩れたとき (`UIHostingConfiguration` が行の高さを提案せずに content を測るようになったとき)
+
+出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (tasks 3.2 の自己サイズ補正、2026-09-03) / kasane/changes/archive/2026-09-04-ios-engine-foundation/summary.md (最終状態 1・採用値と根拠) / kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/height-change-after-ab-measurement.md / kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/row-placement-horizontal-measurement.md / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/adr-alignment.md (ios/ADR-0007 の突き合わせ) / ios/ADR-0001

@@ -1,55 +1,108 @@
 ---
 type: concept
 title: コレクションの項目モデルと差分更新
-description: KsCollectionView が受け取るプレーンな配列・安定 ID・テンプレートキーの契約と、配列を差し替えたときに何が再描画されるか
+description: KsCollectionView が受け取るプレーンな配列・安定 ID・テンプレートキーの契約と、配列を差し替えたときに何が再描画されるか (iOS / Android 共通)
 tags: [core-model, diffable, template]
-timestamp: 2026-09-03
+timestamp: 2026-09-05
 ---
 
 # コレクションの項目モデルと差分更新
 
-この文書を読むと、`KsCollectionView` に渡すデータが何を満たす必要があり、配列を差し替えたときにライブラリが何を再描画し、何を利用者の責務として残しているかが分かる。レイアウトの語彙は [collection-layout](../styling/collection-layout.md)、タップとスクロール制御は [collection-interaction](collection-interaction.md) を参照。iOS 実装が先行しており (2026-09-03 時点)、Android は同じ契約に追随する (cross/ADR-0004)。
+この文書を読むと、`KsCollectionView` に渡すデータが何を満たす必要があり、配列を差し替えたときにライブラリが何を再描画し、何を利用者の責務として残しているかが分かる。レイアウトの語彙は [collection-layout](../styling/collection-layout.md)、タップとスクロール制御は [collection-interaction](collection-interaction.md) を参照。契約は両プラットフォーム共通で、その実現方法は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) と [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) にある。
 
 ## 目的
 
-利用者のモデル型をそのまま並べて表示させる。専用のコレクション型・ラッパー型・ライブラリ独自 protocol への準拠は要求しない (core/ADR-0003)。KMP 共有モデルのように利用者が改造できない型でも、`id:` キーパスの指定だけで表示できることが狙い。
+利用者のモデル型をそのまま並べて表示させる。専用のコレクション型・ラッパー型・ライブラリ独自 protocol / interface への準拠は要求しない (core/ADR-0003)。KMP (Kotlin Multiplatform) で共有しているモデルのように利用者が改造できない型でも、ID の取り出し方を指定するだけで表示できることが狙い。
+
+## 公開 API
+
+```swift
+KsCollectionView(items) { item in Row(item) }                       // Identifiable な要素、単一テンプレート
+KsCollectionView(sharedItems, id: \.itemId) { item in Row(item) }   // 改造できない型は id: で ID を指定
+KsCollectionView(items, template: \.kind) {                          // 値キーでテンプレートを切り替える
+    KsTemplate(.message) { item in MessageRow(item) }
+    KsTemplate(.ad) { item in AdCard(item) }
+}
+```
+
+```kotlin
+KsCollectionView(items = items, key = { it.id }) {                  // 単一テンプレート
+    template { item -> Row(item) }
+}
+KsCollectionView(items = items, key = { it.id }, template = { it.kind }) {
+    template(Kind.Message) { item -> MessageRow(item) }
+    template(Kind.Ad) { item -> AdCard(item) }
+}
+```
+
+| 語彙 | Swift | Kotlin |
+|---|---|---|
+| 安定 ID | `Identifiable` 準拠、または `id:` キーパス | `key: (Item) -> Any` ラムダ (必須) |
+| テンプレートキー | `template:` キーパス | `template: (Item) -> Any` ラムダ |
+| キーごとのテンプレート登録 | `KsTemplate(キー) { item in … }` を宣言ブロックに並べる | `template(キー) { item -> … }` をスコープ内で呼ぶ |
+| 単一テンプレート | 末尾クロージャ | `template { item -> … }` |
+
+語彙と構造は 1 対 1 に対応し、記法だけが各プラットフォームの流儀に従う (core/ADR-0002)。Kotlin の `template(key)` はスコープ関数で対応する公開型を持たないため、Swift の `KsTemplate` に当たる型名は Android には無い。
 
 ## 責務境界
 
 | 責務 | 持つ側 | 具体 |
 |---|---|---|
 | 配列の内容と順序 | 利用者 | 並べ替え・フィルタはデータ層で行い、新しい配列を渡す。ソート専用 API は無い |
-| 安定 ID の宣言 | 利用者 | `Identifiable` 準拠、または `KsCollectionView(items, id: \.itemId)` |
-| テンプレートの選択 | 利用者 | 単一クロージャ、または `template: \.kind` + `Template(Kind.message) { (item: Item) in … }` の登録 |
-| 挿入・削除・移動の差分計算とアニメーション | ライブラリ | 新配列全体を渡すだけで差分が計算される。iOS の実現は `UICollectionViewDiffableDataSource` への snapshot 適用 (ios/ADR-0004)、Android は Compose Lazy 系の `key` に委ねる |
+| 安定 ID の宣言 | 利用者 | 上表の語彙で宣言する。Android の `key` の戻り値は状態保存 (Bundle) に載る型に限る (「してはいけないこと」) |
+| テンプレートの選択 | 利用者 | 単一テンプレート、または種別キーとキーごとの登録 |
+| 挿入・削除・移動の差分計算とアニメーション | ライブラリ | 新配列全体を渡すだけでよい。iOS は差分データソース (`UICollectionViewDiffableDataSource`) へのスナップショット適用 (ios/ADR-0004)、Android は Compose Lazy 系の `key` に委ねる |
 | 内容変化したセルの再構成 | ライブラリ | 同じ ID で内容が違う要素を検出して該当セルだけ再構成する |
-| セル再利用と可視範囲外のセルの生存 | ライブラリ | 生成されるセルは可視範囲 + 再利用プール分に留まる (契約: 同時に生存するセルは可視セル数の 4 倍未満) |
-| 画面外に出たセルの UI 状態 | 利用者 | 再利用で SwiftUI の内部 state は失われる (ios/ADR-0002)。残したい状態はモデルに持たせる |
+| セル再利用と可視範囲外のセルの生存 | ライブラリ | 生成されるセルは可視範囲 + 再利用 (先読み) 分に留まる (契約: スクロール中の任意時点で、その時点の可視セル数の 4 倍未満) |
+| 画面外に出たセルの UI 状態 | 利用者 | 画面外へ出た項目の内部 state (iOS `@State`、Android `remember`) は失われる。残したい状態はモデルに持たせる |
 
 ## 保証すること
 
-- **安定 ID が identity である**。同じ ID の要素は内容が変わってもセルインスタンスを維持したまま再構成される。ID を identity に使わず要素全体を identity にすると、内容変更と削除+挿入の区別がつかず、変わっていない要素まで作り直される (ios-engine-foundation design Decision 2)。
-- **テンプレートキーが変わった要素はセルを置き換える**。同じ ID でも `template:` のキー値が `.message` から `.ad` に変わったら、再構成ではなく置換になる。キーは再利用種別に写像され、同一キーの要素間でのみセルが再利用されるため、キーをまたいで再利用プールが混ざらない。
-- **配列が同値でも親 View の更新が届けば可視セルを再構成する** (ios/ADR-0006)。親の状態 (選択中 ID など) をテンプレートの中で読む書き方が成立する。差分計算と snapshot 適用は同値配列では省略される。
-- **未登録キーの要素は release では空セル + 警告ログになる** (debug では assertion)。要素を黙って非表示にはしない。件数は配列と一致する。
-- **重複 ID は不正入力**。debug では assertion、release では後勝ちで表示を継続し警告ログを出す (ios-engine-foundation deviation.md)。
-- 10,000 件規模でもメモリが件数に比例して増えない。計測手順と基準は [handbook/ios/performance-verification.md](../../../handbook/ios/performance-verification.md)。
+- **安定 ID が identity である**。同じ ID の要素は内容が変わってもセルインスタンスを維持したまま再構成される (理由は下記)。
+- **テンプレートキーが変わった要素はセルを置き換える**。同じ ID でもキー値が `.message` から `.ad` に変われば、再構成ではなく置換になる。
+- **同一キーの要素間でのみセルが再利用される**。キーは再利用種別 (iOS `CellRegistration`、Android `contentType`) に写像され、キーをまたいで再利用プールが混ざらない。
+- **配列が同値でも親 View の更新が届けば可視セルを再構成する** (ios/ADR-0006)。親の状態 (選択中 ID など) をテンプレートの中で読む書き方が成立する。成立条件は下記「親の状態をテンプレートで読む条件」。
+- **不正入力は release で落とさず・消さず・黙らず** (core/ADR-0011)。種類ごとの挙動は下表。
+- 10,000 件規模でもメモリが件数に比例して増えない。計測手順と基準は [iOS](../../../handbook/ios/performance-verification.md) / [Android](../../../handbook/android/performance-verification.md) の性能検証規約。
+
+### 不正入力の扱い (core/ADR-0011)
+
+「debug」は利用者が動かしているアプリのビルド種別を指す (ライブラリの配布形態ではない)。
+
+| 不正入力 | debug | release |
+|---|---|---|
+| 未登録テンプレートキーの要素 | assertion | 最小高 (1pt / 1dp) の空セルを該当位置に置き、警告ログ。件数は配列と一致する |
+| 配列内の重複 ID | assertion | 後勝ち (後の要素を採用) で表示を継続し、警告ログ |
+| 同じキーへの二重登録 | assertion | 後勝ちで登録を継続し、警告ログ |
+| `key` が Bundle に載らない型を返す (Android のみ) | assertion | ライブラリは警告ログを出して継続するが、`key` を包まないため Compose 自身が初回表示時に例外を投げうる。利用契約で防ぐ |
+
+### 親の状態をテンプレートで読む条件
+
+iOS では、その状態が親の body 側でも読まれていて、親 View の更新自体が起きることが条件になる。テンプレートの中でしか読まない状態は body の依存グラフに載らず、更新の起点にならない (「してはいけないこと」)。Android は再コンポジションで条件なしに成り立つ。
+
+### なぜ ID を identity にするか
+
+要素全体を identity にすると、内容変更と「削除 + 挿入」の区別がつかず、変わっていない要素まで作り直される。ID を identity にすることで、同じ ID の要素は内容が変わっても同じセルのまま再構成され、差分アニメーションが挿入・削除・移動だけに限られる (出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/design.md Decision 2)。
 
 ## してはいけないこと
 
-- `id:` / `template:` のキーパスと `Template` の登録集合を表示中に差し替えない (ios/ADR-0006)。同値配列の更新ではこれらの変更は反映されない。宣言箇所ごとに静的に決める。
-- テンプレートの中でしか読まれない親の `@State` に依存して更新を期待しない。そのクロージャは SwiftUI の body 評価の外で実行されるため依存グラフに載らず、その状態だけが変わっても親 View は再評価されない (2026-09-03 観測)。回避策は同じ状態を body 側でも読むこと。根本的な解き方は変更 template-parent-state-observation (`kasane/changes/` 配下の探索メモ) で検討中。
-- セル内の `@State` に「画面外に出ても残したい状態」を置かない。再利用で初期値に戻る (ios/ADR-0002)。
+- ID とテンプレートキーの取り出し方 (Swift `id:` / `template:`、Kotlin `key` / `template`) と登録集合を表示中に差し替えない (ios/ADR-0006)。宣言箇所ごとに静的に決める。Android で偶然反映されても契約にはしない。
+- Android の `key` に、`Parcelable` / `Serializable` を実装していない `data class` / `value class` など Bundle に載らない型を返さない。使える型は文字列・数値・enum・`Serializable`・`Parcelable`。違反時の挙動は上表「不正入力の扱い」の最終行。
+- iOS で、テンプレートの中でしか読まれない親の `@State` に依存して更新を期待しない。そのクロージャは body 評価の外で実行され依存グラフに載らない (2026-09-03 観測)。回避策は同じ状態を body 側でも読むこと。根本的な解き方は ios/ADR-0008 (proposed)。Android は Compose の自動観測で問題にならない。
+- セル内の `@State` / `remember` に「画面外に出ても残したい状態」を置かない。再利用・破棄で初期値に戻る (ios/ADR-0002。Android は可視範囲と先読み分を超えて送ると Composition が破棄される)。
 
 ## 用語
 
-- **安定 ID**: 要素を同一とみなす鍵。`Hashable` で、同一配列内で一意。
-- **テンプレートキー**: `template:` キーパスが返す `Hashable` な値。どの `Template` で描くかを選び、再利用種別にもなる。
-- **再構成 (reconfigure)**: セルインスタンスを維持したまま内容を差し替えること。**置換 (reload)** はセルごと入れ替えること。
+- **安定 ID**: 要素を同一とみなす鍵。`Hashable` (Kotlin では `equals` / `hashCode`) で、同一配列内で一意。
+- **テンプレートキー**: `template` が返す `Hashable` な値。どのテンプレートで描くかを選び、再利用種別にもなる。
+- **再構成 (reconfigure)**: セルインスタンスを維持したまま内容を差し替えること。Android では項目の Composition を保ったまま新しい値で再コンポジションされることを指す。**置換 (reload)** はセルごと入れ替えること。
+- **Sample**: リポジトリ同梱 (`samples/`) の動作確認・プラットフォーム間パリティ検証用アプリ。両プラットフォームに同じデモ画面を持つ。
+- **再利用種別**: 同じ種別の要素間でだけセルを使い回す単位。iOS は `CellRegistration`、Android は `contentType`。
 
 ## 関連
 
 - [collection-layout](../styling/collection-layout.md) — `layout` 値・スペーシング・区切り線・ヘッダー/フッター
 - [collection-interaction](collection-interaction.md) — タップ・長押し・スクロール制御
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — この契約を UICollectionView でどう実現しているか
-- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、ios/ADR-0002、ios/ADR-0004、ios/ADR-0006
+- [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — この契約を Compose Lazy 系でどう実現しているか
+- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、ios/ADR-0002、ios/ADR-0004、ios/ADR-0006、android/ADR-0001

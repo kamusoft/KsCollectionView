@@ -13,13 +13,19 @@ sticky ヘッダ付きグループ化と、画面向きで列数が変わる可�
 ### phase-1 からの申し送り (2026-09-01)
 
 - レイアウトは単一コンポーネント + `layout` 値で確定 (core/ADR-0006)。本フェーズの拡張は「セクションごとに layout 値を付与する」形で同じ語彙に乗せる
-- 旧語彙の申し送り (core/ADR-0009): `IsGroupingEnabled` / `GroupHeaderTemplate` / `GroupHeaderHeight` / `IsGroupHeaderSticky` (旧 iOS のみ → 両対応が論点)。`GroupFirstSpacing` / `GroupLastSpacing` / `BothSidesMargin` / `SpacingType` は contentPadding / spacing の流儀へ簡素化する方向
+- 旧語彙の申し送り (core/ADR-0009) — グループ化系: `IsGroupingEnabled` / `GroupHeaderTemplate` / `GroupHeaderHeight` / `IsGroupHeaderSticky` (旧 iOS のみ → 両対応が論点)
+- 旧語彙の申し送り (core/ADR-0009) — 余白系: `GroupFirstSpacing` / `GroupLastSpacing` / `BothSidesMargin` / `SpacingType` は contentPadding / spacing の流儀へ簡素化する方向
 - ソート連携は DSL 追加なしで確定 (データ層並べ替え + 自動差分 move — core/ADR-0003)。本フェーズでは差分 move アニメの動作確認のみ
 
 ### phase-2 からの申し送り (2026-09-03)
 
 - list の区切り線は「先頭行の上端 + 全セルの下端」に全幅で描く規則 (ios-engine-foundation deviation.md)。セクションが入ると前セクション末尾の下線と次セクション先頭の上線が二重になるため、セクション境界での規則を決める
 - 区切り線はセル bounds の底辺に描かれ、幅はセル幅 (`contentPadding` の分だけ内側に寄る)。`rowSpacing > 0` の list では線が行間の中央ではなく各行の直下に出る。セクション単位の余白・装飾を設計する際にこの見え方を含めて決める
+
+### phase-3 からの申し送り (2026-09-05)
+
+- 区切り線は両プラットフォームとも content の前面に描く (core/ADR-0010 accepted)。Android は項目単位の `drawWithContent`、iOS はセルのサブビューで、いずれも「行間に区切り線用の item / decoration を挿入する」形ではない。セクション境界の装飾はこの前提 (項目単位の描画) の上で設計する
+- Android の `LazyVerticalGrid` は `stickyHeader` を持つ (Foundation 1.8 以上、android/ADR-0001)。論点「グリッドでの sticky 可否が未確定」の Android 側はこれで解ける
 
 ## 決定事項
 

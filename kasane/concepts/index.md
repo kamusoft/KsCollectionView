@@ -6,7 +6,7 @@ concepts はドメイン別に分割して管理する。カテゴリ定義・�
 |---|---|
 | [core](core/index.md) | 全 platform が共有する契約 (architecture / core-model / cells / styling) |
 | [ios](ios/index.md) | iOS 固有の公開 API・エンジンの契約 |
-| android | Android 固有の公開 API・Bridge 境界 |
+| [android](android/index.md) | Android 固有の公開 API・ラッパーの契約 |
 | cross | リポジトリ横断のメタ事項 (リポジトリ構成・命名規約) |
 
 概念を持つドメインは名前がその index へのリンクになっている。ドメインディレクトリと各ドメインの index は最初の概念が生まれるときに作成する。
