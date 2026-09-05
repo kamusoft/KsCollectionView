@@ -47,6 +47,37 @@ final class KsSwiftUIIntegrationTests: XCTestCase {
         }
     }
 
+    private struct KeyedItem: Identifiable, Equatable {
+        enum Kind: Hashable {
+            case message
+            case ad
+        }
+
+        let id: Int
+        let kind: Kind
+        let title: String
+    }
+
+    private struct KeyedTemplateView: View {
+        let items: [KeyedItem]
+        let record: (Int, String) -> Void
+
+        var body: some View {
+            // 要素型とキー型の注釈を書かない推論形。ビルダーが各宣言へ文脈型を与えるため、
+            // キーの省略記法とクロージャ引数の型がどちらも推論できる。
+            KsCollectionView(items, template: \.kind) {
+                KsTemplate(.message) { item in
+                    let _ = record(item.id, item.title)
+                    Text(item.title).frame(maxWidth: .infinity, minHeight: 44)
+                }
+                KsTemplate(.ad) { item in
+                    let _ = record(item.id, "広告: \(item.title)")
+                    Text("広告: \(item.title)").frame(maxWidth: .infinity, minHeight: 44)
+                }
+            }
+        }
+    }
+
     private struct SelectionHighlightView: View {
         @State private var selectedID: Int?
         let items: [Item]
@@ -119,6 +150,24 @@ final class KsSwiftUIIntegrationTests: XCTestCase {
         setSelection?(3)
 
         await waitUntil("選択中 ID を反映した可視セル", value: { recorded[3] }) { $0 == true }
+    }
+
+    func test型注釈なしの推論形で宣言したテンプレートがキーごとに描画される() async {
+        var recorded: [Int: String] = [:]
+        let items = [
+            KeyedItem(id: 0, kind: .message, title: "メッセージ"),
+            KeyedItem(id: 1, kind: .ad, title: "お知らせ"),
+        ]
+        let host = UIHostingController(rootView: KeyedTemplateView(
+            items: items,
+            record: { recorded[$0] = $1 }
+        ))
+        let window = showInWindow(controller: host, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitUntil("キーごとの描画", value: { (recorded[0], recorded[1]) }) {
+            $0.0 == "メッセージ" && $0.1 == "広告: お知らせ"
+        }
     }
 
     private func collectionController(

@@ -1,6 +1,14 @@
 import UIKit
 
 internal final class KsHostingCell: UICollectionViewCell {
+    /// 区切り線の色を指定しなかったときに使う色。
+    static let defaultSeparatorColor = UIColor(
+        red: 217 / 255,
+        green: 217 / 255,
+        blue: 222 / 255,
+        alpha: 1
+    )
+
     private let touchFeedbackView = UIView()
     private let topSeparatorView = UIView()
     private let bottomSeparatorView = UIView()
@@ -46,8 +54,12 @@ internal final class KsHostingCell: UICollectionViewCell {
         subviews.firstIndex(of: touchFeedbackView) ?? -1
     }
 
-    var separatorColor: UIColor? {
+    var topSeparatorColor: UIColor? {
         topSeparatorView.backgroundColor
+    }
+
+    var bottomSeparatorColor: UIColor? {
+        bottomSeparatorView.backgroundColor
     }
 
     override init(frame: CGRect) {
@@ -56,12 +68,7 @@ internal final class KsHostingCell: UICollectionViewCell {
         touchFeedbackView.isUserInteractionEnabled = false
         addSubview(touchFeedbackView)
         [topSeparatorView, bottomSeparatorView].forEach {
-            $0.backgroundColor = UIColor(
-                red: 217 / 255,
-                green: 217 / 255,
-                blue: 222 / 255,
-                alpha: 1
-            )
+            $0.backgroundColor = Self.defaultSeparatorColor
             $0.isHidden = true
             $0.isUserInteractionEnabled = false
             addSubview($0)
@@ -146,10 +153,16 @@ internal final class KsHostingCell: UICollectionViewCell {
         lastHitWasInteractive = false
     }
 
-    func configureSeparators(showsTop: Bool, showsBottom: Bool) {
-        guard topSeparatorView.isHidden != !showsTop
+    func configureSeparators(showsTop: Bool, showsBottom: Bool, color: UIColor) {
+        let colorChanged = topSeparatorView.backgroundColor != color
+        guard colorChanged
+            || topSeparatorView.isHidden != !showsTop
             || bottomSeparatorView.isHidden != !showsBottom else {
             return
+        }
+        if colorChanged {
+            topSeparatorView.backgroundColor = color
+            bottomSeparatorView.backgroundColor = color
         }
         topSeparatorView.isHidden = !showsTop
         bottomSeparatorView.isHidden = !showsBottom

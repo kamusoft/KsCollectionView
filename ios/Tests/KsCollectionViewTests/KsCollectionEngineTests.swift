@@ -145,12 +145,8 @@ final class KsCollectionEngineTests: XCTestCase {
         XCTAssertEqual(middle.bottomSeparatorFrame.height, 1, accuracy: 0.01)
         XCTAssertEqual(last.bottomSeparatorFrame.maxY, last.bounds.height, accuracy: 0.5)
         XCTAssertGreaterThan(first.separatorZPosition, first.contentViewZPosition)
-        XCTAssertEqual(first.separatorColor, UIColor(
-            red: 217 / 255,
-            green: 217 / 255,
-            blue: 222 / 255,
-            alpha: 1
-        ))
+        XCTAssertEqual(first.topSeparatorColor, KsHostingCell.defaultSeparatorColor)
+        XCTAssertEqual(first.bottomSeparatorColor, KsHostingCell.defaultSeparatorColor)
         let separatorsOnImage = renderedImageData(of: first)
 
         configuration.showsSeparators = false
@@ -164,6 +160,78 @@ final class KsCollectionEngineTests: XCTestCase {
         controller.update(configuration: configuration)
         XCTAssertTrue(first.isTopSeparatorVisible)
         XCTAssertTrue(first.isBottomSeparatorVisible)
+    }
+
+    func test区切り線の色を指定すると位置と本数を変えずにその色で描く() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        var configuration = makeConfiguration(items: items)
+        configuration.separatorColor = .systemPink
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitForVisibleItemCount(3, in: controller)
+
+        let first = tryUnwrapCell(controller, item: 0)
+        let middle = tryUnwrapCell(controller, item: 1)
+        let last = tryUnwrapCell(controller, item: 2)
+        controller.collectionView.layoutIfNeeded()
+        [first, middle, last].forEach {
+            $0.setNeedsLayout()
+            $0.layoutIfNeeded()
+        }
+
+        // 中間行・最終行で実際に見えるのは下端の線なので、上端と下端の両方の色を確かめる。
+        XCTAssertEqual(first.topSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(first.bottomSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(middle.topSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(middle.bottomSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(last.topSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(last.bottomSeparatorColor, UIColor.systemPink)
+        XCTAssertTrue(first.isTopSeparatorVisible)
+        XCTAssertTrue(first.isBottomSeparatorVisible)
+        XCTAssertFalse(middle.isTopSeparatorVisible)
+        XCTAssertTrue(middle.isBottomSeparatorVisible)
+        XCTAssertFalse(last.isTopSeparatorVisible)
+        XCTAssertTrue(last.isBottomSeparatorVisible)
+        XCTAssertEqual(first.topSeparatorFrame.width, first.bounds.width, accuracy: 0.5)
+        XCTAssertEqual(first.topSeparatorFrame.height, 1, accuracy: 0.01)
+
+        configuration.separatorColor = nil
+        controller.update(configuration: configuration)
+        XCTAssertEqual(first.topSeparatorColor, KsHostingCell.defaultSeparatorColor)
+        XCTAssertEqual(first.bottomSeparatorColor, KsHostingCell.defaultSeparatorColor)
+        XCTAssertEqual(middle.bottomSeparatorColor, KsHostingCell.defaultSeparatorColor)
+        XCTAssertEqual(last.bottomSeparatorColor, KsHostingCell.defaultSeparatorColor)
+    }
+
+    func test区切り線が非表示なら色を指定しても描かない() async {
+        let items = (0..<3).map { Item(id: $0, title: "項目 \($0)") }
+        var configuration = makeConfiguration(items: items)
+        configuration.showsSeparators = false
+        configuration.separatorColor = .systemPink
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+
+        await waitForVisibleItemCount(3, in: controller)
+
+        let cells = (0..<3).map { tryUnwrapCell(controller, item: $0) }
+        controller.collectionView.layoutIfNeeded()
+        cells.forEach {
+            $0.setNeedsLayout()
+            $0.layoutIfNeeded()
+        }
+        XCTAssertTrue(cells.allSatisfy { !$0.isTopSeparatorVisible && !$0.isBottomSeparatorVisible })
+
+        // 上端・下端のどちらの線も画素として現れないことを、色を外した描画との一致で確かめる。
+        let middle = cells[1]
+        let coloredImage = renderedImageData(of: middle)
+        configuration.separatorColor = nil
+        controller.update(configuration: configuration)
+        middle.setNeedsLayout()
+        middle.layoutIfNeeded()
+        XCTAssertEqual(coloredImage, renderedImageData(of: middle))
     }
 
     func test挿入削除並べ替え後に区切り線の位置を再構成する() async {
@@ -872,7 +940,7 @@ final class KsCollectionEngineTests: XCTestCase {
 
     func test未登録テンプレートキーをsnapshot準備時に検知する() async {
         let registry = KsTemplateRegistry<Item>(templates: [
-            Template("registered") { (item: Item) in
+            KsTemplate("registered") { (item: Item) in
                 Text(item.title).frame(maxWidth: .infinity, minHeight: 44)
             },
         ])
@@ -888,6 +956,7 @@ final class KsCollectionEngineTests: XCTestCase {
             layout: .list,
             contentPadding: EdgeInsets(),
             showsSeparators: true,
+            separatorColor: nil,
             header: nil,
             footer: nil,
             onItemTap: nil,
@@ -1021,6 +1090,7 @@ final class KsCollectionEngineTests: XCTestCase {
             layout: .list,
             contentPadding: EdgeInsets(),
             showsSeparators: true,
+            separatorColor: nil,
             header: nil,
             footer: nil,
             onItemTap: nil,

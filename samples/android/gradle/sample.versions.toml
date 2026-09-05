@@ -1,0 +1,24 @@
+# KsCollectionView Android Sample — Sample 専用のバージョンカタログ
+#
+# 本体と共有するカタログ (../../android/gradle/libs.versions.toml) は配布物の版の宣言元で
+# あり、Sample でしか使わない依存はそこへ足さない。両カタログは settings.gradle.kts が
+# `libs` / `sampleLibs` として同時に読み込む。
+
+[versions]
+# Compose の setContent を持つ ComponentActivity。
+activity-compose = "1.11.0"
+
+# Macrobenchmark。実機での固定手順の計測に使う。
+benchmark-macro = "1.4.1"
+
+# UiAutomator。計測中の実座標フリックに使う。
+uiautomator = "2.3.0"
+
+# 計測を走らせる AndroidJUnitRunner。
+androidx-test-runner = "1.7.0"
+
+[libraries]
+activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activity-compose" }
+benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmark-macro" }
+uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidx-test-runner" }

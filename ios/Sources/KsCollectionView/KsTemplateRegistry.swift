@@ -6,7 +6,7 @@ internal struct KsTemplateRegistry<Item> {
     private let fallback: (Item) -> AnyView
     private let logger = Logger(subsystem: "jp.kamusoft.kscollectionview", category: "template")
 
-    init<Key: Hashable>(templates: [Template<Item, Key>]) {
+    init<Key: Hashable>(templates: [KsTemplate<Item, Key>]) {
         // 重複したテンプレートキーは不正入力。後勝ちで 1 件へ畳み、警告ログを残して表示を継続する。
         self.templates = Dictionary(
             templates.map { (AnyHashable($0.key), $0.content) },

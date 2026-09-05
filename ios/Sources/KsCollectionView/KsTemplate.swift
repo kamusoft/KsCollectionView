@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 値キーに対応するセルの表示内容です。
-public struct Template<Item, Key: Hashable> {
+public struct KsTemplate<Item, Key: Hashable> {
     internal let key: Key
     internal let content: (Item) -> AnyView
 

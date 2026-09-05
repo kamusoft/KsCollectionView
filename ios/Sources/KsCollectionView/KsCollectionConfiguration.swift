@@ -8,6 +8,7 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     var layout: KsCollectionLayout
     var contentPadding: EdgeInsets
     var showsSeparators: Bool
+    var separatorColor: UIColor?
     var header: (() -> AnyView)?
     var footer: (() -> AnyView)?
     var onItemTap: ((Item) -> Void)?

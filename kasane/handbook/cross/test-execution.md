@@ -4,15 +4,15 @@ applies-when:
   always: false
   tasks: [テスト実行, テスト結果の報告]
 title: テスト実行規約
-description: テストを「実際に全件走らせた」と言える条件 — 実行件数の確認、収束を待つアサーション、確認済みの iOS 実行手順
-timestamp: 2026-09-02
+description: テストを「実際に全件走らせた」と言える条件 — 実行件数の確認、収束を待つアサーション、確認済みの iOS / Android 実行手順
+timestamp: 2026-09-05
 ---
 
 # テスト実行規約
 
 この文書は、各プラットフォームのテストを「実際に全件走らせる」ための規律と、**実行や検証が黙って空振りする範囲**の扱いを定める。読むと、何をもって検証したと言えるか、どんな書き方が「待ったつもり」になるかが分かる。
 
-本文書の現行規範は、プラットフォーム非依存の 2 節と、実構成で確認済みの iOS 実行手順である。Android の節はまだ翻案元での知見に留まる。
+本文書の現行規範は、プラットフォーム非依存の 2 節と、実構成で確認済みの iOS / Android の実行手順である。
 
 ## 実行件数の確認までが検証
 
@@ -38,7 +38,7 @@ timestamp: 2026-09-02
 
 ## プラットフォーム別の実行手順
 
-実測していない手順を確定した手順として書かない。iOS は本プロジェクトで確認済み、Android は未検証である。
+実測していない手順を確定した手順として書かない。iOS・Android とも本プロジェクトで確認済みである。
 
 ### iOS: Simulator で SwiftPM 全件を実行する
 
@@ -56,14 +56,24 @@ Sample (`samples/ios/`) の UI テストターゲットには、アサーショ�
 - 計測ドライバは `-scheme KsCollectionViewSamplesPerformance` でのみ実行する。実行そのものが計測手順の一部であり、合否ではなく Instruments 側の記録で判定する
 - どちらのスキームも実行件数を報告する。通常スキームの件数に計測ドライバが含まれていないことが、分離が効いている確認になる
 
-### Android: 差分なし再実行と Robolectric の描画限界 (未検証)
+### Android: 差分なし再実行と Robolectric の描画限界
+
+本体とテストは 2 つのビルドルートに分かれている。完了判定にはどちらも回す。
+
+- 本体は `android/` で `./gradlew :kscollectionview:testDebugUnitTest --rerun-tasks`
+- Sample は `samples/android/` で `./gradlew :app:testDebugUnitTest --rerun-tasks`
+- JDK 17 が既定でない環境では `JAVA_HOME=$(/usr/libexec/java_home -v 17)` を前置きする
+
+件数の得方と落とし穴は次のとおり。
 
 - Gradle は up-to-date なテストタスクをスキップするため、**差分なしの再実行は「テスト 0 件で BUILD SUCCESSFUL」になり得る**。全件を回し直して件数を確認するときは `--rerun-tasks` を付ける
 - 実行件数はコンソールに出ない。`build/test-results/<タスク名>/TEST-*.xml` の `tests` / `failures` 属性の合計、または `build/reports/tests/<タスク名>/index.html` で確認する
 - ディレクトリ名は variant 名ではなく**タスク名**であり、読み替えを誤ると集計対象が 0 件になる
-- Robolectric の既定 (legacy graphics モード) では一部の描画処理が実行されず、描画結果を見るアサーションが空振りする。実描画を要する検証にはクラスへ `@GraphicsMode(GraphicsMode.Mode.NATIVE)` が必要になる
+- XML はクラスごとに 1 ファイルできる。集計はクラス単位の内訳まで出し、期待するクラスがすべて現れていることを確かめる (1 クラスだけ走った状態も「0 件ではない」ため終了コードでは見分けられない)
 
-Robolectric の NATIVE モードは実 Skia を動かすため起動コストと CI の環境依存が増える。採否は Android ラッパー基盤の実装時に、必要な検証と費用を突き合わせて決める。
+Robolectric の既定 (legacy graphics モード) では一部の描画処理が実行されず、描画結果を見るアサーションが空振りする。**実描画を要する検証はクラスへ `@GraphicsMode(GraphicsMode.Mode.NATIVE)` を付ける。**
+
+NATIVE モードは実 Skia を動かすため起動コストが増えるが、区切り線の色・タップフィードバックの伝播・content の配置はこれ無しでは検証層に載らないため採用する。ヒープは既定では足りず、`testOptions` で `maxHeapSize = "2g"` を与えている。
 
 ## 関連
 

@@ -346,11 +346,11 @@ final class KsCollectionScenarioTests: XCTestCase {
         recorder: RenderRecorder
     ) -> KsCollectionConfiguration<KeyedItem> {
         let registry = KsTemplateRegistry<KeyedItem>(templates: [
-            Template(KeyedItem.Kind.message) { (item: KeyedItem) in
+            KsTemplate(KeyedItem.Kind.message) { (item: KeyedItem) in
                 let _ = recorder.record(item.id, item.title)
                 Text(item.title).frame(maxWidth: .infinity, alignment: .leading)
             },
-            Template(KeyedItem.Kind.ad) { (item: KeyedItem) in
+            KsTemplate(KeyedItem.Kind.ad) { (item: KeyedItem) in
                 let _ = recorder.record(item.id, "広告: \(item.title)")
                 Text("広告: \(item.title)").frame(maxWidth: .infinity, alignment: .leading)
             },
@@ -388,6 +388,7 @@ final class KsCollectionScenarioTests: XCTestCase {
             layout: .list,
             contentPadding: EdgeInsets(),
             showsSeparators: true,
+            separatorColor: nil,
             header: nil,
             footer: nil,
             onItemTap: nil,

@@ -56,7 +56,7 @@ fun FruitList(fruits: List<Fruit>) {
         onItemTap = { fruit: Fruit -> println("tapped: ${fruit.name}") },
         touchFeedbackColor = Color.Yellow,   // 省略時は標準 ripple
     ) {
-        template<Fruit> { fruit ->
+        template { fruit ->
             Text(fruit.name)
         }
     }
@@ -80,6 +80,25 @@ KsCollectionView(sharedFruits, id: \.itemId) { fruit in
 ```
 
 list の区切り線は既定で表示される。非表示にする場合だけ `.listSeparators(false)` を指定し、grid では指定にかかわらず表示されない。
+
+色を変える場合は表示の有無とは独立した語彙で指定する。未指定ならライブラリ既定の色になる。
+
+```swift
+KsCollectionView(fruits) { fruit in
+    Text(fruit.name)
+}
+.listSeparatorColor(.blue)
+```
+
+```kotlin
+KsCollectionView(
+    items = fruits,
+    key = { it.id },
+    listSeparatorColor = Color.Blue,
+) {
+    template { fruit -> Text(fruit.name) }
+}
+```
 
 ## 2. 値キーによるセル切り替え + 向き可変グリッド
 
@@ -107,8 +126,8 @@ struct FeedScreen: View {
                 columnSpacing: 8
             )
         ) {
-            Template(FeedItem.Kind.message) { (item: FeedItem) in MessageCard(item) }
-            Template(FeedItem.Kind.ad) { (item: FeedItem) in AdCard(item) }
+            KsTemplate(.message) { item in MessageCard(item) }
+            KsTemplate(.ad) { item in AdCard(item) }
         }
     }
 }
@@ -217,7 +236,7 @@ fun FeedList(vm: FeedViewModel) {
         paging = KsPaging(state = vm.pagingState, onLoadMore = vm::loadNextPage),
         onRefresh = vm::refresh,   // Compose 側の Pull to Refresh 接続 (最終形は phase-3 で流儀確認)
     ) {
-        template<Message> { msg -> MessageRow(msg) }
+        template { msg -> MessageRow(msg) }
     }
 }
 ```
@@ -266,7 +285,7 @@ fun ProductGrid(products: List<Product>) {
             scrollController = scroller,
             modifier = Modifier.padding(padding),
         ) {
-            template<Product> { p -> ProductCard(p) }
+            template { p -> ProductCard(p) }
         }
     }
 }
@@ -328,7 +347,7 @@ fun PhotoGrid(photos: List<Photo>) {
         layout = KsLayout.Grid(KsColumns.Fixed(portrait = 3, landscape = 5)),
         prefetchResources = { photo: Photo -> listOf(photo.thumbnailUrl) },
     ) {
-        template<Photo> { photo ->
+        template { photo ->
             KsImage(photo.thumbnailUrl)
         }
     }
@@ -378,10 +397,10 @@ class RankingViewModel : ViewModel() {
 | 語彙 | Swift | Kotlin | 出典 ADR |
 |---|---|---|---|
 | コンポーネント | `KsCollectionView(_:layout:)` | `KsCollectionView(items, key, layout, ...)` | 0002 |
-| テンプレート登録 | `Template(_:)` (値キー) / 単一クロージャ | `template(key) { }` / 単一クロージャ | 0004 |
+| テンプレート登録 | `KsTemplate(_:)` (値キー) / 単一クロージャ | `template(key) { }` / 単一クロージャ | 0004 |
 | レイアウト | `.list` / `.list(rowSpacing:)` / `.grid(columns:rowSpacing:columnSpacing:)` | `KsLayout.List(rowSpacing =)` / `KsLayout.Grid(columns =, rowSpacing =, columnSpacing =)` | 0006 |
 | 列指定 | `.fixed(_)` / `.fixed(portrait:landscape:)` / `.adaptive(minItemWidth:)` | `KsColumns.Fixed(...)` / `KsColumns.Adaptive(...)` | 0006 |
-| 余白・区切り線 | `contentPadding:` / `.listSeparators(_)` | `contentPadding =` / `listSeparators =` | 0006 |
+| 余白・区切り線 | `contentPadding:` / `.listSeparators(_)` / `.listSeparatorColor(_)` | `contentPadding =` / `listSeparators =` / `listSeparatorColor =` | 0006, 0010 |
 | ルート補助表示 | `.header { }` / `.footer { }` | `header =` / `footer =` | 0006 |
 | ページング | `.paging(_:onLoadMore:)` + `KsPagingState` | `paging = KsPaging(state, onLoadMore)` + `KsPagingState` | 0005 |
 | スクロール | `KsScrollController` + `.scrollController(_)` | `KsScrollController` / `rememberKsScrollController()` + `scrollController =` | 0007, 0009 |
@@ -399,4 +418,26 @@ class RankingViewModel : ViewModel() {
 
 iOS はセルが再利用されるたびに SwiftUI のホスティング内容を作り直すため、テンプレート内部の `@State` は画面外へのスクロールと再利用をまたいで保持されない。展開状態や選択状態など、残す必要がある値は項目モデルまたは画面の状態へ持たせる。
 
-`id:` / `template:` の指定と `Template` の登録集合は、表示中に差し替えない前提の宣言として扱う。項目の配列が同じままこれらだけを差し替えても、その変更は表示へ反映されない。
+`id:` / `template:` の指定と `KsTemplate` の登録集合は、表示中に差し替えない前提の宣言として扱う。項目の配列が同じままこれらだけを差し替えても、その変更は表示へ反映されない。
+
+## Android `key` の型の制約
+
+`key` ラムダが返す値は、同じ配列の中で一意であることに加えて、**Android の状態保存 (Bundle) に載せられる型**でなければならない。Compose の Lazy 系は項目の識別に使う値をそのまま保存対象にするためで、載せられない型を返すと画面の再生成をまたいだ位置の復元が成り立たない。
+
+| 使える | 使えない |
+|---|---|
+| `String` / `Char` / `Boolean` / 数値 / enum / `Serializable` / `Parcelable` を実装した型 | 上のいずれにも当たらない独自クラス (`data class` であっても該当しない) |
+
+違反は不正入力として扱う。debug ビルドでは assertion で停止し、release ビルドでは警告ログを残して表示を続ける (core/ADR-0011 の「落とさず・消さず・黙らず」)。要素そのものを `key` に返す書き方は避け、ID となるプロパティを返す。
+
+## Android テンプレート内の state の保持
+
+Compose の Lazy 系は、可視範囲と先読み分の外へ出た項目のコンポジションを破棄する。**画面外へ十分に送った項目のテンプレート内の `remember` は、戻ってきたときに初期値へ戻っている。** 展開状態・選択状態など残す必要がある値は、項目モデルまたは画面の状態へ持たせる (iOS のセル再利用と同じ結論に、別の理由で行き着く)。
+
+破棄と作り直しは実測でも確かめられている。10,000 件の画面でテンプレートの評価回数を数えると、初期表示は可視範囲の 22 回に留まり、371 件目付近まで送った時点の累計は 394 回 — 通過した項目の数とほぼ同数になる。範囲外へ出た項目は保持されず、戻ってくるときに作り直される。
+
+`remember` 自体が無効なわけではない。可視範囲にいる間は保たれ、同じ ID・同じテンプレートキーのまま内容だけが変わる更新では作り直されない。保持されないのは「画面外へ十分に出て戻る」往復をまたいだときである。
+
+## Android 行の高さ変化のアニメーション
+
+行の高さが変わるとき (展開・折りたたみ) はライブラリが高さを補間し、後続の行もそれに追従して動く。補間中は**テンプレートの根の Composable に高さの制約が渡る**ため、根が `fillMaxWidth().background(...)` のように制約を使って背景を塗っていれば、背景も行の枠に追従して縮む。根が透明な箱 (`Box` / `Column` など制約を子へ渡さないもの) で本体を包んでいると、折りたたみの途中で箱と本体の間にページ背景が見える。本体へ制約を届けるには箱に `propagateMinConstraints = true` を付けるか、根で背景を塗る。

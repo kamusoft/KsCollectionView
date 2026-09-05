@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Sample の配色は SampleTheme (Kotlin 側) が正のため、ここでは Compose の土台となる
+         最小の Material テーマだけを与え、色は宣言しない。 -->
+    <style name="Theme.KsCollectionViewSamples" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

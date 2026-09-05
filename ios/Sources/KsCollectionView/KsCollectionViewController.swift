@@ -89,6 +89,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let previousLayout = self.configuration.layout
         let previousPadding = self.configuration.contentPadding
         let previousShowsSeparators = self.configuration.showsSeparators
+        let previousSeparatorColor = self.configuration.separatorColor
         let previousController = self.configuration.scrollController
         let supplementaryStructureChanged = (self.configuration.header == nil) != (configuration.header == nil)
             || (self.configuration.footer == nil) != (configuration.footer == nil)
@@ -111,7 +112,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         if layoutChanged || supplementaryStructureChanged {
             collectionView.collectionViewLayout.invalidateLayout()
         }
-        if previousShowsSeparators != configuration.showsSeparators || layoutKindChanged {
+        if previousShowsSeparators != configuration.showsSeparators
+            || previousSeparatorColor != configuration.separatorColor
+            || layoutKindChanged {
             updateVisibleCellSeparators()
         }
         updateVisibleSupplementaryViews()
@@ -285,7 +288,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let showsSeparators = isList && configuration.showsSeparators
         cell.configureSeparators(
             showsTop: showsSeparators && indexPath.item == 0,
-            showsBottom: showsSeparators
+            showsBottom: showsSeparators,
+            color: configuration.separatorColor ?? KsHostingCell.defaultSeparatorColor
         )
         // 既定はプラットフォーム標準のハイライト相当の半透明色。不透明色にするとセル内容を覆い隠す。
         cell.configureTouchFeedback(color: configuration.touchFeedbackColor ?? .systemFill)

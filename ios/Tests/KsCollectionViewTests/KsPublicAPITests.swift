@@ -32,6 +32,7 @@ final class KsPublicAPITests: XCTestCase {
         .header { Text("ヘッダー") }
         .footer { Text("フッター") }
         .listSeparators(false)
+        .listSeparatorColor(.red)
         .onItemTap { _ in }
         .onItemLongTap { _ in }
         .touchFeedback(color: .yellow)
@@ -40,6 +41,7 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertEqual(view.configuration.items.map(\.id), [1])
         XCTAssertEqual(view.configuration.layout.rowSpacing, 4)
         XCTAssertFalse(view.configuration.showsSeparators)
+        XCTAssertEqual(view.configuration.separatorColor, UIColor(Color.red))
         XCTAssertNotNil(view.configuration.header)
         XCTAssertNotNil(view.configuration.footer)
         XCTAssertNotNil(view.configuration.onItemTap)
@@ -59,14 +61,22 @@ final class KsPublicAPITests: XCTestCase {
             template: \.kind,
             layout: .grid(columns: .fixed(portrait: 2, landscape: 4))
         ) {
-            Template(Item.Kind.message) { (item: Item) in Text(item.title) }
-            Template(Item.Kind.ad) { (item: Item) in Text("広告: \(item.title)") }
+            KsTemplate(.message) { item in Text(item.title) }
+            KsTemplate(.ad) { item in Text("広告: \(item.title)") }
         }
 
         XCTAssertEqual(view.configuration.items.map(\.id), [1, 2])
         XCTAssertTrue(view.configuration.registry.contains(AnyHashable(Item.Kind.message)))
         XCTAssertTrue(view.configuration.registry.contains(AnyHashable(Item.Kind.ad)))
         XCTAssertEqual(view.configuration.templateKey(items[1]), AnyHashable(Item.Kind.ad))
+    }
+
+    func test区切り線の色を指定しなければ既定の色になる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+
+        XCTAssertNil(view.configuration.separatorColor)
     }
 
     func test非Identifiable型をidキーパスで組み立てられる() {

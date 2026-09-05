@@ -11,9 +11,9 @@ final class KsTemplateRegistryTests: XCTestCase {
     }
 
     func test値キーごとのテンプレートを登録する() {
-        let templates: [Template<String, Kind>] = [
-            Template(.message) { Text($0) },
-            Template(.ad) { Text("広告: \($0)") },
+        let templates: [KsTemplate<String, Kind>] = [
+            KsTemplate(.message) { Text($0) },
+            KsTemplate(.ad) { Text("広告: \($0)") },
         ]
         let registry = KsTemplateRegistry(templates: templates)
 
@@ -29,8 +29,8 @@ final class KsTemplateRegistryTests: XCTestCase {
 
     #if !DEBUG
     func testReleaseでは未登録キーを空セルへ解決する() {
-        let templates: [Template<String, Kind>] = [
-            Template(.message) { Text($0) },
+        let templates: [KsTemplate<String, Kind>] = [
+            KsTemplate(.message) { Text($0) },
         ]
         let registry = KsTemplateRegistry(templates: templates)
 

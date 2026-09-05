@@ -1,0 +1,64 @@
+# KsCollectionView Android — バージョンカタログ
+#
+# ビルド関連バージョン (AGP / Kotlin / Compose BOM / ライブラリの Maven 座標のバージョン) の
+# 単一宣言元。Sample は settings.gradle.kts の versionCatalogs で本ファイルを共有する。
+# AGP・Kotlin・Compose BOM は最新安定版に追随する (android/ADR-0002)。ただし利用者に未普及の
+# SDK Platform を強いる版は採らない (Compose BOM の項を見る)。
+
+[versions]
+# Android SDK のコンパイル対象。本体・Sample・計測モジュールの 3 モジュールがここを参照する
+# (同じ版を複数箇所に書かない)。targetSdk も同値を使う。
+compile-sdk = "36"
+
+# Android Gradle Plugin。要求する Gradle の最低版は 9.6.0
+# (https://developer.android.com/build/releases/gradle-plugin)。
+agp = "9.4.0"
+
+# Kotlin。Kotlin Android プラグインと Compose Compiler プラグインで共通の版を使う
+# (https://kotlinlang.org/docs/releases.html)。
+kotlin = "2.4.10"
+
+# Jetpack Compose BOM。Compose 各ライブラリの版を整合させる。
+# 2026.06.01 = compose 1.11.4 / material3 1.4.0
+# (https://developer.android.com/develop/ui/compose/bom/bom-mapping)。
+# Compose 1.12 系ではなく 1.11 系の最新安定に留める。1.12 の AAR メタデータは利用者アプリに
+# compileSdk 37 を要求し、ライブラリを入れるだけで未普及の SDK Platform を強いるため
+# (android/ADR-0002 の「最新安定」の読み替え。deviation.md を見る)。
+compose-bom = "2026.06.01"
+
+# Navigation Compose。Compose BOM の対象外のため個別に指定する (android/ADR-0002)。
+# Sample の画面遷移で使う。2.10 系は AAR メタデータで compileSdk 37 を要求するため、
+# compile-sdk と同じ理由で 2.9 系の最新に留める。
+navigation-compose = "2.9.8"
+
+# ライブラリの Maven 座標のバージョン。ルート build.gradle.kts が subprojects 一括で
+# `version` に使う。
+kscollectionview = "0.1.0-SNAPSHOT"
+
+# テスト用の版 (Compose の版は BOM が決めるため、ここには BOM 外のものだけを置く)。
+junit = "4.13.2"
+robolectric = "4.16"
+androidx-test-core = "1.7.0"
+androidx-test-ext-junit = "1.3.0"
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+
+[libraries]
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+compose-animation-core = { group = "androidx.compose.animation", name = "animation-core" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout" }
+compose-material3 = { group = "androidx.compose.material3", name = "material3" }
+compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidx-test-core" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidx-test-ext-junit" }

@@ -49,7 +49,7 @@ public struct KsCollectionView<Item: Equatable>: View {
         template: KeyPath<Item, Key>,
         layout: KsCollectionLayout = .list,
         contentPadding: EdgeInsets = EdgeInsets(),
-        @KsTemplateBuilder<Item, Key> templates: () -> [Template<Item, Key>]
+        @KsTemplateBuilder<Item, Key> templates: () -> [KsTemplate<Item, Key>]
     ) where Item: Identifiable {
         self.init(
             items: items,
@@ -68,7 +68,7 @@ public struct KsCollectionView<Item: Equatable>: View {
         template: KeyPath<Item, Key>,
         layout: KsCollectionLayout = .list,
         contentPadding: EdgeInsets = EdgeInsets(),
-        @KsTemplateBuilder<Item, Key> templates: () -> [Template<Item, Key>]
+        @KsTemplateBuilder<Item, Key> templates: () -> [KsTemplate<Item, Key>]
     ) {
         self.init(
             items: items,
@@ -96,6 +96,7 @@ public struct KsCollectionView<Item: Equatable>: View {
             layout: layout,
             contentPadding: contentPadding,
             showsSeparators: true,
+            separatorColor: nil,
             header: nil,
             footer: nil,
             onItemTap: nil,
@@ -149,6 +150,13 @@ public struct KsCollectionView<Item: Equatable>: View {
     public func listSeparators(_ isVisible: Bool) -> KsCollectionView<Item> {
         var copy = self
         copy.configuration.showsSeparators = isVisible
+        return copy
+    }
+
+    /// list の区切り線の色を設定します。指定しない場合は既定の色で描かれます。
+    public func listSeparatorColor(_ color: Color) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.separatorColor = UIColor(color)
         return copy
     }
 
