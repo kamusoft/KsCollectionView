@@ -26,7 +26,7 @@ SwiftUI / Jetpack Compose で同じ書き味のリスト・グリッド部品を
 - リポジトリ構成: `../KsSettingsView/` と同型の monorepo (`ios/` `android/` ビルドルート)。skills/ 方式の利用者ドキュメントを踏襲
 - CI (verify-ios / verify-android)・lockstep 単一バージョン・配布 (SPM / Maven、package-distribution 設計) は踏襲候補 — phase-7 で確定する
 - 先行実装参照: iOS エンジンは KsSettingsViewUI (diffable + Compositional Layout) と旧 `../AiForms.CollectionView/` の `ContentCellContainer`
-- 立ち上げ探索の経緯は [exploration.md](../../changes/revival-feasibility/exploration.md)
+- 立ち上げ探索の経緯は [exploration.md](../../changes/archive/2026-09-05-revival-feasibility/exploration.md)
 - Sample は各フェーズのパリティ検証装置とする (根拠: [cross/ADR-0004](../../decisions/cross/0004-sample-cross-platform-parity.md)、規約: [sample-parity](../../handbook/cross/sample-parity.md))
 - phase-2 / phase-3 は各自の Sample scaffold (`SampleScreen` / `SampleTheme` / メニュー構造) と対向プラットフォームへの追随タスクを責務とし、両フェーズ完了時を最初のパリティ収束ゲートとする
 - phase-4〜6 および phase-8 の機能フェーズは「デモ画面を両プラットフォームの Sample に sample-parity 準拠で追加」を完了条件に含める (phase-7 は配布・ドキュメント専業で対象外)

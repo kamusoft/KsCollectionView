@@ -36,4 +36,4 @@ date: 2026-08-31
 - 負: iOS は UIKit interop (diffable data source・cell registration・compositional layout) の実装と保守を負う
 - 負: 公開 DSL の対称性は自動では得られず、内部非対称が API に漏れないよう設計コストを払い続ける必要がある
 
-出典: kasane/changes/revival-feasibility/exploration.md (調査結果: 各機能の実装コスト・検討した選択肢) / cross/ADR-0001
+出典: kasane/changes/archive/2026-09-05-revival-feasibility/exploration.md (調査結果: 各機能の実装コスト・検討した選択肢) / cross/ADR-0001

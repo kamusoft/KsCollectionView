@@ -35,4 +35,4 @@ KsCollectionView を **SwiftUI / Jetpack Compose の2プラットフォームラ
 - 負: 外部 (OSS) 需要は未実証。ただし主目的が自社の KMP 量産であるため、成立性は外部需要に依存しない
 - 負: KsSettingsView / KsDialogs が未リリースのまま並行開発になる (リソース配分の競合)
 
-出典: kasane/changes/revival-feasibility/exploration.md (検討した選択肢・未決の論点)
+出典: kasane/changes/archive/2026-09-05-revival-feasibility/exploration.md (検討した選択肢・未決の論点)

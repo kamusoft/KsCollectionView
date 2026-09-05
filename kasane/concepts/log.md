@@ -7,3 +7,6 @@
 
 ## 2026-09-03
 - distilled: ios-engine-foundation (ADR ios/0005・ios/0006・ios/0007・core/0010・core/0011 を proposed で起票 / handbook/ios/performance-verification.md 新設 / concepts 初起票: core/core-model/collection-items.md・core/core-model/collection-interaction.md・core/styling/collection-layout.md・ios/architecture/collection-engine.md / core・ios のドメイン index 新設)
+
+## 2026-09-05
+- distilled: revival-feasibility (ADR cross/0001・core/0001 は探索内で accepted 済み / handbook・concepts の変更なし — 探索のみの change でロードマップ v1-foundation へハンドオフ済み / lessons inbox に調査所見の訂正を 1 件捕捉)
