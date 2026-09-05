@@ -89,7 +89,7 @@ iOS に対応物が無い (phase-2 の範囲外) ため、Android だけ先行�
 
 ### 行の高さ変化の検証画面 — Android 固有の技術検証画面として置く (2026-09-04、論点 8)
 
-「検証: 行の高さ変化 (Android 固有)」を `VerificationScreen` に置く (iOS の「検証: 行の高さ変化 (iOS 固有)」と同じ区分。sample-parity の固有検証画面の例外枠に収まり、9 デモの集合は動かさない)。構成は iOS と同じ「展開経路 2 種 (親 state / テンプレート内 state) × list / grid 切替」で行タップで展開/折りたたみ。確かめること: 高さ変化時の `animateItem` / `animateContentSize`、`Box(TopCenter)` による content 配置、テンプレート内 state が再コンポーズをまたいで保持されるか (ios/ADR-0002 との差)。親 state 経路は [template-parent-state-observation](../../../../changes/template-parent-state-observation/exploration.md) との対称性を見る場を兼ねる。共通デモへの昇格 (iOS 側の改修と 10 デモ化が要る) は必要になったら改めて決める。
+「検証: 行の高さ変化 (Android 固有)」を `VerificationScreen` に置く (iOS の「検証: 行の高さ変化 (iOS 固有)」と同じ区分。sample-parity の固有検証画面の例外枠に収まり、9 デモの集合は動かさない)。構成は iOS と同じ「展開経路 2 種 (親 state / テンプレート内 state) × list / grid 切替」で行タップで展開/折りたたみ。確かめること: 高さ変化時の `animateItem` / `animateContentSize`、`Box(TopCenter)` による content 配置、テンプレート内 state が再コンポーズをまたいで保持されるか (ios/ADR-0002 との差)。親 state 経路は [template-parent-state-observation](../../../../changes/archive/2026-09-05-template-parent-state-observation/proposal.md) との対称性を見る場を兼ねる。共通デモへの昇格 (iOS 側の改修と 10 デモ化が要る) は必要になったら改めて決める。
 
 ## TODO
 

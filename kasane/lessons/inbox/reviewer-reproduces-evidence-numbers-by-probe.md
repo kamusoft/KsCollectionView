@@ -2,17 +2,19 @@
 scope: code-review
 kind: success
 severity: normal
-count: 2
+count: 3
 first-seen: 2026-09-03
 last-seen: 2026-09-05
 evidence:
   - ios-engine-foundation (review-013 が証跡の数値を自前プローブで再計測し、前サイクルの Minor 対応が入れた回帰 — 初回レイアウトで実測値が捨てられ推定高さが既定値に戻る — を検出した)
   - android-wrapper-foundation (review-006〜008 が実装に触れない別経路 — `animator_duration_scale` で引き伸ばした連続静止画の画素列・文字認識によるスクロール位置の復元・基準機での性能再計測 — で証跡の数値を再現し、review-006 は帯 (約 240 ms)、review-007 は「切り取りが一度も働かない」実装欠陥を検出した)
+  - template-parent-state-observation (review-001 / 002 がテンプレートのクロージャ呼び出し回数と読まれた観測値を記録する自前プローブで挙動を再現し、review-002 は宣言なし経路の doc コメントの過剰約束 (Minor) と宣言有無の非対称を検出。Simulator の 1 タップ目の証跡も独立に再現した)
 ---
 
 ## ルール文
 レビュー対象の証跡に計測値 (contentSize・回数・比率など) が含まれ、その計測対象コードが直前のサイクルで修正されているときは、レビュアーは証跡の手順を自前のプローブで再実行し、現行コードで同じ値が再現するかを判定に含める。再現しなければ Major として測り直しを求める。
 
 ## 経緯
+- 2026-09-05 template-parent-state-observation: 修正サイクル後のレビューが証跡 (evidence/height-change-tap-verification.md) を Simulator で独立に再現し、プローブ 5 本でクロージャ呼び出し回数を数えて、実装の正しさと doc コメントの射程の食い違い (配列が変わる更新で宣言なし経路は既存セルを呼び直さない) を切り分けた。
 - 2026-09-05 android-wrapper-foundation: 動きの不具合の修正サイクルで、レビュアーが証跡 (帯の画素数・スクロール量の系列・性能値) を自前経路で再計測し、実装者の数値と食い違わないまま 2 件の実装欠陥を Major として検出した。3 サイクルで収束。
 - 2026-09-03 ios-engine-foundation: 幅変化でのリセット追加 (Minor 対応) が初回レイアウトで実測を捨てる回帰を入れ、証跡の「誤差 −26.9% → 0%」が現行コードで再現しなくなっていた。実装側のテストは全て通過しており、プローブ再計測だけが検出した。

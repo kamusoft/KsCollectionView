@@ -1,8 +1,9 @@
 ---
 id: 0008
 title: テンプレートの中で読む親の状態は、観測する値として DSL に明示的に渡す (iOS 固有の modifier)
-status: proposed
+status: accepted
 date: 2026-09-05
+amends: 0006
 ---
 
 ## Context
@@ -17,8 +18,8 @@ Android (Compose) では、テンプレートのラムダは `@Composable` で `
 
 ## Decision
 
-- テンプレートの中で読む親の状態を、観測する値として DSL に明示的に渡す modifier を iOS に追加する (名称は仮に `.observing(_:)`。`Hashable` な値を 1 つ受け取り、複数の状態は構造体やタプルにまとめて渡す)。modifier の引数式は body の中で評価されるため依存が張られ、親の再評価とライブラリへの更新が届く。
-- ライブラリは前回の観測値と比較し、変わったときに可視セルを再構成する。観測する値を渡した場合に限り、ios/ADR-0006 の「親の更新が届いたら再構成する」は「観測する値が変わったら再構成する」に置き換わる (ADR-0006 の部分的な精緻化。未指定時は ADR-0006 のまま)。
+- テンプレートの中で読む親の状態を、観測する値として DSL に明示的に渡す modifier `observedValue(_:)` を iOS に追加する (`Hashable` な値を 1 つ受け取り、複数の状態は構造体などにまとめて渡す)。modifier の引数式は body の中で評価されるため依存が張られ、親の再評価とライブラリへの更新が届く。名称は既存の modifier (`header` / `touchFeedback(color:)` / `listSeparators(_:)` 等) と同じ「設定する対象」を表す名詞句に揃え、デルタスペックの語彙「観測する値」と 1 対 1 で対応させる (実装時に仮称 `.observing(_:)` から確定)。
+- ライブラリは前回の観測値と比較し、変わったときに可視セルの内容を再構成する。**ios/ADR-0006 の決定のうち「配列が同値でも、親 View の更新が届いたら可視セルの内容を再構成する」を、観測する値を渡した場合に限り「観測する値が変わったときに再構成する」へ本決定で置き換える。他の決定 (観測する値を渡していない場合の再構成、ID・テンプレートキーの宣言と登録集合の表示中不変) は維持する。**
 - 「テンプレートの中で親の状態を読むなら、その状態を観測する値として渡す」を利用者契約とし、利用者向けドキュメントに明記する。
 - modifier を指定しない場合の挙動は ios/ADR-0006 のまま残す (親の更新が届くたびに可視セルを再構成する)。modifier は純粋な追加であり、既存の契約を狭めない。
 - Android には対応する API を設けない。親の状態の観測は Compose が自動で行うため不要であり、状態保持の流儀はプラットフォームごとに残す (core/ADR-0002)。
@@ -29,20 +30,25 @@ Android (Compose) では、テンプレートのラムダは `@Composable` で `
 - **KsSettingsView の CustomCell と同じく、テンプレートのクロージャが (項目, content 値) を受け取る形にする**: 却下。観測する値をコレクション全体で 1 つ渡す modifier のほうが公開面の変更が小さく、単一テンプレート・複数テンプレートの両方の init を変えずに済む。効果 (宣言時に評価される値で依存を張る) は同じ。
 - **状態を項目 (配列) または参照型モデルに持たせる書き方だけを支える (API 不変)**: 単独では却下。配列に入れる形は両プラットフォームで対称だが、ios/ADR-0006 が目指した「親の状態を捕捉するテンプレート」を諦めることになる。参照型モデルをセルの中で観測する書き方は中身のアニメーションが成立する利点があり、本決定と排他ではないため、利用者向けドキュメントに参考 (推奨ではない) として併記する (オーナー判断 2026-09-05)。
 - **指定が無いときは観測値が変わったときだけ再構成する (ADR-0006 の挙動を狭める)**: 却下。modifier を忘れると body で読んでいても無反応になり、静かな失敗の範囲が広がる。
+- **動名詞の名称 `.observing(_:)`**: 却下 (実装時)。既存の利用者向け modifier はイベントハンドラを除きすべて名詞句で統一されており、Swift API Design Guidelines も非破壊のメソッドに名詞句を推奨する。
 
 ## Consequences
 
-- 正: テンプレートの中で親の状態を読む書き方が、iOS でも Android と同じように表示へ反映される。
+- 正: テンプレートの中で親の状態を読む書き方が、iOS でも Android と同じように表示へ反映される。検証画面「行の高さ変化」の親 state 経路は body で状態を読む回避策なしに、遷移直後の 1 タップ目から list / grid とも開閉する (実装結果: Simulator の実タッチで確認、追従の非対称は消えた)。
 - 正: 観測値が変わったときだけ可視セルを再構成できるため、再構成の契機と負荷が読める。
 - 正: 既存の書き方 (body でも読んでいる場合) は modifier なしで従来どおり動く。
+- 正: 観測する値を渡した場合、配列の変化と観測する値の変化が同じ更新で届いても、内容が同値のまま残る可視セルはテンプレートが呼び直され、古い観測値のまま取り残されない (実装結果: 相方レビューの指摘で配列変更経路にも引き渡すよう修正)。
 - 負: iOS だけに存在する語彙が 1 つ増える。利用者向けドキュメントで「Android では不要」と説明する必要がある。
 - 負: modifier を忘れ、かつ body でも読んでいない場合は、依然として無反応になる (静かな失敗そのものは消えない)。
-- 負: 可視セルの再構成では `UIHostingConfiguration` が差し替わるため、中身の変化はアニメーションしない (ios/ADR-0006 の帰結のまま)。SwiftUI のトランザクション (`context.transaction`) を再構成に引き渡して改善できるかは、本決定を実装する change の中で確かめる (オーナー判断 2026-09-05)。
-- 負: ios/ADR-0006 の Consequences (前提の成立条件を本 change に委ねる記述) は、本決定の accepted 昇格時に改訂が必要になる。
+- 負: 観測する値を渡した場合、配列が同値の更新では渡した値以外の変化 (クロージャの差し替え、クロージャの中で読む別の状態) は可視セルへ届かない。テンプレートの中で読む状態はすべて 1 つの値にまとめる必要がある (実装結果)。
+- 負: 観測する値を渡していない経路は、配列が変わる更新では差分で拾われた項目しか再構成しない。同じ更新で親の状態も変わっていると、内容不変の既存セルは古い状態のまま残る。ios/ADR-0006 の目的「親の状態を捕捉するテンプレート」は宣言なしの経路では配列変更を伴う更新で成立せず、宣言の有無で追従の射程が非対称になる。埋めるかは別の変更の判断 (実装結果: レビューのプローブで確認、スペックの合意範囲内)。
+- 負: 可視セルの再構成では `UIHostingConfiguration` が差し替わるため、中身の変化はアニメーションしない (ios/ADR-0006 の帰結のまま)。SwiftUI のトランザクションを再構成に引き渡す試作は効果が無かった: 親の state 変更で届く transaction は `animation=nil` で引き渡すものが無く、タップを `withAnimation` で包んで `DefaultAnimation` を届けても中身はアニメーションしなかった (実装結果: フレームログの A/B とオーナー目視、2026-09-05)。中身のアニメーションはトランザクションの引き渡しでは解けず、別の解き方が要る。
+- 負: 観測する値が変わった配列変更の更新では、生き残る可視セルを再構成対象へ加えるために新 snapshot の全識別子を 1 パス走査する (既存の同規模パスと同オーダー、スクロール中の経路ではない。性能 2 系統の再計測はオーナー判断で見送り) (実装結果)。
 
 ## Revisit When
 
 - SwiftUI がホスティング外のクロージャで読まれた状態の依存追跡を提供するようになったとき。
 - テンプレートのクロージャの中で親の状態を読む書き方そのものを利用者契約から外す判断をしたとき。
+- 可視セル再構成で中身のアニメーションを成立させる別の解き方が見つかったとき (トランザクションの引き渡しは効果なしと確認済み)。
 
-出典: kasane/changes/template-parent-state-observation/exploration.md / kasane/changes/archive/2026-09-04-ios-engine-foundation/session.md (親 state の観測と A/B、2026-09-03) / ../KsSettingsView/ios/Sources/KsSettingsViewUI/CustomCell.swift (利用者側の契約) / android/kscollectionview/src/main/kotlin/jp/kamusoft/kscollectionview/KsCollectionView.kt (item 内でのテンプレート実行)
+出典: kasane/changes/archive/2026-09-05-template-parent-state-observation/exploration.md (選択肢と決定事項) / kasane/changes/archive/2026-09-05-template-parent-state-observation/deviation.md (modifier の名称・可視セル再構成の分割・アニメーションの spike・性能検証の扱い) / kasane/changes/archive/2026-09-05-template-parent-state-observation/review-002.md (宣言なし経路の非対称) / kasane/changes/archive/2026-09-04-ios-engine-foundation/session.md (親 state の観測と A/B、2026-09-03) / ../KsSettingsView/ios/Sources/KsSettingsViewUI/CustomCell.swift (利用者側の契約) / android/kscollectionview/src/main/kotlin/jp/kamusoft/kscollectionview/KsCollectionView.kt (item 内でのテンプレート実行)

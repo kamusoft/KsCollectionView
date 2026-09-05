@@ -92,7 +92,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let previousSeparatorColor = self.configuration.separatorColor
         let previousController = self.configuration.scrollController
         let previousObservedValue = self.configuration.observedValue
-        // 観測する値が宣言されているときは、その値が変わった更新でだけテンプレートを呼び直す。
+        // 観測する値が宣言されているときは、その値が変わった更新でだけテンプレートを呼び直す (ios/ADR-0008)。
         // 宣言が無いときは配列が同値の更新が届くたびに呼び直す (ios/ADR-0006)。
         let observedValueChanged = configuration.observedValue != nil
             && configuration.observedValue != previousObservedValue
@@ -405,7 +405,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let identifiers = plan.identifiers.map(KsItemIdentifier.init)
         let currentIdentifiers = dataSource.snapshot().itemIdentifiers
         let positionsChanged = identifiers != currentIdentifiers
-        // 観測する値が変わった更新では、内容が同値のまま残る可視セルもテンプレートを呼び直す。
+        // 観測する値が変わった更新では、内容が同値のまま残る可視セルもテンプレートを呼び直す (ios/ADR-0008)。
         // 配列の変化と同時に届いた場合に、既存のセルが古い観測値のまま取り残されるのを防ぐ。
         // 画面外のセルは表示されるときに最新の構成で作られるため対象にしない。
         let survivingVisibleIdentifiers: Set<KsItemIdentifier>

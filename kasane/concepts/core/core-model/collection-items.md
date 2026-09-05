@@ -1,7 +1,7 @@
 ---
 type: concept
 title: コレクションの項目モデルと差分更新
-description: KsCollectionView が受け取るプレーンな配列・安定 ID・テンプレートキーの契約と、配列を差し替えたときに何が再描画されるか (iOS / Android 共通)
+description: KsCollectionView が受け取るプレーンな配列・安定 ID・テンプレートキーの契約と、配列を差し替えたときに何が再描画されるか、親の状態をテンプレートで読む条件 (iOS / Android 共通)
 tags: [core-model, diffable, template]
 timestamp: 2026-09-05
 ---
@@ -23,6 +23,8 @@ KsCollectionView(items, template: \.kind) {                          // 値キ�
     KsTemplate(.message) { item in MessageRow(item) }
     KsTemplate(.ad) { item in AdCard(item) }
 }
+KsCollectionView(items) { item in Row(item, isExpanded: expandedIDs.contains(item.id)) }
+    .observedValue(expandedIDs)                                      // テンプレートの中で読む親の状態を観測する値として渡す (iOS のみ)
 ```
 
 ```kotlin
@@ -41,8 +43,9 @@ KsCollectionView(items = items, key = { it.id }, template = { it.kind }) {
 | テンプレートキー | `template:` キーパス | `template: (Item) -> Any` ラムダ |
 | キーごとのテンプレート登録 | `KsTemplate(キー) { item in … }` を宣言ブロックに並べる | `template(キー) { item -> … }` をスコープ内で呼ぶ |
 | 単一テンプレート | 末尾クロージャ | `template { item -> … }` |
+| テンプレートの中で読む親の状態 | `.observedValue(_:)` modifier (`Hashable` な値を 1 つ) | 無し (Compose が自動で購読する) |
 
-語彙と構造は 1 対 1 に対応し、記法だけが各プラットフォームの流儀に従う (core/ADR-0002)。Kotlin の `template(key)` はスコープ関数で対応する公開型を持たないため、Swift の `KsTemplate` に当たる型名は Android には無い。
+語彙と構造は 1 対 1 に対応し、記法だけが各プラットフォームの流儀に従う (core/ADR-0002)。Kotlin の `template(key)` はスコープ関数で対応する公開型を持たないため、Swift の `KsTemplate` に当たる型名は Android には無い。観測する値だけは iOS にしか無い語彙で、Android には対応物を設けない (ios/ADR-0008)。
 
 ## 責務境界
 
@@ -61,7 +64,7 @@ KsCollectionView(items = items, key = { it.id }, template = { it.kind }) {
 - **安定 ID が identity である**。同じ ID の要素は内容が変わってもセルインスタンスを維持したまま再構成される (理由は下記)。
 - **テンプレートキーが変わった要素はセルを置き換える**。同じ ID でもキー値が `.message` から `.ad` に変われば、再構成ではなく置換になる。
 - **同一キーの要素間でのみセルが再利用される**。キーは再利用種別 (iOS `CellRegistration`、Android `contentType`) に写像され、キーをまたいで再利用プールが混ざらない。
-- **配列が同値でも親 View の更新が届けば可視セルを再構成する** (ios/ADR-0006)。親の状態 (選択中 ID など) をテンプレートの中で読む書き方が成立する。成立条件は下記「親の状態をテンプレートで読む条件」。
+- **配列が同値でも、親の状態の変化を可視セルへ反映する** (ios/ADR-0006・ios/ADR-0008)。親の状態 (選択中 ID・展開中 ID の集合など) をテンプレートの中で読む書き方が成立する。iOS での条件は下記「親の状態をテンプレートで読む条件」。
 - **不正入力は release で落とさず・消さず・黙らず** (core/ADR-0011)。種類ごとの挙動は下表。
 - 10,000 件規模でもメモリが件数に比例して増えない。計測手順と基準は [iOS](../../../handbook/ios/performance-verification.md) / [Android](../../../handbook/android/performance-verification.md) の性能検証規約。
 
@@ -78,7 +81,16 @@ KsCollectionView(items = items, key = { it.id }, template = { it.kind }) {
 
 ### 親の状態をテンプレートで読む条件
 
-iOS では、その状態が親の body 側でも読まれていて、親 View の更新自体が起きることが条件になる。テンプレートの中でしか読まない状態は body の依存グラフに載らず、更新の起点にならない (「してはいけないこと」)。Android は再コンポジションで条件なしに成り立つ。
+iOS では、テンプレートの中で読む親の状態を `observedValue(_:)` に観測する値として渡す (ios/ADR-0008)。テンプレートのクロージャは body 評価の外で実行されるため、その中でしか読まれない状態は SwiftUI の依存グラフに載らず、渡さないと状態が変わっても更新がライブラリへ届かない。複数の状態は `Hashable` な 1 つの値 (構造体など) にまとめて渡す。Android は Compose が合成の中でテンプレートを実行して親の State を自動で購読するため、対応する指定は無い。
+
+iOS で何が再構成されるかは、観測する値の有無と更新の種類で決まる。
+
+| iOS の書き方 | 配列が同値の更新 | 配列が変わる更新 |
+|---|---|---|
+| 観測する値を渡している | 値が変わったときだけ可視セルのテンプレートを呼び直す。値以外の変化 (クロージャの差し替え・クロージャの中で読む別の状態) は届かない | 差分で拾われた項目に加え、内容が同値のまま残る可視セルもテンプレートを呼び直す (取り残しなし) |
+| 渡していない | 親 View の更新が届くたびに可視セルのテンプレートを呼び直す (ios/ADR-0006)。状態が body でも読まれていることが、更新が届く条件 | 差分で拾われた項目だけ。同じ更新で親の状態も変わっていると、内容不変の既存セルは古い状態のまま残る |
+
+参考 (推奨ではない): 状態を項目の配列に持たせる書き方は両プラットフォームで対称に成立する。参照型モデルをセルの中で観測する書き方は中身の変化がアニメーションする利点がある。どちらも上の契約と排他ではない。
 
 ### なぜ ID を identity にするか
 
@@ -88,7 +100,7 @@ iOS では、その状態が親の body 側でも読まれていて、親 View �
 
 - ID とテンプレートキーの取り出し方 (Swift `id:` / `template:`、Kotlin `key` / `template`) と登録集合を表示中に差し替えない (ios/ADR-0006)。宣言箇所ごとに静的に決める。Android で偶然反映されても契約にはしない。
 - Android の `key` に、`Parcelable` / `Serializable` を実装していない `data class` / `value class` など Bundle に載らない型を返さない。使える型は文字列・数値・enum・`Serializable`・`Parcelable`。違反時の挙動は上表「不正入力の扱い」の最終行。
-- iOS で、テンプレートの中でしか読まれない親の `@State` に依存して更新を期待しない。そのクロージャは body 評価の外で実行され依存グラフに載らない (2026-09-03 観測)。回避策は同じ状態を body 側でも読むこと。根本的な解き方は ios/ADR-0008 (proposed)。Android は Compose の自動観測で問題にならない。
+- iOS で、テンプレートの中で読む親の状態を `observedValue(_:)` に渡さずに更新を期待しない。そのクロージャは body 評価の外で実行され依存グラフに載らない (ios/ADR-0008)。渡すときは、テンプレートの中で読む状態をすべて 1 つの値にまとめる (渡した値以外の変化は同値配列の更新で届かない)。Android は Compose の自動観測で問題にならない。
 - セル内の `@State` / `remember` に「画面外に出ても残したい状態」を置かない。再利用・破棄で初期値に戻る (ios/ADR-0002。Android は可視範囲と先読み分を超えて送ると Composition が破棄される)。
 
 ## 用語
@@ -98,6 +110,7 @@ iOS では、その状態が親の body 側でも読まれていて、親 View �
 - **再構成 (reconfigure)**: セルインスタンスを維持したまま内容を差し替えること。Android では項目の Composition を保ったまま新しい値で再コンポジションされることを指す。**置換 (reload)** はセルごと入れ替えること。
 - **Sample**: リポジトリ同梱 (`samples/`) の動作確認・プラットフォーム間パリティ検証用アプリ。両プラットフォームに同じデモ画面を持つ。
 - **再利用種別**: 同じ種別の要素間でだけセルを使い回す単位。iOS は `CellRegistration`、Android は `contentType`。
+- **観測する値**: iOS で `observedValue(_:)` に渡す `Hashable` な値。テンプレートの中で読む親の状態を表し、その変化が可視セルのテンプレート呼び直しの契機になる。
 
 ## 関連
 
@@ -105,4 +118,4 @@ iOS では、その状態が親の body 側でも読まれていて、親 View �
 - [collection-interaction](collection-interaction.md) — タップ・長押し・スクロール制御
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — この契約を UICollectionView でどう実現しているか
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — この契約を Compose Lazy 系でどう実現しているか
-- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、ios/ADR-0002、ios/ADR-0004、ios/ADR-0006、android/ADR-0001
+- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、ios/ADR-0002、ios/ADR-0004、ios/ADR-0006、ios/ADR-0008 (観測する値)、android/ADR-0001

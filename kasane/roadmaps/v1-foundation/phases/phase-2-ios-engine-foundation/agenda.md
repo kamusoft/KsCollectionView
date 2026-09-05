@@ -112,7 +112,7 @@ change [ios-engine-foundation](../../../../changes/archive/2026-09-04-ios-engine
 |---|---|
 | 値キーテンプレートの推論形と `Template` の `Ks` 接頭辞 | [phase-3 agenda](../phase-3-android-wrapper-foundation/agenda.md) 「phase-2 からの申し送り」(着手前に対応) |
 | 行の高さ変化の検証画面を Android にも置くか | [phase-3 agenda](../phase-3-android-wrapper-foundation/agenda.md) 「phase-2 ライブ調整からの申し送り」 |
-| テンプレート内でだけ読まれる親 state の変更検知 (ios/ADR-0006 の前提) | 独立 change [template-parent-state-observation](../../../../changes/template-parent-state-observation/exploration.md) |
+| テンプレート内でだけ読まれる親 state の変更検知 (ios/ADR-0006 の前提) | 独立 change [template-parent-state-observation](../../../../changes/archive/2026-09-05-template-parent-state-observation/proposal.md) (2026-09-05 完了・蒸留済み: ios/ADR-0008 accepted、`observedValue(_:)` modifier) |
 | セクション導入時の区切り線二重化 (「全セルに下線」規則) と `rowSpacing` / `contentPadding` 下での区切り線の見え方 | [phase-4 agenda](../phase-4-sections-grouping/agenda.md) 「phase-2 からの申し送り」 |
 | 基準機 iPhone 11 での性能計測、メモリ絶対値 (Simulator 約 610 MB) の実機確認、grid の推定高さの残る乖離と移動平均の揺れの観測 | [phase-7 agenda](../phase-7-samples-distribution/agenda.md) 「phase-2 からの申し送り」 |
 | プリフェッチ接続口 (`UICollectionViewDataSourcePrefetching`) の実接続 | [phase-8 agenda](../phase-8-image-loading/agenda.md) の既存論点 (iOS の接続) |

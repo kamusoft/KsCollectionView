@@ -12,7 +12,7 @@ timestamp: 2026-09-05
 
 ## 目的
 
-Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ねる。
+Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ねる。テンプレートのラムダは item の合成の中で実行されるため、そこで読んだ親の State は自動で購読され、iOS の `observedValue(_:)` に当たる指定は無い (ios/ADR-0008)。
 
 ## 構成
 

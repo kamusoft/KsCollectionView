@@ -3,6 +3,7 @@ id: 0006
 title: 同値配列の更新でも可視セルを再構成し、ID・テンプレートキーの宣言と登録集合は表示中不変とする
 status: accepted
 date: 2026-09-02
+amended-by: 0008
 ---
 
 ## Context
@@ -29,5 +30,6 @@ date: 2026-09-02
 - 負: 可視セルの再構成では `UIHostingConfiguration` が差し替わるため、中身の変化は SwiftUI のアニメーションとして扱われず瞬時に切り替わる (テンプレート内部の状態変化はアニメーションする)。
 - 負: 表示中にキーパスや登録集合を差し替えても反映されないことを、利用者向けドキュメントに明記する必要がある。
 
-出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (差分更新 2 件、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/session.md (親 state の観測、2026-09-03) / kasane/changes/template-parent-state-observation/exploration.md
+出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (差分更新 2 件、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/session.md (親 state の観測、2026-09-03) / kasane/changes/archive/2026-09-05-template-parent-state-observation/exploration.md
 現行照合: 2026-09-05 確認。`Template` は `KsTemplate` に改名済み (android-wrapper-foundation、命名のみで決定は不変)。同値配列での可視セル再構成と登録集合の表示中不変は維持。 判定: 維持
+一部改訂: 2026-09-05 ios/ADR-0008 (観測する値を渡した場合の再構成条件を置き換え。宣言なし経路と表示中不変の決定は維持)
