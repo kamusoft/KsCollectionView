@@ -9,5 +9,6 @@
 | [0005](0005-single-swiftpm-product.md) | SwiftPM の product は KsCollectionView 単一とし、エンジンは同一モジュールの internal に置く | accepted | 公開面は DSL の入口に限定。Core/UI 分割・別 package は却下 (モデル層が無い・共有先が無い)。 |
 | [0006](0006-reconfigure-visible-cells-on-equal-array-update.md) | 同値配列の更新でも可視セルを再構成し、ID・テンプレートキーの宣言と登録集合は表示中不変とする | accepted | 親の状態を捕捉するテンプレートを成立させる。前提「親の更新が届く」の成立条件は template-parent-state-observation で扱う。 |
 | [0007](0007-cell-content-placement.md) | セル content は行の上端に固定・水平は中央に置き、content へ行の高さを提案しない | proposed | UIHostingConfiguration の中央配置はみ出し対策 (KsRowContentPlacement)。帰結: grid で背の低いセルは行高いっぱいに広がらない。Android 実装完了まで proposed (オーナー判断 2026-09-04)。 |
+| [0008](0008-observed-parent-state-modifier.md) | テンプレートの中で読む親の状態は、観測する値として DSL に明示的に渡す (iOS 固有の modifier) | proposed | 仮称 `.observing(_:)`。引数式が body で評価されるため依存が張られ、値が変わったときだけ可視セルを再構成する。未指定時は ADR-0006 のまま。Android は Compose の自動観測で不要。 |
 
 採番規則は [../index.md](../index.md) を参照。
