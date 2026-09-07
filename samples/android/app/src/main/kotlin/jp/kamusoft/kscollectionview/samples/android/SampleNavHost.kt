@@ -57,6 +57,7 @@ fun SampleNavHost(startRoute: String? = null) {
                     SampleScreen.Scrolling -> ScrollControlDemoScreen()
                     SampleScreen.Spacing -> SpacingPaddingDemoScreen()
                     SampleScreen.LargeData -> LargeDataDemoScreen()
+                    SampleScreen.ImageGrid -> ImageGridDemoScreen()
                 }
             }
         }

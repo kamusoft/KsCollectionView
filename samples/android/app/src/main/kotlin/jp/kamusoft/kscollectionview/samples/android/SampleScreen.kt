@@ -17,4 +17,5 @@ enum class SampleScreen(val title: String) {
     Scrolling("スクロール制御"),
     Spacing("スペーシングと余白"),
     LargeData("大量件数"),
+    ImageGrid("画像グリッド"),
 }

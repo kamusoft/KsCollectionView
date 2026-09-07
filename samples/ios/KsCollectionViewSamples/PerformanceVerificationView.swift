@@ -6,6 +6,7 @@ import UIKit
 /// メモリ計測用の検証画面です。起動引数で指定したときだけ表示します。
 struct PerformanceVerificationView: View {
     let automaticallyRuns: Bool
+    var fixture: PerformanceFixture = .largeData
 
     @State private var completedRoundTrips = 0
     @State private var memoryAfterFirstRoundTrip = "未計測"
@@ -33,20 +34,33 @@ struct PerformanceVerificationView: View {
                 .accessibilityIdentifier("performance.memory.second")
             // 通過件数は往復ごとに数え直すため、直近 1 往復の結果であることを表示に明示する。
             // 桁区切りが入ると読み取り側の期待値がロケール依存になるため、そのままの数字で表示する。
-            Text(verbatim: "直近往復の通過: \(visitedItemsInLastRoundTrip.count) / \(DemoData.largeItems.count)")
+            Text(verbatim: "直近往復の通過: \(visitedItemsInLastRoundTrip.count) / \(fixture.itemCount)")
                 .accessibilityIdentifier("performance.visitedItems")
 
+            fixtureCollection
+        }
+        .task {
+            guard automaticallyRuns else { return }
+            await runUntilSteady()
+            exit(EXIT_SUCCESS)
+        }
+    }
+
+    /// 走査する土俵です。件数と配置とセルの中身がここで決まります。
+    @ViewBuilder
+    private var fixtureCollection: some View {
+        switch fixture {
+        case .largeData:
             KsCollectionView(
                 DemoData.largeItems,
                 layout: .grid(columns: .fixed(2), rowSpacing: 1, columnSpacing: 1)
             ) { item in
                 DemoListRow(item: item)
             }
-        }
-        .task {
-            guard automaticallyRuns else { return }
-            await runUntilSteady()
-            exit(EXIT_SUCCESS)
+        case .imageGrid(let destination):
+            // 件数・列数・間隔・外周の余白・セルはデモ画面と同じ宣言元 (ImageGridFixture) から
+            // 取り、プリフェッチの到達点だけを外から選ぶ。
+            ImageGridFixture.collection(destination: destination)
         }
     }
 
@@ -90,7 +104,7 @@ struct PerformanceVerificationView: View {
         }
         print(
             "KS_PERF_VISITED_ITEMS_LAST_ROUND="
-                + "\(visitedItemsInLastRoundTrip.count)/\(DemoData.largeItems.count)"
+                + "\(visitedItemsInLastRoundTrip.count)/\(fixture.itemCount)"
         )
         let isSteady = everyRoundTripIsValid && Self.hasSteadied(footprints)
         print("KS_PERF_STEADY=\(isSteady ? "yes" : "no")")
@@ -131,17 +145,17 @@ struct PerformanceVerificationView: View {
         }
         print(
             "KS_PERF_MEMORY_ROUND_\(completedRoundTrips)=\(text) "
-                + "visited=\(visited.count)/\(DemoData.largeItems.count)"
+                + "visited=\(visited.count)/\(fixture.itemCount)"
         )
 
         let reachedBothEnds = forward.reachedEnd && backward.reachedEnd
         let settledEveryStep = forward.settled && backward.settled
-        let coveredEveryItem = visited.count == DemoData.largeItems.count
+        let coveredEveryItem = visited.count == fixture.itemCount
         guard reachedBothEnds, settledEveryStep, coveredEveryItem else {
             print(
                 "KS_PERF_ROUND_TRIP_INVALID=\(completedRoundTrips) "
                     + "reachedBothEnds=\(reachedBothEnds) settledEveryStep=\(settledEveryStep) "
-                    + "visited=\(visited.count)/\(DemoData.largeItems.count)"
+                    + "visited=\(visited.count)/\(fixture.itemCount)"
             )
             return false
         }

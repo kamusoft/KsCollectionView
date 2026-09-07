@@ -16,6 +16,13 @@ object MeasurementTarget {
     /** 起動時に開く経路を渡す追加情報のキー。 */
     const val StartRouteExtra = "ks_start_route"
 
+    /**
+     * 起動時に画像キャッシュを空にすることを求める追加情報のキー。
+     *
+     * 対象アプリ側のキー (`SampleRoutes.ResetImageCacheExtra`) をここに写して持つ。
+     */
+    const val ResetImageCacheExtra = "ks_reset_image_cache"
+
     /** 走査の進捗を読むための印。 */
     const val StatusDescription = "measurement-status"
 
@@ -42,4 +49,12 @@ object MeasurementTarget {
     /** メモリの定常判定のための自動往復。 */
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
         "measurement/memory/$count/$maxRoundTrips"
+
+    /** ライブラリで描く画像グリッドの土俵。到達点は "none" / "disk" / "memory"。 */
+    fun imageGrid(count: Int, destination: String): String =
+        "measurement/image/$count/$destination"
+
+    /** 画像グリッドのメモリの定常判定のための自動往復。 */
+    fun imageMemoryRoundTrip(count: Int, maxRoundTrips: Int, destination: String): String =
+        "measurement/image-memory/$count/$maxRoundTrips/$destination"
 }

@@ -1,0 +1,18 @@
+---
+scope: spec-review
+kind: pain
+severity: normal
+count: 1
+first-seen: 2026-09-07
+last-seen: 2026-09-07
+evidence:
+  - image-loading (design Decision 1 が「現在の共有パイプラインの configuration と delegate をそのまま引き継ぐ」と決めたが、Nuke 13.2.0 の ImagePipeline.delegate は internal 宣言で外から読めず、実装フェーズの tasks 3.3 / 3.5 で停止。この記述は相方の spec-review 指摘 #1「dataCache が nil でも独自 DataLoader / delegate を持つ構成を壊す」への対応として採用されたもので、ホスト・相方どちらの突き合わせでも実現可能性を確認していなかった。オーナー判断で自動差し替えを取りやめ、明示的な公開 API へ方針変更)
+  - image-loading / 同一 change 内の再発 (design Decision 8 が Android の統合テストで BlackholeDecoder を使うと決めたが、Coil 3.5.0 の BlackholeDecoder は @ExperimentalCoilApi で opt-in を要することが design に書かれていなかった。実装側が opt-in を internal な adapter の 1 メソッドに閉じて回避。同一作業単位のため count は増やさない)
+---
+
+## ルール文
+提案・設計のレビューで、記述が外部ライブラリの値を読む・引き継ぐ・差し替えるといった具体的な API 利用を前提にしているときは、その API が**採用版のソースまたは公式リファレンスで公開宣言されている**ことを確かめ、確認した宣言の位置 (ファイルと行、またはリファレンスの該当項目) をレビュー結果に書く。設計文書の疑似コードが自然に読めることを実現可能性の根拠にしない。指摘への対応として新しい API 利用が書き加えられた場合も、突き合わせの時点で同じ確認を行う。
+
+## 経緯
+- 2026-09-07 image-loading: 相方の spec-review 指摘を受けて「configuration と delegate を引き継ぐ」形へ設計を直し、突き合わせ表で「採用・反映済み」として閉じた。実装に入って初めて delegate が internal と判明し、指摘が解こうとした問題 (利用者構成の破壊) は結局解けていなかった。configuration 側は public で引き継げたため、実際に失われるのは delegate だけと分かったが、design と spec を凍結したまま方針を決め直す判断がオーナーに戻り、実装は 2 タスク分停止した。
+- 2026-09-07 image-loading (同一 change 内の再発): Android 側でも design が指定した Coil の API が experimental (opt-in 必須) であることを提案段階で確認しておらず、実装側の判断で opt-in の露出範囲を internal に閉じて処理した。停止には至らなかったが、確認していれば design に「opt-in の露出をどこで止めるか」を書けた。

@@ -3,6 +3,7 @@ package jp.kamusoft.kscollectionview.samples.android
 import android.os.Debug
 import android.util.Log
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,7 +16,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.dp
 import jp.kamusoft.kscollectionview.KsCollectionView
+import jp.kamusoft.kscollectionview.KsLayout
+import jp.kamusoft.kscollectionview.KsPrefetchDestination
 import jp.kamusoft.kscollectionview.KsScrollPosition
 import jp.kamusoft.kscollectionview.rememberKsScrollController
 import kotlinx.coroutines.delay
@@ -47,12 +51,22 @@ private const val StepDeadlineMillis = 10_000L
  *
  * @param items 表示する要素
  * @param maxRoundTrips 重ねる往復の上限
+ * @param layout 土俵の配置
+ * @param contentPadding 土俵の外周の余白
+ * @param prefetchResources プリフェッチする URL の宣言。宣言しないときは null
+ * @param prefetchDestination プリフェッチの到達点
+ * @param row 1 項目の見た目
  */
 @Composable
 fun MemoryRoundTripScreen(
     items: List<DemoItem>,
     maxRoundTrips: Int,
     modifier: Modifier = Modifier,
+    layout: KsLayout = LargeDataLayout,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    prefetchResources: ((DemoItem) -> List<String>)? = null,
+    prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
+    row: @Composable (DemoItem) -> Unit = { DemoListRow(it) },
 ) {
     val controller = rememberKsScrollController()
     var status by remember { mutableStateOf("running") }
@@ -114,13 +128,16 @@ fun MemoryRoundTripScreen(
             color = SampleTheme.secondaryText,
             modifier = Modifier.semantics { contentDescription = MeasurementStatusDescription },
         )
-        // 土俵の配置はデモ画面と同じ宣言元 (LargeDataLayout) から取る。走査の到達確認のために
+        // 土俵の配置と 1 項目の見た目はデモ画面と同じ宣言元から取る。走査の到達確認のために
         // 項目が載ったことを記録する点だけがデモ画面との違い。
         KsCollectionView(
             items = items,
             key = { it.id },
             scrollController = controller,
-            layout = LargeDataLayout,
+            layout = layout,
+            contentPadding = contentPadding,
+            prefetchResources = prefetchResources,
+            prefetchDestination = prefetchDestination,
         ) {
             template { item ->
                 DisposableEffect(item.id) {
@@ -128,7 +145,7 @@ fun MemoryRoundTripScreen(
                     visited += item.id
                     onDispose { composed -= item.id }
                 }
-                DemoListRow(item)
+                row(item)
             }
         }
     }

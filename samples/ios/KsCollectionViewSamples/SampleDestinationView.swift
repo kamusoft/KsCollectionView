@@ -24,6 +24,8 @@ struct SampleDestinationView: View {
                 SpacingPaddingDemoView()
             case .largeData:
                 LargeDataDemoView()
+            case .imageGrid:
+                ImageGridDemoView()
             }
         }
         .navigationTitle(screen.rawValue)

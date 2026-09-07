@@ -8,6 +8,7 @@ enum SampleScreen: String, CaseIterable, Hashable, Identifiable {
     case scrolling = "スクロール制御"
     case spacing = "スペーシングと余白"
     case largeData = "大量件数"
+    case imageGrid = "画像グリッド"
 
     var id: Self { self }
 }

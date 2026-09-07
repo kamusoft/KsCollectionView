@@ -192,6 +192,52 @@ public struct KsCollectionView<Item: Equatable>: View {
         return copy
     }
 
+    /// もうすぐ表示される項目の画像を、表示より前に取得しておくことを宣言します。
+    ///
+    /// クロージャには項目を渡し、その項目の表示に必要なリモート画像の URL を返します。返す URL が
+    /// 無い項目では空の配列を返してください。この宣言をしないコレクションでは画像の先読みは
+    /// 一切行われません。
+    ///
+    /// ```swift
+    /// KsCollectionView(photos) { photo in
+    ///     KsImage(photo.thumbnailURL)
+    /// }
+    /// .prefetchResources { [$0.thumbnailURL] }
+    /// ```
+    ///
+    /// 先読みした画像は、同じ URL を表示するときに再ダウンロードなしで使われます。`destination` に
+    /// ``KsPrefetchDestination/memory`` を指定すると、ディスクへの保存に加えてデコード済みの画像を
+    /// メモリにも載せ、表示までの待ちをさらに短くします。
+    ///
+    /// 既定の ``KsPrefetchDestination/disk`` が働くには、ディスクのキャッシュが有効になっている
+    /// 必要があります。アプリの起動時に ``KsImagePipeline/enableSharedDiskCache()`` を一度呼んで
+    /// ください。呼ばない場合、先読みした元データは残らず表示のときに取得し直しになります。
+    ///
+    /// ```swift
+    /// @main
+    /// struct PhotoApp: App {
+    ///     init() {
+    ///         KsImagePipeline.enableSharedDiskCache()
+    ///     }
+    ///
+    ///     var body: some Scene {
+    ///         WindowGroup { ContentView() }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// クロージャと `destination` は表示中に差し替えない前提の宣言です。差し替えた場合、以後に
+    /// 始まる取得にだけ反映されます。
+    public func prefetchResources(
+        destination: KsPrefetchDestination = .disk,
+        _ resources: @escaping (Item) -> [URL]
+    ) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.prefetchResources = resources
+        copy.configuration.prefetchDestination = destination
+        return copy
+    }
+
     /// スクロール命令を受け取るコントローラを接続します。
     public func scrollController(_ controller: KsScrollController) -> KsCollectionView<Item> {
         var copy = self

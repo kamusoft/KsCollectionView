@@ -5,7 +5,7 @@ applies-when:
   tasks: [環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
 title: ローカル開発環境と Sample の実行
 description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。両プラットフォームとも実際に確認した手順を記す
-timestamp: 2026-09-05
+timestamp: 2026-09-07
 ---
 
 # ローカル開発環境と Sample の実行
@@ -83,6 +83,22 @@ JDK 17 が既定でない環境では、Gradle を呼ぶコマンドに `JAVA_HO
 iOS Sample は `samples/ios/KsCollectionViewSamples.xcodeproj` を Xcode で開き、scheme `KsCollectionViewSamples` と利用可能な iOS Simulator を選んで実行する。本体は `../../ios` の Local Package として解決される。
 
 CLI のビルドは `samples/ios/` で `xcodebuild build -project KsCollectionViewSamples.xcodeproj -scheme KsCollectionViewSamples -destination 'platform=iOS Simulator,name=<利用可能な機種名>,OS=<利用可能な版>' -configuration Debug CODE_SIGNING_ALLOWED=NO` を実行する。
+
+iOS の実機で実行・計測するときは、機体を UDID で指名する (`-destination 'platform=iOS,id=<UDID>'`)。
+接続中の機体は `xcrun xctrace list devices` の Devices 節に出る。
+
+**実機が一覧に出るのに使えないときは、端末側ではなく Mac 側のペアリングが確立していないことがある。**
+`xcrun devicectl list devices -v` で該当機体の `developerModeStatus` が `nil`、`ddiServicesAvailable` が
+`false` になっているのがその状態で、UDID や OS 版のような基本情報は読めるのにデベロッパモードの状態を
+問い合わせられていないことを意味する (一覧の State は `unavailable`、`xcodebuild -showdestinations` の
+候補にも現れない)。次で張り直す:
+
+```
+xcrun devicectl manage pair --device <UDID>
+```
+
+成功すると State が `available (paired)` になり、ビルド先の候補にも現れる。**端末の解錠・信頼・
+デベロッパモードがすべて済んでいてもこの状態になる**ため、端末を疑う前に張り直しを試す。
 
 Android Sample は `samples/android/` を Android Studio で開く (このディレクトリがビルドルートであり、
 リポジトリ直下や `android/` を開くのではない)。CLI からは `samples/android/` で

@@ -29,6 +29,32 @@ final class PerformanceDriverUITests: XCTestCase {
         }
     }
 
+    /// 画像グリッドを 3 秒間フリックします。起動済みの app に接続して測る使い方も同じ環境変数で選べます。
+    @MainActor
+    func test画像グリッドを3秒間連続フリックスクロールする() {
+        let app = XCUIApplication(bundleIdentifier: "jp.kamusoft.kscollectionview.samples.ios")
+        let attachesToExistingApp = ProcessInfo.processInfo.environment["KS_PERF_ATTACH_EXISTING"] == "1"
+        if attachesToExistingApp {
+            // Instruments の接続完了後に、起動済みの Release app を前面化します。
+            Thread.sleep(forTimeInterval: 20)
+            app.activate()
+        } else {
+            app.launchArguments = ["--screen", "画像グリッド"]
+            app.launch()
+        }
+
+        let collection = app.collectionViews.firstMatch
+        XCTAssertTrue(collection.waitForExistence(timeout: 5))
+        if !attachesToExistingApp {
+            // Instruments が実機プロセスへ接続するための待機窓です。
+            Thread.sleep(forTimeInterval: 5)
+        }
+        let deadline = Date().addingTimeInterval(3)
+        while Date() < deadline {
+            collection.swipeUp(velocity: .fast)
+        }
+    }
+
     /// 1 往復は端点間のジャンプではなく可視範囲の半分ずつ送る全件走査のため、往復ごとの待ち時間を長めに取ります。
     @MainActor
     func test大量件数を全件通過で2往復してメモリを表示する() {

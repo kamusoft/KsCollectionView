@@ -331,9 +331,10 @@ struct PhotoGrid: View {
 
     var body: some View {
         KsCollectionView(photos, layout: .grid(columns: .fixed(portrait: 3, landscape: 5))) { photo in
-            KsImage(photo.thumbnailURL)   // プリフェッチと同一ローダ・キャッシュ
+            // プリフェッチと同一ローダ・キャッシュ。ソースは URL の便宜形でも書ける
+            KsImage(.remote(photo.thumbnailURL), contentMode: .fill)
         }
-        .prefetchResources { (photo: Photo) in [photo.thumbnailURL] }
+        .prefetchResources(destination: .memory) { (photo: Photo) in [photo.thumbnailURL] }
     }
 }
 ```
@@ -346,10 +347,28 @@ fun PhotoGrid(photos: List<Photo>) {
         key = { it.id },
         layout = KsLayout.Grid(KsColumns.Fixed(portrait = 3, landscape = 5)),
         prefetchResources = { photo: Photo -> listOf(photo.thumbnailUrl) },
+        prefetchDestination = KsPrefetchDestination.Memory,
     ) {
         template { photo ->
-            KsImage(photo.thumbnailUrl)
+            // プリフェッチと同一ローダ・キャッシュ。ソースは URL の便宜形でも書ける
+            KsImage(KsImageSource.Remote(photo.thumbnailUrl), contentMode = KsImageContentMode.Fill)
         }
+    }
+}
+```
+
+到達点の既定はディスクまで。iOS はディスクのキャッシュが既定では働かないため、アプリの起動時に
+`KsImagePipeline.enableSharedDiskCache()` を一度呼ぶ (Android は既定で働くため呼び出し不要)。
+
+```swift
+@main
+struct PhotoApp: App {
+    init() {
+        KsImagePipeline.enableSharedDiskCache()
+    }
+
+    var body: some Scene {
+        WindowGroup { PhotoGrid(photos: photos) }
     }
 }
 ```
@@ -405,7 +424,8 @@ class RankingViewModel : ViewModel() {
 | ページング | `.paging(_:onLoadMore:)` + `KsPagingState` | `paging = KsPaging(state, onLoadMore)` + `KsPagingState` | 0005 |
 | スクロール | `KsScrollController` + `.scrollController(_)` | `KsScrollController` / `rememberKsScrollController()` + `scrollController =` | 0007, 0009 |
 | タップ | `.onItemTap { }` / `.onItemLongTap { }` / `.touchFeedback(color:)` | `onItemTap =` / `onItemLongTap =` / `touchFeedbackColor =` | 0009 |
-| 画像 | `.prefetchResources { }` + `KsImage` | `prefetchResources =` + `KsImage` | 0008 |
+| 画像 | `.prefetchResources(destination:_:)` + `KsImage(_:contentMode:)` | `prefetchResources =` / `prefetchDestination =` + `KsImage(source, contentMode =)` | 0008 |
+| 画像の取得元・到達点 | `KsImageSource` (`.remote` / `.file` / `.asset`) / `KsPrefetchDestination` (`.disk` / `.memory`) / `KsImageContentMode` (`.fit` / `.fill`) | `KsImageSource` (`Remote` / `File` / `Resource`) / `KsPrefetchDestination` (`Disk` / `Memory`) / `KsImageContentMode` (`Fit` / `Fill`) | 0008 |
 
 ## 実装フェーズへの申し送り
 

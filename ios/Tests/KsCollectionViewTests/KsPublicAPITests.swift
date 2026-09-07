@@ -105,4 +105,72 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertEqual(view.configuration.id(items[0]), AnyHashable("shared-1"))
         XCTAssertEqual(view.configuration.id(items[1]), AnyHashable("shared-2"))
     }
+
+    func testプリフェッチを宣言しなければ到達点は既定のdiskで宣言なしのままになる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+
+        XCTAssertNil(view.configuration.prefetchResources)
+        XCTAssertEqual(view.configuration.prefetchDestination, .disk)
+    }
+
+    func testプリフェッチ宣言を到達点付きで組み立てられる() {
+        let item = Item(id: 1, kind: .message, title: "A")
+        let expected = [
+            URL(string: "https://example.com/1-a.jpg")!,
+            URL(string: "https://example.com/1-b.jpg")!,
+        ]
+        let view = KsCollectionView([item]) { item in
+            Text(item.title)
+        }
+        .prefetchResources(destination: .memory) { _ in expected }
+
+        XCTAssertEqual(view.configuration.prefetchDestination, .memory)
+        XCTAssertEqual(view.configuration.prefetchResources?(item), expected)
+    }
+
+    func testプリフェッチ宣言の到達点を省略するとdiskになる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        .prefetchResources { _ in [] }
+
+        XCTAssertEqual(view.configuration.prefetchDestination, .disk)
+        XCTAssertNotNil(view.configuration.prefetchResources)
+    }
+
+    func test画像ソースは3種を表せる() {
+        let remote = KsImageSource.remote(URL(string: "https://example.com/1.jpg")!)
+        let file = KsImageSource.file(URL(fileURLWithPath: "/tmp/1.jpg"))
+        let asset = KsImageSource.asset("thumbnail")
+
+        XCTAssertNotEqual(remote, file)
+        XCTAssertNotEqual(file, asset)
+        XCTAssertEqual(asset, KsImageSource.asset("thumbnail"))
+    }
+
+    func test読み込み中と失敗の表示は片方だけでも差し替えられる() {
+        let url = URL(string: "https://example.com/1.jpg")!
+        let source = KsImageSource.remote(url)
+
+        let bothDefault = KsImage(source)
+        let loadingOnly = KsImage(source, loading: { Color.clear })
+        let failureOnly = KsImage(source, failure: { Color.clear })
+        let bothGiven = KsImage(source, contentMode: .fit, loading: { Color.clear }, failure: { Color.clear })
+
+        for view in [bothDefault.source, loadingOnly.source, failureOnly.source, bothGiven.source] {
+            XCTAssertEqual(view, source)
+        }
+        XCTAssertEqual(bothDefault.contentMode, .fill)
+        XCTAssertEqual(loadingOnly.contentMode, .fill)
+        XCTAssertEqual(failureOnly.contentMode, .fill)
+        XCTAssertEqual(bothGiven.contentMode, .fit)
+
+        // 便宜形の URL でも同じ 4 組を書ける。
+        XCTAssertEqual(KsImage(url).source, source)
+        XCTAssertEqual(KsImage(url, loading: { Color.clear }).source, source)
+        XCTAssertEqual(KsImage(url, failure: { Color.clear }).source, source)
+        XCTAssertEqual(KsImage(url, loading: { Color.clear }, failure: { Color.clear }).source, source)
+    }
 }

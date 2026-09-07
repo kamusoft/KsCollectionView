@@ -19,6 +19,8 @@ android {
 
     defaultConfig {
         minSdk = 29
+        // 実機で走らせる計測用テスト (instrumented test) の実行係。
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -39,6 +41,9 @@ android {
         }
         named("test") {
             kotlin.directories += "src/test/kotlin"
+        }
+        named("androidTest") {
+            kotlin.directories += "src/androidTest/kotlin"
         }
     }
 
@@ -78,6 +83,11 @@ dependencies {
     // Compose Foundation Layout。`contentPadding` が PaddingValues を受け取る。
     api(libs.compose.foundation.layout)
 
+    // Coil (Compose 連携)。公開 API に Coil の型は出さないが、利用者が AsyncImage を直接使って
+    // 同じローダーのキャッシュを共有する経路を前提にしているため、compile classpath へ届ける
+    // (core/ADR-0012)。
+    api(libs.coil.compose)
+
     // ---- 実装内部でのみ使う依存 ----
 
     // Compose Foundation。LazyVerticalGrid / GridCells / combinedClickable を使う。
@@ -88,6 +98,14 @@ dependencies {
 
     // Material 3。タップフィードバックの既定を標準 ripple にするために使う。
     implementation(libs.compose.material3)
+
+    // androidx App Startup。アプリケーションのコンテキストを起動時に捕捉する Initializer で使う。
+    // 公開面には現れないので implementation で置く。
+    implementation(libs.startup.runtime)
+
+    // Coil のネットワーク取得 (OkHttp)。ServiceLoader で自動登録されるため、利用者が
+    // fetcher を選ぶ必要はない。公開面には現れないので implementation で置く。
+    implementation(libs.coil.network.okhttp)
 
     // ---- テスト専用依存 ----
 
@@ -103,4 +121,12 @@ dependencies {
     // テスト実行時の Activity (ComponentActivity) の AndroidManifest を供給する。
     // テスト専用の configuration に置き、発行物へ混入させない。
     testImplementation(libs.compose.ui.test.manifest)
+
+    // ---- 実機で走らせるテスト専用依存 ----
+    //
+    // 端末のデコードが選ぶ画素の構成は JVM 上のテスト環境では再現しないため、その分岐は
+    // 実機で走るテストでしか検証層に載らない。
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

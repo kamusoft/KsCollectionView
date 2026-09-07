@@ -38,6 +38,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var hasAppliedSnapshot = false
     private var isCommandFlushScheduled = false
     private var lastContainerSize: CGSize = .zero
+    // プリフェッチ宣言がある間だけ持つ URL 解決層。台帳を持つため、構成の差し替えでは作り直さない。
+    private var imagePrefetcher: KsImagePrefetcher<Item>?
     // 推定高さは固定値ではなく実測から決める。固定値だと推定と実測の差がそのまま
     // 行位置の飛びとスクロールインジケータのずれになる。
     private var estimatedHeight = KsEstimatedHeight()
@@ -76,6 +78,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
         configureCollectionView()
         configureDataSource()
+        syncImagePrefetching()
         apply(items: configuration.items, animatingDifferences: false)
         configuration.scrollController?.attach(self)
     }
@@ -125,6 +128,11 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         updateVisibleSupplementaryViews()
 
+        syncImagePrefetching()
+        // 差し替え後の配列に無い項目は、システムから取り消し通知が来ないためここで取り消す。
+        // ID が同じまま画像が差し替わった項目も、ここで新しい URL へ切り替える。
+        imagePrefetcher?.retain(items: configuration.items)
+
         apply(
             items: configuration.items,
             animatingDifferences: true,
@@ -146,6 +154,34 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
 
     func disconnect() {
         configuration.scrollController?.detach(self)
+        // 画面から消えたときは未完了の取得をすべて取り消す。
+        imagePrefetcher?.cancelAll()
+    }
+
+    // プリフェッチ宣言の有無に合わせて URL 解決層を組み立て直す。宣言が続いている間は同じ
+    // インスタンスを使い続け、台帳 (どの項目がどの URL を要求しているか) を保つ。
+    private func syncImagePrefetching() {
+        guard let resources = configuration.prefetchResources else {
+            imagePrefetcher?.cancelAll()
+            imagePrefetcher = nil
+            return
+        }
+
+        let prefetcher: KsImagePrefetcher<Item>
+        if let existing = imagePrefetcher {
+            prefetcher = existing
+            prefetcher.resources = resources
+            prefetcher.destination = configuration.prefetchDestination
+        } else {
+            prefetcher = KsImagePrefetcher(
+                loading: configuration.imageLoading ?? KsNukeImageLoading(pipeline: .shared),
+                id: configuration.id,
+                resources: resources,
+                destination: configuration.prefetchDestination
+            )
+            imagePrefetcher = prefetcher
+        }
+        configuration.prefetcher = KsAnyPrefetcher(prefetcher)
     }
 
     private func configureCollectionView() {

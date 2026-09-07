@@ -1,2 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      アプリケーションのコンテキストを起動時に捕捉するための登録。
+      provider 自体は androidx.startup のもので、利用者のアプリに既にある同じ provider へ
+      マージされるため、ライブラリを入れても ContentProvider は増えない。
+    -->
+    <application>
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="jp.kamusoft.kscollectionview.KsAppContextInitializer"
+                android:value="androidx.startup" />
+        </provider>
+    </application>
+
+</manifest>

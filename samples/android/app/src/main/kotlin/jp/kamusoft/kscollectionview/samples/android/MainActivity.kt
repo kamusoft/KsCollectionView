@@ -14,6 +14,13 @@ import androidx.compose.material3.MaterialTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 画像の読み込みを観測できる構成では、最初の読み込みより前に観測を仕込む。
+        // 配布する構成では何も起きない。
+        installImageLoadingObserver()
+        // 計測の試行ごとに同じキャッシュ状態から始めるための消去。配布する構成では何も起きない。
+        resetImageCacheForMeasurement(
+            intent?.getBooleanExtra(SampleRoutes.ResetImageCacheExtra, false) == true,
+        )
         val startRoute = intent?.getStringExtra(SampleRoutes.StartRouteExtra)
         setContent {
             MaterialTheme {

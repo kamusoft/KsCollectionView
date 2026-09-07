@@ -34,6 +34,30 @@ object DemoData {
         )
     }
 
+    /** 「画像グリッド」画面の件数。 */
+    const val ImageGridItemCount: Int = 10_000
+
+    /**
+     * 「画像グリッド」画面と画像の性能計測の fixture を、要求された件数だけ作る。
+     *
+     * セルの文言は整数 ID から決定的に作るため、同じバイナリでは項目ごとの内容が常に一致する。
+     * 件数ごとに新しく作る理由は [largeItems] と同じ (メモリを件数間で比べるため)。
+     *
+     * @param count 作る件数
+     */
+    fun imageGridItems(count: Int): List<DemoItem> =
+        (1..count).map { DemoItem(id = it, title = "#$it") }
+
+    /**
+     * 「画像グリッド」画面のデモ画像の URL。
+     *
+     * アイテム ID から決定的に組み立てるため、同じセルには常に同じ絵が出る。スクロールで
+     * 戻ってきたときに絵が変われば、キャッシュではなく別画像を引いたと分かる。
+     *
+     * @param id アイテムの ID
+     */
+    fun imageUrl(id: Int): String = "https://picsum.photos/seed/ks-$id/400/400"
+
     /** 「大量件数」画面の件数。計測で件数を変えるときも生成規則はこの関数のまま使う。 */
     const val LargeItemCount: Int = 10_000
 

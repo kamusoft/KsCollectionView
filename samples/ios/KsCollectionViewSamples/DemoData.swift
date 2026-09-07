@@ -1,3 +1,5 @@
+import Foundation
+
 enum DemoData {
     static let fruits = [
         DemoItem(id: 1, title: "Apple", detail: "ID: 1"),
@@ -28,5 +30,22 @@ enum DemoData {
                 ? "可変行高を確認するための固定シード長文データ \(index) — KsCollectionView"
                 : nil
         )
+    }
+
+    /// 「画像グリッド」画面の件数。
+    static let imageGridItemCount = 10_000
+
+    /// 「画像グリッド」画面が使う 10,000 件。セルの文言は ID から作る。
+    static let imageGridItems = (1...imageGridItemCount).map {
+        DemoItem(id: $0, title: "#\($0)")
+    }
+
+    /// 「画像グリッド」画面のデモ画像の URL。
+    ///
+    /// アイテム ID から決定的に組み立てるため、同じセルには常に同じ絵が出る。スクロールで
+    /// 戻ってきたときに絵が変われば、キャッシュではなく別画像を引いたと分かる。
+    static func imageURL(for id: Int) -> URL {
+        // 組み立てに使うのは固定の文字列と整数だけなので、URL の生成は必ず成功する。
+        URL(string: "https://picsum.photos/seed/ks-\(id)/400/400")!
     }
 }

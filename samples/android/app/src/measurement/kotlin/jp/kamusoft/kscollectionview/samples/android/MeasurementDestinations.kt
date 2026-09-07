@@ -22,6 +22,8 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import jp.kamusoft.kscollectionview.KsCollectionView
+import jp.kamusoft.kscollectionview.KsPrefetchDestination
 
 /**
  * 計測用の入口の経路。
@@ -53,6 +55,20 @@ object MeasurementRoutes {
     /** メモリの定常判定のための自動往復。 */
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
         "${Prefix}memory/$count/$maxRoundTrips"
+
+    /** 到達点を渡す引数の名前。 */
+    const val DestinationArgument = "destination"
+
+    /** ライブラリで描く画像グリッドの土俵。 */
+    fun imageGrid(count: Int, destination: String): String =
+        "${Prefix}image/$count/$destination"
+
+    /** 画像グリッドのメモリの定常判定のための自動往復。 */
+    fun imageMemoryRoundTrip(count: Int, maxRoundTrips: Int, destination: String): String =
+        "${Prefix}image-memory/$count/$maxRoundTrips/$destination"
+
+    /** 画像の挙動 (共有・読み込み中・失敗) の検証画面。 */
+    fun imageBehavior(): String = "${Prefix}image-behavior"
 
     /**
      * 計測用の画面が載り終えたことを外から読むための印。
@@ -152,7 +168,116 @@ fun NavGraphBuilder.measurementDestinations(onBack: () -> Unit) {
             )
         }
     }
+
+    imageMeasurementDestinations(onBack)
 }
+
+/**
+ * 画像グリッドの計測用の画面を経路に加える。
+ *
+ * 土俵はデモ画面「画像グリッド」と同じ宣言元 ([ImageGridFixture]) から取り、件数と
+ * プリフェッチの到達点だけを経路で選べるようにする。操作バーは計測に関係しないため持たない。
+ *
+ * @param onBack 戻る導線の処理
+ */
+private fun NavGraphBuilder.imageMeasurementDestinations(onBack: () -> Unit) {
+    composable(route = MeasurementRoutes.imageBehavior()) {
+        SampleScaffold(title = "検証: 画像の挙動", onBack = onBack) {
+            ImageBehaviorVerificationScreen(
+                modifier = Modifier.markMeasurementScreen(MeasurementRoutes.imageBehavior()),
+            )
+        }
+    }
+
+    composable(
+        route = "${MeasurementRoutes.Prefix}image/{${MeasurementRoutes.CountArgument}}" +
+            "/{${MeasurementRoutes.DestinationArgument}}",
+        arguments = listOf(
+            navArgument(MeasurementRoutes.CountArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.DestinationArgument) { type = NavType.StringType },
+        ),
+    ) { entry ->
+        val count = entry.arguments.readCount()
+        val choice = entry.arguments.readPrefetchChoice()
+        val route = MeasurementRoutes.imageGrid(count, choice.routeSegment)
+        SampleScaffold(title = "計測: 画像 $count 件 ${choice.title}", onBack = onBack) {
+            ImageGridMeasurementScreen(
+                count = count,
+                choice = choice,
+                modifier = Modifier.markMeasurementScreen(route),
+            )
+        }
+    }
+
+    composable(
+        route = "${MeasurementRoutes.Prefix}image-memory/{${MeasurementRoutes.CountArgument}}" +
+            "/{${MeasurementRoutes.MaxRoundTripsArgument}}" +
+            "/{${MeasurementRoutes.DestinationArgument}}",
+        arguments = listOf(
+            navArgument(MeasurementRoutes.CountArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.MaxRoundTripsArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.DestinationArgument) { type = NavType.StringType },
+        ),
+    ) { entry ->
+        val count = entry.arguments.readCount()
+        val maxRoundTrips = entry.arguments.readMaxRoundTrips()
+        val choice = entry.arguments.readPrefetchChoice()
+        val route = MeasurementRoutes.imageMemoryRoundTrip(
+            count,
+            maxRoundTrips,
+            choice.routeSegment,
+        )
+        val items = remember(count) { ImageGridFixture.items(count) }
+        SampleScaffold(
+            title = "計測: 画像メモリ $count 件 ${choice.title}",
+            onBack = onBack,
+        ) {
+            MemoryRoundTripScreen(
+                items = items,
+                maxRoundTrips = maxRoundTrips,
+                modifier = Modifier.markMeasurementScreen(route),
+                layout = ImageGridFixture.layout,
+                contentPadding = ImageGridFixture.contentPadding,
+                prefetchResources = ImageGridFixture.resources(choice.destination),
+                prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
+                row = { item -> ImageGridCell(item) },
+            )
+        }
+    }
+}
+
+/**
+ * 「画像グリッド」の土俵を、操作バーを持たずに描く計測用の画面。
+ *
+ * 要素・配置・外周の余白・プリフェッチの宣言はデモ画面と同じ [ImageGridFixture] から取る。
+ * 計測でデモ画面と違う土俵を測ってしまわないよう、件数と到達点以外はここで宣言しない。
+ *
+ * @param count 土俵の件数
+ * @param choice プリフェッチの到達点の選択
+ */
+@Composable
+fun ImageGridMeasurementScreen(
+    count: Int,
+    choice: ImagePrefetchChoice,
+    modifier: Modifier = Modifier,
+) {
+    val items = remember(count) { ImageGridFixture.items(count) }
+    KsCollectionView(
+        items = items,
+        key = { it.id },
+        modifier = modifier.fillMaxSize(),
+        layout = ImageGridFixture.layout,
+        contentPadding = ImageGridFixture.contentPadding,
+        prefetchResources = ImageGridFixture.resources(choice.destination),
+        prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
+    ) {
+        template { item -> ImageGridCell(item) }
+    }
+}
+
+/** 経路の文字列に使う到達点の名前。 */
+val ImagePrefetchChoice.routeSegment: String
+    get() = name.lowercase()
 
 /**
  * 目的の画面が載ったことを外から読めるようにする印を付ける。
@@ -165,6 +290,19 @@ private fun Modifier.markMeasurementScreen(route: String): Modifier =
 /** 経路の引数から件数を読む。 */
 private fun Bundle?.readCount(): Int =
     this?.getInt(MeasurementRoutes.CountArgument) ?: error("経路の引数に件数がありません")
+
+/** 経路の引数から往復の上限を読む。 */
+private fun Bundle?.readMaxRoundTrips(): Int =
+    this?.getInt(MeasurementRoutes.MaxRoundTripsArgument)
+        ?: error("経路の引数に往復の上限がありません")
+
+/** 経路の引数からプリフェッチの選択を読む。 */
+private fun Bundle?.readPrefetchChoice(): ImagePrefetchChoice {
+    val name = this?.getString(MeasurementRoutes.DestinationArgument)
+        ?: error("経路の引数に到達点がありません")
+    return ImagePrefetchChoice.entries.firstOrNull { it.routeSegment == name }
+        ?: error("経路の引数の到達点を解釈できません: $name")
+}
 
 /**
  * 「大量件数」の土俵を、ライブラリを通さず素の LazyVerticalGrid で描く。

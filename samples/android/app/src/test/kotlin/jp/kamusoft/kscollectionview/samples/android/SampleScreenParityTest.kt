@@ -23,6 +23,7 @@ class SampleScreenParityTest {
         "スクロール制御",
         "スペーシングと余白",
         "大量件数",
+        "画像グリッド",
     )
 
     @Test
@@ -31,8 +32,8 @@ class SampleScreenParityTest {
     }
 
     @Test
-    fun `デモ画面は 9 つある`() {
-        assertEquals(9, SampleScreen.entries.size)
+    fun `デモ画面は 10 ある`() {
+        assertEquals(10, SampleScreen.entries.size)
     }
 
     @Test

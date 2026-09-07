@@ -77,6 +77,13 @@ internal object KsTapFeedback {
  * @param listSeparators リストの区切り線を表示するかどうか。グリッドでは表示しない
  * @param listSeparatorColor 区切り線の色。省略するとライブラリ既定の色を使う
  * @param scrollController 外からスクロールさせるためのコントローラ
+ * @param prefetchResources もうすぐ表示される要素の画像を、表示より前に取得しておくための宣言。
+ *   要素を受け取り、その要素の表示に必要なリモート画像の URL を返す。返す URL が無い要素では空の
+ *   配列を返す。省略すると画像の先読みは一切行わない。先読みした画像は、同じ URL を表示するときに
+ *   再ダウンロードなしで使われる。このラムダは表示中に差し替えない前提の宣言で、差し替えた場合は
+ *   以後に始まる取得にだけ反映される
+ * @param prefetchDestination 先読みした画像をどこまで用意しておくか。[KsPrefetchDestination.Memory]
+ *   を指定すると、ディスクへの保存に加えてデコード済みの画像をメモリにも載せる
  * @param content テンプレートを宣言するブロック
  */
 @Composable
@@ -95,6 +102,8 @@ public fun <Item> KsCollectionView(
     listSeparators: Boolean = true,
     listSeparatorColor: Color? = null,
     scrollController: KsScrollController? = null,
+    prefetchResources: ((Item) -> List<String>)? = null,
+    prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
     content: KsCollectionViewScope<Item>.() -> Unit,
 ) {
     val context = LocalContext.current
@@ -129,6 +138,19 @@ public fun <Item> KsCollectionView(
     KsDiagnostics.WarnOnce(diagnostics)
 
     val gridState = rememberLazyGridState()
+
+    // プリフェッチは宣言があるときだけ組み立てる。宣言が無いコレクションでは可視範囲の
+    // 観測も先読みも一切起きない。
+    if (prefetchResources != null) {
+        KsPrefetchWindowEffect(
+            gridState = gridState,
+            items = displayedItems,
+            key = key,
+            leadingItemCount = if (header != null) 1 else 0,
+            resources = prefetchResources,
+            destination = prefetchDestination,
+        )
+    }
 
     val receiver = remember(context) { KsScrollCommandReceiver(context) }
     DisposableEffect(scrollController, receiver) {

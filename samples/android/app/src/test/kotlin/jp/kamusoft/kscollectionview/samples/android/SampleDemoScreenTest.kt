@@ -144,6 +144,19 @@ class SampleDemoScreenTest {
         composeTestRule.onNodeWithText("行 1 の先頭").assertIsDisplayed()
     }
 
+    /** 「画像グリッド」画面は「ディスクまで」で始まり、3 択を選び直せる。 */
+    @Test
+    fun `画像グリッド画面のプリフェッチの初期選択はディスクまでである`() {
+        composeTestRule.setContent { ImageGridDemoScreen() }
+
+        composeTestRule.onNodeWithText("ディスクまで").assertIsSelected()
+        composeTestRule.onNodeWithText("#1").assertIsDisplayed()
+
+        composeTestRule.onNodeWithText("なし").performClick()
+        composeTestRule.onNodeWithText("なし").assertIsSelected()
+        composeTestRule.onNodeWithText("#1").assertIsDisplayed()
+    }
+
     private companion object {
         /** 検証画面の最終行の index (画面外へ確実に送るための送り先)。 */
         const val LastRowIndex = 59
