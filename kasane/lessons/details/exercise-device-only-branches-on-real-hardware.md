@@ -1,13 +1,6 @@
----
-scope: test
-kind: pain
-severity: critical
-count: 1
-first-seen: 2026-09-07
-last-seen: 2026-09-07
-evidence:
-  - image-loading (到達点メモリの表示経路が、実機のハードウェア支援でデコードされた画像から書き換え可能なビットマップを作ろうとして `IllegalArgumentException` で確実にクラッシュした。単体テストは Robolectric のソフトウェアビットマップなのでこの分岐を踏まず、エミュレータでの動作確認でも表面化せず、独立レビュー 4 周・相方レビュー 4 周・verify VALID をすべて通過した。実機計測で初めて判明し、公開 API の選択肢を選んだ利用者が落ちる欠陥だった)
----
+# 教訓の経緯: 実行環境で実体が変わる資源を扱う分岐は実機で踏むまで未検証
+
+昇格先: kasane/handbook/cross/runtime-behavior-verification.md「実行環境で実体が変わる資源を扱う分岐」(2026-09-08、severity: critical のため 1 件で即昇格。出典 change: image-loading)
 
 ## ルール文
 **実行環境によって実体が変わる資源** (画像のデコード構成・GPU 資源・センサ・権限・ファイルシステムの権限モデル) を扱う分岐は、単体テストの実行環境 (Robolectric / Simulator) で緑になっても完了としない。その Scenario は**実機で踏む経路を 1 本用意するか、実機での確認を証跡に残すまで「未検証」として扱う**。テスト環境が代替実装 (ソフトウェアのビットマップ、モックのセンサ) を提供している場合、緑は「代替実装では動く」ことしか意味しない。

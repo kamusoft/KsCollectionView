@@ -1,7 +1,7 @@
 ---
 scope: impl
 kind: pain
-severity: high
+severity: normal
 count: 1
 first-seen: 2026-09-08
 last-seen: 2026-09-08

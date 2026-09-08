@@ -23,6 +23,20 @@
 - 相対基準 (素の Compose との差 10% 以内) は比較対象にライブラリと同じ既定機能を付けた条件で測るもので、ラッパーそのものの薄さより緩い側にある。リリース基準として引くときは規約の但し書きを読む
 - maven-publish の設定は基盤では行っていない (composite build の明示 substitution で Sample が本体を参照)。配布座標 `jp.kamusoft:kscollectionview` は cross/ADR-0003 どおり Sample で実地確認済み
 
+### phase-8 からの申し送り (2026-09-08)
+
+- 利用者ドキュメント (skills/ 方式) に画像ロードの運用を含める。原料は concepts `core/core-model/image-loading.md` の責務境界と「してはいけないこと」。含める項目は次の表
+
+| 項目 | 要点 |
+|---|---|
+| 先読みに宣言する URL | グリッドにはサムネイル用途の寸法で配信される URL を宣言する |
+| iOS のディスクキャッシュ | 起動時に `KsImagePipeline.enableSharedDiskCache()` を一度呼ぶ。delegate を使うアプリは自分でパイプラインを組む |
+| iOS の `remove` | 消したソースはローダー付属ビューとキャッシュを共有しなくなる |
+| Android のキャッシュ操作 | androidx.startup の初期化が前提。無効化した構成では警告だけで何もしない |
+
+- 検証 CI の構成に、実機が接続されていないと実行できないテスト (`android/kscollectionview/src/androidTest/`、到達点メモリの実機分岐 3 件) の受け皿を含めるか決める。実機の受け皿は性能計測の CI 化 (phase-2 / phase-3 の申し送り) と同じ課題
+- iOS Sample にはユニットテストターゲットが無く、計測入口の土俵一致や観測ログの分類はテストで担保していない (Android は持つ)。ターゲット追加は project ファイルの変更を伴うため、配布・CI の構成を決めるときに併せて判断する
+
 ## 決定事項
 
 (議論で確定したらここに移動)

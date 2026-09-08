@@ -7,7 +7,7 @@ import androidx.startup.Initializer
  * ライブラリが持つアプリケーションのコンテキスト。
  *
  * 画像の共有ローダーを引くには Context が要るが、公開 API の引数構成は両プラットフォームで
- * 揃える (core/ADR-0002) ため、Context を引数で受け取らずここから読む。値は
+ * 揃える (core/ADR-0002) ため、Context を引数で受け取らずここから読む (android/ADR-0005)。値は
  * [KsAppContextInitializer] がアプリの起動時に入れる。
  */
 internal object KsAppContext {

@@ -3,7 +3,7 @@ type: concept
 title: Android Compose ラッパー
 description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策
 tags: [architecture, compose, lazy-grid]
-timestamp: 2026-09-05
+timestamp: 2026-09-08
 ---
 
 # Android Compose ラッパー
@@ -31,8 +31,11 @@ flowchart TD
     TAP["combinedClickable + ripple<br/>ハンドラ宣言時のみ"]
     BOX["Box(propagateMinConstraints = true) + ksAnimatedHeight<br/>行の高さを補間し、補間中の高さを根まで制約として届ける"]
     TPL["テンプレート (利用者の Composable)"]
+    PREFETCH["KsImagePrefetchWindow<br/>prefetchResources 宣言時のみ layoutInfo を観測し<br/>進行方向へ可視件数分の窓を作って差分を enqueue / dispose"]
+    COIL["KsCoilImageLoading<br/>SingletonImageLoader への写像 (到達点 → 取得方針)"]
 
     KCV --> SCOPE
+    KCV -- 宣言があるときだけ --> PREFETCH --> COIL
     KCV --> PLAN --> DIAG
     KCV --> BWC --> GRID
     KCV --> CTRL -- 命令を解決して state を動かす --> GRID
@@ -56,6 +59,9 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003) |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
 | `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID → index (ヘッダー分 +1 込み) を解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
+| `KsImagePrefetchWindow` / `KsCoilImageLoading` | `LazyGridState.layoutInfo` を `snapshotFlow` で観測し、先頭可視 index の変化から進行方向を判定して「可視範囲の外側・進行方向・可視件数と同数」の窓を作る。「アイテム ID → URL」「URL → 参照数」の台帳の差分だけをローダーへ伝える。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は Coil の adapter、テストは記録用の fake を注入する |
+| `KsImageRequestFactory` / `KsImageInvalidation` | `KsImage` の表示要求の組み立て (表示サイズ付きの鍵) と、キャッシュ消去の世代 (Compose の状態として持ち、読んでいる `KsImage` だけが組み立て直される) |
+| `KsAppContext` / `KsAppContextInitializer` | androidx.startup の Initializer でアプリケーションのコンテキストを起動時に捕捉する。公開 API が `Context` を引数に取らないための経路 (android/ADR-0005)。未初期化なら `KsImageCache` は警告ログで no-op |
 
 ## 保証すること (実測で確かめた罠対策)
 
@@ -83,9 +89,21 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 
 Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外にする。core/ADR-0011 の「落とさず・消さず・黙らず」を release で成立させるため、配列を `items()` に渡す前にライブラリが前処理する。診断は純粋な値として組み立ててから停止と報告に分け、再コンポジションのたびに同じ警告が繰り返されないようにする。
 
+### 先読み窓は宣言があるときだけ観測する
+
+`prefetchResources` が無いコレクションでは `snapshotFlow` の観測自体を起動しない (観測と集合差分はスクロール中の再コンポジション経路に乗るため)。窓の作り直しは可視範囲の変化ごとで、窓から可視範囲へ移った項目は取り消さず台帳に残す (表示側の読み込みへ引き継ぐ)。台帳の操作は錠で直列化する — `KsImageCache` が任意のスレッドから呼べ、消す前に先読み層の進行中の取得を止める (`KsImagePrefetchRegistry`) ため。既存の固定 fixture (「大量件数」、宣言なし) での回帰計測で、先読み窓の追加によるラッパーの上乗せは増えていない。
+
+### 表示要求の鍵に表示サイズと当てはめ方を載せる
+
+`KsImage` の表示要求は表示枠の実サイズを鍵に含め、同じ取得元でも表示サイズごとに別のキャッシュ項目になる。鍵に表示サイズを載せる付随情報の名前はローダー内部と同じ `coil#size` でなければならない — ローダーは鍵の表示サイズと要求の表示サイズが食い違う項目を捨てるため (逆アセンブルで確認。ローダーの版が上がると壊れうるが、壊れ方は「再デコードが増える」方向で表示は正しいまま)。当てはめ方の区別には自前の `ks#scale` を併用する (無いと fit の縮小結果が fill でも使われる)。表示枠は `BoxWithConstraints` で最初の構成で同期に読む (画像 1 枚あたり subcomposition が 1 段増える)。到達点 `memory` の先読みが載せた元寸は、画素を読み出せる場合だけその場で縮小して初回描画に使い (`KsDownscaleResult`)、読み出せない (ハードウェア支援ビットマップ) 場合は読み込み中からローダーの縮小デコードを待つ。ハードウェア支援を切って読めるようにする指定は採らない (載る画像も縮小結果もソフトウェアビットマップになり、描画のたびにテクスチャアップロードが乗る。実測でフレーム超過が 3 倍・メモリ定常値 +40 MB)。
+
+### リソースはローダーを通さず同期で描く
+
+`KsImageSource.Resource` は Coil ではなく `painterResource` で描く。Coil 経由では必ず一瞬読み込み中を経由し、「リソースは読み込み中を経由しない」契約を満たせない。読めないリソース ID (存在しない・drawable ではない・XML の読み取り失敗) は debug で停止、release は警告ログと失敗表示 (core/ADR-0011)。この帰結として `KsImageCache.remove(Resource)` は no-op になる。
+
 ### 仮想化と再利用が成立している
 
-10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。スクロール性能は、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (比較対象) との相対と、フレーム超過時間の絶対上限で判定する。合格基準と手順は [Android 性能検証](../../../handbook/android/performance-verification.md)。
+10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。スクロール性能は、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (比較対象) との相対と、フレーム超過時間の絶対上限で判定する。合格基準と手順は [Android 性能検証](../../../handbook/android/performance-verification.md)。画像グリッド (10,000 件・3 列、宣言あり) の絶対基準 (frameOverrun P99 が 0.0 ms 以下) は両到達点とも届かず (ディスク 6 ms 台、メモリ 4 ms 台。cold の取得が原因ではなく warm でも縮まらない)、合否は規約の見直し (change `performance-criteria-review`) を待つ。到達点 `memory` の方式の見直しは change `prefetch-display-size`。
 
 ## してはいけないこと
 
@@ -94,6 +112,8 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - スクロール命令の消費を配列をキーにした `LaunchedEffect` にしない (上記)。
 - 項目に `animateItem` を重ねない (上記)。
 - 計測用画面・テンプレート計数を release のソースセットに置かない。Sample の `measurement` / `counterEnabled` ソースセットの差し替えで release には空実装だけが入る。
+- 画像の要求にハードウェア支援ビットマップを使わない指定 (`allowHardware(false)`) を付けない。クラッシュ対策であっても、描画資源を切る回避策は実装側で選ばずオーナーに諮る (上記「表示要求の鍵」)。
+- 公開 API に `Context` を引数で足さない。`KsAppContext` から読む (android/ADR-0005)。
 
 ## 用語
 
@@ -102,12 +122,16 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - **補間中**: `ksAnimatedHeight` が行の高さを目標値へ向けて動かしている区間。この間だけ content の測り直しと切り取りが働く。
 - **比較対象**: 性能の相対基準で突き合わせる、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (Sample の計測用ソースセット)。
 - **Sample**: リポジトリ同梱 (`samples/android/`) の動作確認・パリティ検証用アプリ。計測用画面・テンプレート計数は debug / 計測構成のソースセットにだけ実体がある。
+- **受け口 (`KsImageLoading`)**: ローダーへの操作を集めた internal な境界。本番は Coil の adapter、テストは記録用の fake が入る。
 
 ## 関連
 
 - [collection-items](../../core/core-model/collection-items.md) — 実現している契約 (項目モデル・不正入力)
 - [collection-layout](../../core/styling/collection-layout.md) — 実現している契約 (layout 値・区切り線・content 配置・行の高さ変化)
 - [collection-interaction](../../core/core-model/collection-interaction.md) — 実現している契約 (タップ・スクロール命令)
+- [image-loading](../../core/core-model/image-loading.md) — 実現している契約 (先読み・到達点・KsImage・キャッシュ操作)
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
 - [Android 性能検証の手順と合格基準](../../../handbook/android/performance-verification.md)
-- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)、android/ADR-0004 (行の高さ変化の補間)、core/ADR-0007、core/ADR-0011、ios/ADR-0007
+- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針。Coil は利用者の compileSdk 要求を上げない 3.5.0 に固定)、android/ADR-0003 (material3 と ripple)、android/ADR-0004 (行の高さ変化の補間)
+- android/ADR-0005 (アプリケーションコンテキストの捕捉)、core/ADR-0012 (Coil への直接依存と共有インスタンス)
+- core/ADR-0007、core/ADR-0011、ios/ADR-0007

@@ -5,12 +5,12 @@ applies-when:
   tasks: [iOS エンジンのスクロール性能・メモリの検証, 大量件数を扱う変更の完了判定]
 title: iOS 性能検証の手順と合格基準
 description: 大量件数 (固定高・可変行高混在 10,000 件) での hitch time ratio とメモリ定常化を、固定 fixture と固定手順で計測して合否を判定する規約
-timestamp: 2026-09-03
+timestamp: 2026-09-08
 ---
 
 # iOS 性能検証の手順と合格基準
 
-この文書は、iOS エンジンの変更を「性能面で完了」と判定する条件を定める。読むと、何を土俵に、どの機材と操作で計測し、どの数値なら合格かが分かる。手順は ios-engine-foundation の実装で実測して検証したもの (証跡: `kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/performance-early-measurement.md`)。
+この文書は、iOS エンジンの変更を「性能面で完了」と判定する条件を定める。読むと、何を土俵に、どの機材と操作で計測し、どの数値なら合格かが分かる。手順は ios-engine-foundation の実装で実測して検証し (証跡: `kasane/changes/archive/2026-09-04-ios-engine-foundation/evidence/performance-early-measurement.md`)、スクロール性能の接続手順は image-loading の基準機での計測で立て直したもの (証跡: `kasane/changes/archive/2026-09-08-image-loading/evidence/image-grid-measurement-ios.md`)。
 
 ## 規約
 
@@ -29,9 +29,14 @@ Sample「大量件数」画面と、同じデータを使う計測専用の laun
 
 ### スクロール性能
 
-1. Sample を Release 構成で実機へインストールし、「大量件数」を開く。
-2. Instruments の Animation Hitches テンプレートを Sample process に接続する。
-3. 先頭へ戻し、実座標タッチによる 3 秒間の連続フリックを行う。これを独立に 3 回記録し、各試行の hitch time ratio を個別に記録する。Release の Runner は UI Automation の初期化がタイムアウトするため、Debug の XCTest Runner から Release app へ実座標のフリックだけを入力する。
+1. Sample を Release 構成で実機へインストールする。Release の Runner は UI Automation の初期化がタイムアウトするため、駆動は Debug の XCTest Runner から行い、Release app へ実座標のフリックだけを入力する。
+2. 駆動テスト自身が Release app を起動し (計測窓を `os_signpost` 区間で示す起動引数 `--signpost-scroll-window` を付ける)、その後に Instruments の Animation Hitches テンプレートをプロセス指定で接続する。
+3. 先頭へ戻し、実座標タッチによる 3 秒間の連続フリックを行う。駆動はフリックの座標を区間に入る前に確定し、区間中に要素の走査 (アクセシビリティのスナップショット) を行わない。区間は締切 (3.000 秒) で閉じ、hitch time の合計は区間の実測長で割る。これを独立に 3 回記録し、各試行の hitch time ratio を個別に記録する。
+4. 実機のログは `log stream` では追えず `log collect` は root を要するため、必要なら Instruments の Logging テンプレート (`xctrace record --template Logging --attach <pid>`) で採る。端末全体を対象にすると行が落ちるためプロセス指定にする。
+
+接続の順序を逆にしない。起動済みのアプリに接続してから駆動側の `activate()` で前面化すると、前面化の瞬間に対象アプリが終了したものとして記録が打ち切られ、フリック区間が入らない。
+
+計測の足場の限界を証跡に明記する: 座標による press-drag も指を離した後の静止まで待って戻るため、3 秒の区間に入るフリックの投入は 1 回になり、区間内に無操作の時間が残る。区間中も XCTest ランナーがアクセシビリティの走査を続け、主スレッドの一部を占める。
 
 基準機は iPhone 11 相当。接続できない場合は代替機で計測してよいが、代替機が基準機より高速なら「基準機相当の保証にならない」旨を証跡に明記する。
 

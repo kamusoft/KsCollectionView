@@ -3,7 +3,7 @@ type: concept
 title: iOS コレクションエンジン
 description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・レイアウト・操作契約の実現方法と、その中で守っている仕組み
 tags: [ios, engine, uicollectionview, hosting]
-timestamp: 2026-09-05
+timestamp: 2026-09-08
 ---
 
 # iOS コレクションエンジン
@@ -20,7 +20,9 @@ KsCollectionView (SwiftUI, 値型 + modifier で KsCollectionConfiguration を�
            ├ KsSnapshotPlanner        … 旧新の突き合わせで reconfigure / reload を振り分ける
            ├ KsTemplateRegistry       … テンプレートキー → CellRegistration (遅延登録、snapshot 適用前に全キー準備)
            ├ UICollectionViewCompositionalLayout (sectionProvider が configuration を実行時参照)
+           ├ KsImagePrefetcher        … prefetchResources の URL 解決層 (台帳) → KsNukeImageLoading (Nuke ImagePrefetcher)
            └ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
+KsImage (SwiftUI)  … KsImageRequestFactory が表示要求を組み立て、NukeUI LazyImage が共有パイプラインへ出す
 ```
 
 Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)。差分計算は diffable に任せ、内容変更の検知だけを旧新突き合わせで行う。
@@ -36,6 +38,9 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 | `KsRowContentPlacement` | セル content を包む `Layout`。行の高さの遅れによる中央配置はみ出しを防ぐ (後述) |
 | `KsEstimatedHeight` | 自己サイズの実測から推定高さを決める値型 (後述) |
 | `KsScrollController` | 命令を受け取り VC へ転送する。未接続は no-op、最後の接続だけ有効 |
+| `KsImagePrefetcher` / `KsNukeImageLoading` | システムの先読み通知 (`KsPrefetching`、アイテム単位) を URL 単位へ翻訳し、「アイテム ID → URL」「URL → 参照数」の台帳で寿命を管理する。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は到達点ごとの `ImagePrefetcher` へ写像、テストは記録用の fake を注入する |
+| `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の表示要求の組み立て (枠の実サイズからのデコード時縮小)、ソースごとの世代付き識別子、キャッシュ消去の通知 (`ObservableObject`。下限 iOS 16 のため `@Observable` は使わない) |
+| `KsImagePipeline` | `enableSharedDiskCache()` の実装。`dataCache` が未設定なら `configuration` を引き継いで差し替える (core/ADR-0012) |
 
 ## 保証すること (実測で確かめた罠対策)
 
@@ -66,6 +71,18 @@ compositional layout の `.estimated` は item 定義単位で index path ごと
 
 親の state 変更で Representable に届く `context.transaction` は `animation=nil` で、`withTransaction` で再構成へ引き渡しても載せるものが無い。タップを `withAnimation` で包んで `DefaultAnimation` を届けても、中身 (SwiftUI 側の描画) はアニメーションしなかった (Simulator でのフレームログ A/B とオーナー目視、2026-09-05)。行の高さの変化自体は UICollectionView の自己サイズ変更として約 0.35 秒かけて動き、transaction の有無に依存しない。`UIHostingConfiguration` の content view は内部の描画レイヤーを外から観測できないため、中身のアニメーションの判定は目視で行う。中身をアニメーションさせるには別の解き方が要る。
 
+### 画像の先読みは controller 生成時の共有パイプラインを捕捉する
+
+`KsCollectionViewController` は生成時に `ImagePipeline.shared` を読んで `KsNukeImageLoading` を作る。`KsImagePipeline.enableSharedDiskCache()` を後から呼んでも既存のコレクションの先読みは差し替え前のパイプラインを使い続けるため、利用者契約は「起動時に一度呼ぶ」になる ([画像の先読みと KsImage](../../core/core-model/image-loading.md))。取り消し通知には到達点が付かないため、`KsNukeImageLoading` は作成済みの全到達点の `ImagePrefetcher` へ停止を伝える。`ImagePrefetcher` は解放時に未完了の取得を止めるので、controller の解放で先読みは全停止する。
+
+### 表示要求は 1 本の鍵で出し、元寸がメモリにあればその場で縮小して初回描画に使う
+
+`KsImage` の表示要求は常にデコード時縮小の指定 (`ImageRequest.ThumbnailOptions` の `.aspectFit` / `.aspectFill`) を持つ 1 本の形にする。ローダーは要求そのものの鍵でメモリを引き、結果も同じ鍵へ書くため、経路ごとに鍵を変えると自分で書いた項目に次の表示が当たらず、戻ったときに読み込み中を経由する。到達点 `memory` の先読みは寸法なしの鍵で元寸を載せるので表示の鍵と一致しない。`KsImageRequestFactory` は組み立ての時点で元寸をメモリから同期で引き当て、その場で枠の大きさへ縮小して初回描画に使い、縮小結果を表示の鍵で共有キャッシュへ書く。元寸が無ければ読み込み中から始める。この準備は SwiftUI の body 評価の中で共有キャッシュへ書き込むが、同じ入力には同じ結果なので再評価で項目は増えない。`ThumbnailOptions` 付きの要求は元寸のメモリ項目を再利用せず再デコードする、という Nuke の挙動がこの引き当てを要する理由 (相方レビューで再現)。
+
+### ソース単位の削除は世代付き識別子で旧項目を避ける
+
+Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどのサイズで要求したかを後から列挙できない。`KsImageCache.remove(source)` はそのソースの世代を `KsImageIdentity` で進め、以後の `KsImage` と先読みの要求は `ImageRequest.imageID` に「URL + 世代」を入れて発行する。世代 0 (一度も消していないソース) は識別子を付けず、ローダー付属ビューと同じ項目を指し続ける。`clear` は識別子を変えず、`KsImageInvalidation` の世代だけを進めて表示中の `KsImage` を組み立て直す。`clear` / `remove` は `KsImagePrefetchRegistry` を通じて生存している先読み層の進行中の取得を止めてから消す。表示側の進行中の取得は止めない (Android に公開の取り消し口が無く、両プラットフォームで揃えるため)。
+
 ### レイアウト切替・入力・命令
 
 - **レイアウトオブジェクトは差し替えない**。list ⇄ grid・列数・スペーシング・向き変更のいずれも、sectionProvider が `configuration.layout` を実行時参照し `invalidateLayout()` で反映する。`setCollectionViewLayout` を使うと全セルがバウンドして描画が乱れる (翻案元の実績。ios/ADR-0003)。
@@ -83,15 +100,20 @@ compositional layout の `.estimated` は item 定義単位で index path ごと
 
 ## 性能
 
-Sample「大量件数」(10,000 件、固定高 + 可変行高混在、2 列 grid) で、iPhone 15 実機の hitch time ratio (1 秒のスクロールあたりコマ落ちで失われた時間。小さいほど滑らかで、合格基準は 5 ms/s 未満) は 0.0 ms/s (3 試行)、Simulator のメモリは全項目走査の往復 4〜5 回で定常化。同時生存セルは可視セル数の 3 倍程度 ([項目モデル](../../core/core-model/collection-items.md) の責務境界にある契約は 4 倍未満)。手順と基準は [handbook/ios/performance-verification.md](../../../handbook/ios/performance-verification.md)。基準機 iPhone 11 での計測は未実施。
+Simulator のメモリは全項目走査の往復 4〜5 回で定常化し、同時生存セルは可視セル数の 3 倍程度 ([項目モデル](../../core/core-model/collection-items.md) の責務境界にある契約は 4 倍未満)。手順と基準は [handbook/ios/performance-verification.md](../../../handbook/ios/performance-verification.md)。
+
+スクロール性能 (hitch time ratio。1 秒のスクロールあたりコマ落ちで失われた時間) は、基準機 iPhone 11 で規約の手順を立て直して計測した結果、Sample「大量件数」(10,000 件、固定高 + 可変行高混在、2 列 grid) が 3 試行とも合格線 (5 ms/s 未満) を桁違いに超え、主スレッドが飽和している。原因は未特定で、区切り線更新が毎レイアウトで全可視セルの背景色をガード無しに代入する無駄 (change `ios-separator-update-guard`) が識別できる最大の費用だが主因とは示せていない。過去の iPhone 15 での 0.0 ms/s は hitch を検出できない手順の値で、基準機・現手順の値としては使えない。合否は規約 (窓・閾値・fixture の件数) の見直し (change `performance-criteria-review`) を待つ。
 
 ## 用語
 
 - **識別子だけの snapshot**: diffable の item identifier に安定 ID (`AnyHashable`) のみを載せ、内容を含めない構成。内容変化は snapshot の差分ではなく再構成で扱う。
 - **登録準備の前倒し**: snapshot 適用前に使用する全テンプレートキーの `CellRegistration` を生成すること。画面外の未登録キーもこの時点で検知される。
+- **受け口 (`KsImageLoading`)**: ローダーへの操作を集めた internal な境界。本番は Nuke の adapter、テストは記録用の fake が入る。
 
 ## 関連
 
 - [項目モデルと差分更新](../../core/core-model/collection-items.md)、[レイアウト語彙](../../core/styling/collection-layout.md)、[操作とスクロール制御](../../core/core-model/collection-interaction.md)
-- ios/ADR-0001〜0008 (0007: セル content の配置、0008: 観測する値)、core/ADR-0010 (区切り線の既定外観)、handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
+- [画像の先読みと KsImage](../../core/core-model/image-loading.md) — 先読み・到達点・キャッシュ操作の契約 (この文書はその iOS 側の実現)
+- ios/ADR-0001〜0008 (0007: セル content の配置、0008: 観測する値)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0012 (Nuke への直接依存と共有パイプライン)
+- handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
 - 翻案元: `../KsSettingsView/ios/Sources/KsSettingsViewUI/` (`FullSnapshotContentTargets` / `KsCellRegistry` / `CustomCellRowPlacement` / `SectionBoxLayout`)

@@ -13,6 +13,6 @@
 | [0009](0009-legacy-vocabulary-inventory.md) | 旧 AiForms.CollectionView 公開契約の棚卸し | accepted | ScrollController・向き別列数・タップ系等を継承、IsInfinite・HCollectionView・手動サイズ指定等を廃止。v1 は縦のみ。 |
 | [0010](0010-list-separator-default-appearance.md) | list の区切り線の既定外観 — 先頭行の上端・行間・最終行の下端に全幅 1pt の固定色で描く | accepted | hairline・行間のみ・インセット・semantic color・背面描画を却下。両プラットフォーム同じ実値、線は content の前面。色は `listSeparatorColor` で変更可。Android 実装と突き合わせて accepted (2026-09-05)。 |
 | [0011](0011-invalid-input-release-behavior.md) | 不正入力 (重複 ID・未登録テンプレートキー) は debug では assertion、release では表示を継続して警告ログを出す | accepted | 落とさず・消さず・黙らず。重複 ID と重複登録は後勝ち。Android のみ 4 つ目 (Bundle に載らない `key`)。debug の主語は利用者アプリのビルド種別。Android 実装と突き合わせて accepted (2026-09-05)。 |
-| [0012](0012-image-loader-direct-dependency.md) | 画像ローダー — 本体が iOS は Nuke・Android は Coil 3 に直接依存し `KsImage` とプリフェッチ接続を内蔵 | proposed | 別 product 同梱・ローダー抽象 + アダプタ・Kingfisher を却下。ローダーの共有インスタンスをそのまま共有キャッシュとする。 |
+| [0012](0012-image-loader-direct-dependency.md) | 画像ローダー — 本体が iOS は Nuke・Android は Coil 3 に直接依存し `KsImage` とプリフェッチ接続を内蔵 | proposed | 別 product 同梱・ローダー抽象 + アダプタ・Kingfisher・iOS のディスクキャッシュ自動有効化を却下。ローダーの共有インスタンスをそのまま共有キャッシュとし、iOS のディスクキャッシュは `KsImagePipeline.enableSharedDiskCache()` の明示呼び出し。実装後の視点で本文を書き直し済み、確定はオーナー待ち (2026-09-08)。 |
 
 採番規則は [../index.md](../index.md) を参照。

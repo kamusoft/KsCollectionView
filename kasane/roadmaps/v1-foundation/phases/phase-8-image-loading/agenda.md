@@ -56,11 +56,44 @@ iOS は Nuke (13 系、`Nuke` + `NukeUI`)、Android は Coil 3 (`coil-compose` �
 
 自動テスト: プリフェッチ宣言を付けたとき、もうすぐ表示されるアイテムの URL で取得が開始され、離れたら取り消されること (アイテム単位・宛先の指定が渡ること) を、ローダーを差し替えた検査用の受け口で確かめる (iOS はプリフェッチ配線、Android は先読み窓の差分計算)。実機計測: Sample に大量件数 (例: 1 万件) の画像グリッドのデモ画面を両プラットフォームに置き (sample-parity 準拠)、オーナーの実機でフリング中の開始 / 取消件数 (ローダーのログ) とメモリ推移 (Instruments / Android Studio Profiler) を 1 回計測して history に残す。数値目標・CI での継続計測は持たない。デモ画像は公開のプレースホルダー画像サービスの URL を使う。
 
+## 実装結果 (2026-09-08 反映)
+
+change `image-loading` (L 級) で両プラットフォームに `prefetchResources` (+ 到達点)・`KsImage`・`KsImageSource`・`KsImageContentMode`・`KsImageCache`・`KsPrefetchDestination` を新設した。iOS は Nuke 13.2 系、Android は Coil 3.5.0 (3.6 系は Compose 1.12 の推移で利用者に compileSdk 37 を強いるため固定) に本体が直接依存する。Android はキャッシュ操作の引数を iOS と揃えるため androidx.startup でアプリケーションコンテキストを捕捉する (android/ADR-0005)。契約の全体は concepts `core/core-model/image-loading.md`、実装の実際は `kasane/changes/archive/*-image-loading/deviation.md`。
+
+決定事項から変わった点:
+
+| 決定事項 | 実装の実際 | 理由 |
+|---|---|---|
+| iOS のディスクキャッシュ有効化 (初回利用時に自動で差し替える設計) | 利用者が起動時に `KsImagePipeline.enableSharedDiskCache()` を明示的に呼ぶ | Nuke 13 は共有パイプラインの delegate を外から読めず、自動差し替えは delegate で要求を加工するアプリを黙って壊す |
+| キャッシュのクリアの口 (`.memory` / `.disk` / `.all` の 3 択) | `.memory` / `.all` の 2 択 | ディスクの元データを消すとそこから作られたメモリ項目も落とす実挙動になり、`.disk` と `.all` が同じ動きになった |
+| 画像ソースの種類 (Android のリソースも Coil 経由) | リソースは `painterResource` で同期描画 | 「リソースは読み込み中を経由しない」の契約を Coil 経由では満たせない |
+| 到達点メモリ (元寸をメモリに載せ、表示時に縮小) | Android の実機では初回表示が読み込み中を一瞬経由する (暫定) | 元寸がハードウェアビットマップで画素を読めず、その場の縮小が成立しない。ハードウェア支援を切る回避策はオーナー方針で不採用 |
+| 検証方法 (実機計測 1 回) | handbook の全系統を既存 fixture で回帰計測 + 画像グリッド fixture で絶対基準とメモリ | handbook の rule が上位 |
+
+検証: 自動テスト (iOS 154 件 / Android 130 件 + 実機テスト 3 件)、verify-002 VALID、独立レビュー 13 周と相方レビュー 13 周。実機計測は、メモリ定常化が両プラットフォームとも合格、スクロールの絶対基準が両プラットフォームとも不合格 (iOS は画像ロードの実装が hitch の原因ではなく、対照「大量件数」が同じ手順で桁違いに超過。Android は cold の取得が原因ではない)。到達点メモリの実機クラッシュ (レビューと verify を素通りした欠陥) を修正し、実機で走るテストを本体に新設した。
+
+オーナー受容済みの保留 4 件 (2026-09-08 の蒸留で受容): キャッシュ消去のフェンスは先読み層の進行中取得のみ対象 (表示側は対象外) / iOS 7.4 の判定対象は「戻った可視範囲 1〜12」に絞った読み方 / アクセシビリティテストの SPI (dlsym) 利用 / 7.3 Android (ローダー付属ビューとの共有) の実機再確認は未実施。
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| 到達点 `memory` の方式見直し (先読みの時点で表示サイズを知る) | 独立変更 `kasane/changes/prefetch-display-size` (簡易起票済み) |
+| 性能規約の見直し (窓・閾値・帰属・fixture の件数)、「大量件数」の超過、計測の足場の負荷 | 独立変更 `kasane/changes/performance-criteria-review` (簡易起票済み。Android benchmark の frameCount 下限未判定を材料に追記) |
+| iOS の区切り線更新の無駄 (毎レイアウトで全可視セルの背景色を代入) | 独立変更 `kasane/changes/ios-separator-update-guard` (簡易起票済み) |
+| 利用者ドキュメント (サムネイル URL の宣言、`enableSharedDiskCache()` の運用と delegate、iOS `remove` の共有喪失、Android の startup 前提) | phase-7 の agenda に追記 (原料は concepts `core/core-model/image-loading.md`) |
+| 実機でしか走らないテスト (`android/kscollectionview/src/androidTest/`) の CI の受け皿、iOS Sample にユニットテストターゲットが無いこと | phase-7 の agenda「検証 CI の構成」に追記 |
+| core/ADR-0012 の確定 | オーナー判断待ち (TODO のまま残す。確定まで change は archive しない) |
+| Android `KsImageSource.File` の `Uri` (content://) 対応 | 見送り。需要が出たら追加する (design の Open Question) |
+| 7.3 Android の実機再確認 | 見送り (受容済み。spec の「再ダウンロードなし」はディスクでも満たす) |
+
 ## TODO
 
+core/ADR-0012 の確定と image-loading の archive は、簡易起票済みの 3 change (`prefetch-display-size` / `performance-criteria-review` / `ios-separator-update-guard`) で到達点・性能基準まわりの内容が動きうるためオーナー判断で保留している (2026-09-08)。実装フェーズで解ききれず別 change に逃がした部分があり、そこが落ち着くまで決定を固めない。それらの決着後に image-loading と併せて再蒸留し、確定と archive を行う。
+
 - [x] 論点の解消 (2026-09-05)
-- [ ] core/ADR-0012 (proposed) のオーナー確認 → accepted へ昇格
-- [ ] Sample のデモ画像に使う公開プレースホルダー画像サービスの選定 (identity lint の許可設定を含む)
-- [ ] iOS: Nuke の共有パイプラインでディスクキャッシュ (DataCache) を有効化する設計 (既定無効。共有インスタンスをそのまま使う ADR-0012 との両立方法)
-- [ ] 利用者ドキュメント: グリッドにはサムネイル用途の URL を申告する運用を書く
-- [ ] ksn-propose で変更提案を起こす
+- [ ] core/ADR-0012 (proposed) のオーナー確認 → accepted へ昇格。本文は 2026-09-08 の蒸留で書き直し済み。確定は簡易起票済みの 3 change の決着後 (下記)
+- [x] Sample のデモ画像に使う公開プレースホルダー画像サービスの選定 (identity lint の許可設定を含む) (2026-09-06: Lorem Picsum)
+- [x] iOS: Nuke の共有パイプラインでディスクキャッシュ (DataCache) を有効化する設計 (既定無効。共有インスタンスをそのまま使う ADR-0012 との両立方法) (2026-09-07: 明示 API `enableSharedDiskCache()`。実装結果を参照)
+- [x] 利用者ドキュメント: グリッドにはサムネイル用途の URL を申告する運用を書く (2026-09-08: 原料を concepts へ蒸留、実制作は phase-7 へ申し送り)
+- [x] ksn-propose で変更提案を起こす (2026-09-05: image-loading)
