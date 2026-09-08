@@ -34,6 +34,11 @@ fun ImageGridCell(item: DemoItem, modifier: Modifier = Modifier) {
             // 絵そのものに読み上げる意味はないため、読み上げの対象にしない。
             contentDescription = null,
             contentMode = KsImageContentMode.Fill,
+            // 読み込み中の表示を差し込むのは、数えることを要求した実行だけにする。このセルは
+            // デモ画面・計測用の画面・検証画面が共有しており、常時差し込むと「読み込み中の
+            // 既定の表示」を観測点に持つ検証画面が本体の既定を通らなくなる。要求が無ければ
+            // null になり、本体の既定の表示に任せる。
+            loading = ImageLoadingSlotCounter.rememberLoadingSlot(item.id),
         )
         Text(
             text = item.title,

@@ -5,6 +5,7 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import coil3.ColorImage
+import coil3.EventListener
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.DelicateCoilApi
@@ -22,6 +23,7 @@ import coil3.network.NetworkResponse
 import coil3.network.NetworkResponseBody
 import coil3.request.ImageRequest
 import coil3.request.Options
+import coil3.request.allowHardware
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import okio.Buffer
@@ -39,6 +41,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -108,6 +111,12 @@ internal class KsImageCacheContractTest {
     private val decodes = AtomicInteger(0)
     private val decodeCount: Int get() = decodes.get()
 
+    /**
+     * ローダーが受け取った要求。要求そのものに付いた指定を検証するために記録する。
+     * 記録は取得用のスレッドから行われるため、スレッド間で見える入れ物にする。
+     */
+    private val startedRequests = CopyOnWriteArrayList<ImageRequest>()
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -115,7 +124,13 @@ internal class KsImageCacheContractTest {
         cacheDirectory = File(context.cacheDir, "ks-image-${UUID.randomUUID()}")
         network = CountingNetworkClient()
         decodes.set(0)
+        startedRequests.clear()
         loader = ImageLoader.Builder(context)
+            .eventListener(object : EventListener() {
+                override fun onStart(request: ImageRequest) {
+                    startedRequests += request
+                }
+            })
             .memoryCache { MemoryCache.Builder().maxSizeBytes(4L * 1024 * 1024).build() }
             .diskCache { DiskCache.Builder().directory(cacheDirectory.toOkioPath()).build() }
             .components {
@@ -195,9 +210,17 @@ internal class KsImageCacheContractTest {
         assertEquals("表示で初めてデコードする", 1, decodeCount)
     }
 
-    /** 到達点 memory はデコード済みの画像を残し、表示時に再デコードしない。 */
+    /**
+     * 先読みが載せた元寸の画素を読み出せる場合、到達点 memory は表示時に再デコードしない。
+     *
+     * ここで使うデコーダは画素を読み出せる画像を返すため、表示側は元寸をその場で縮小して
+     * 表示用の鍵へ載せ直せる。この結果が言えるのはその条件の下だけで、到達点 memory が常に
+     * 再デコードを避けることは意味しない。実機の元寸は通常グラフィックス側に画素を置いて
+     * 読み出せないため、表示はローダーの縮小デコードを 1 回待つ — そちらは実機で走る
+     * [KsImageDeviceDecodeTest] が押さえる。
+     */
     @Test
-    fun memoryDestinationAvoidsSecondDecode() {
+    fun memoryDestinationAvoidsSecondDecodeWhenPrefetchedPixelsAreReadable() {
         val target = url("memory")
 
         KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
@@ -212,6 +235,29 @@ internal class KsImageCacheContractTest {
 
         assertEquals("表示でネットワークをやり直さない", 1, network.requestCount)
         assertEquals("表示で再デコードしない", 1, decodeCount)
+    }
+
+    /**
+     * 到達点 memory の先読みは、画素の置き場をローダーと端末の判断に委ねる。
+     *
+     * ハードウェア支援を切ると画素がソフトウェア側に置かれ、描画のたびに転送費用が乗って
+     * スクロールの滑らかさを損なう。読み出せない元寸は表示側が初回の描画に使わない作りで
+     * 受け止めるため、先読み側で切る必要は無い。
+     */
+    @Test
+    fun memoryDestinationKeepsHardwareBitmapsAllowed() {
+        val target = url("hardware")
+
+        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
+        awaitCondition(
+            description = "先読みの要求がローダーに届かない",
+            actual = { "started=${startedRequests.size}" },
+        ) { startedRequests.isNotEmpty() }
+
+        assertTrue(
+            "先読みの要求がハードウェア支援を切っています",
+            startedRequests.first().allowHardware,
+        )
     }
 
     private fun memoryEntryExists(url: String): Boolean =

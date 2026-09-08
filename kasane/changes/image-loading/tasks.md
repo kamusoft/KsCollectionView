@@ -49,11 +49,11 @@
 
 ## 7. 実機計測と証跡
 
-- [ ] 7.1 iOS: Sample「画像グリッド」を固定 fixture (10,000 件・3 列・ID から決定的な URL) として、フリング中のプリフェッチ開始 / 取消件数 (受け口のカウンタ) と、handbook/ios/performance-verification の手順で hitch time ratio (独立 3 試行) とメモリ定常化を計測し `evidence/image-grid-measurement-ios.md` に残す (→ agenda 決定: 検証方法、design.md Risks)
+- [x] 7.1 iOS: Sample「画像グリッド」を固定 fixture (10,000 件・3 列・ID から決定的な URL) として、フリング中のプリフェッチ開始 / 取消件数 (受け口のカウンタ) と、handbook/ios/performance-verification の手順で hitch time ratio (独立 3 試行) とメモリ定常化を計測し `evidence/image-grid-measurement-ios.md` に残す (→ agenda 決定: 検証方法、design.md Risks)
 - [x] 7.2 Android (回帰): handbook/android/performance-verification の全系統 (相対 P90/P99・絶対 frameOverrun P99・メモリ定常化と 1,000 件対 10,000 件、各 3 試行) を既存の固定 fixture (「大量件数」画面、宣言なし) で再計測し、先読み窓の追加でラッパーの上乗せが増えていないことを `evidence/performance-regression-android.md` に残す (→ design.md Risks)
-- [ ] 7.5 Android (画像グリッド): Sample「画像グリッド」を固定 fixture として、開始 / 取消件数 (受け口のカウンタ) と、絶対基準 (frameOverrun P99、3 試行) とメモリ定常化を宣言あり (ディスク / メモリ) で計測し `evidence/image-grid-measurement-android.md` に残す (相対基準は比較対象に同等機能が無いため適用しない) (→ agenda 決定: 検証方法)
+- [x] 7.5 Android (画像グリッド): Sample「画像グリッド」を固定 fixture として、開始 / 取消件数 (受け口のカウンタ) と、絶対基準 (frameOverrun P99、3 試行) とメモリ定常化を宣言あり (ディスク / メモリ) で計測し `evidence/image-grid-measurement-android.md` に残す (相対基準は比較対象に同等機能が無いため適用しない) (→ agenda 決定: 検証方法)
 - [x] 7.3 ローダー付属ビュー (`LazyImage` / `AsyncImage`) を直接使ったときにプリフェッチのキャッシュが効くことを Sample で確認し証跡に残す (→ Scenario: ローダー付属ビューとキャッシュを共有する)
-- [ ] 7.4 フリングで画面外に出たセルの読み込みが取り消されること (受け口のカウンタまたはローダーのログ) と、戻ってきたセルが読み込み中を経由せず表示されることを Sample で確認し証跡に残す (→ Scenario: 画面外へ出た読み込みの取り消し、戻ってきたときの再表示)
+- [x] 7.4 フリングで画面外に出たセルの読み込みが取り消されること (受け口のカウンタまたはローダーのログ) と、戻ってきたセルが読み込み中を経由せず表示されることを Sample で確認し証跡に残す (→ Scenario: 画面外へ出た読み込みの取り消し、戻ってきたときの再表示)
 
 ## 8. 文書
 

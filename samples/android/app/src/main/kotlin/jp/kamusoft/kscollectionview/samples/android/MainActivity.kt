@@ -21,6 +21,13 @@ class MainActivity : ComponentActivity() {
         resetImageCacheForMeasurement(
             intent?.getBooleanExtra(SampleRoutes.ResetImageCacheExtra, false) == true,
         )
+        // 計数は Activity より長く生きるため、入口で必ず初期状態に戻す。前の Activity で
+        // 数えた値や切った観測区間が残っていると、印とログの突き合わせに混ざる。
+        ImageLoadingSlotCounter.reset()
+        // 読み込み中を数えるのは要求された実行だけ。要求が無ければ本体の既定の表示を通す。
+        ImageLoadingSlotCounter.setEnabled(
+            intent?.getBooleanExtra(SampleRoutes.CountImageLoadingSlotsExtra, false) == true,
+        )
         val startRoute = intent?.getStringExtra(SampleRoutes.StartRouteExtra)
         setContent {
             MaterialTheme {

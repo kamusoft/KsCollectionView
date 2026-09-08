@@ -20,6 +20,16 @@ object SampleRoutes {
      */
     const val ResetImageCacheExtra = "ks_reset_image_cache"
 
+    /**
+     * 読み込み中の表示を経由した回数を数えるかを指定する Intent の追加情報のキー。
+     *
+     * 数える構成では読み込み中の表示が Sample 側の複製に置き換わるため、常時数えると
+     * 「読み込み中の既定の表示」を観測点に持つ検証画面が本体の既定を通らなくなる。数えることを
+     * 明示的に要求した実行にだけ置き換わるよう、実行時の指定にする (iOS の起動引数
+     * `--count-image-loading-slots` と対称)。配布する構成では読み捨てられる。
+     */
+    const val CountImageLoadingSlotsExtra = "ks_count_image_loading_slots"
+
     /** デモ画面の経路。 */
     fun demo(screen: SampleScreen): String = "demo/${screen.name}"
 

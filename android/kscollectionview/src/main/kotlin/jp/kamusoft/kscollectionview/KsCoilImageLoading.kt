@@ -1,12 +1,12 @@
 package jp.kamusoft.kscollectionview
 
 import android.content.Context
+import android.graphics.Bitmap
 import coil3.SingletonImageLoader
 import coil3.annotation.ExperimentalCoilApi
 import coil3.decode.BlackholeDecoder
 import coil3.request.CachePolicy
 import coil3.request.ImageRequest
-import coil3.request.allowHardware
 
 /**
  * 受け口を Coil の操作へ写像する adapter。取得は共有インスタンス (singleton の ImageLoader) に
@@ -16,8 +16,16 @@ import coil3.request.allowHardware
  * - [KsPrefetchDestination.Disk] — メモリキャッシュを使わず、デコードもしない要求にする。
  *   元データだけがディスクキャッシュに残る
  * - [KsPrefetchDestination.Memory] — 元データをディスクに残した上で、デコードした画像を
- *   メモリキャッシュにも載せる。載せる画像は表示側 ([KsImageRequestFactory]) がその場で
- *   枠の大きさへ縮小する材料になるため、画素を読み出せる構成でデコードさせる
+ *   メモリキャッシュにも載せる。画素の置き場はローダーと端末の判断に委ね、こちらからは
+ *   指定しない
+ *
+ * 到達点メモリで載る画像の画素は、実機では通常グラフィックス側 ([Bitmap.Config.HARDWARE]) に
+ * 置かれ、その画像は読み出せない。表示側 ([KsImageRequestFactory]) は読み出せない元寸を初回の
+ * 描画に使わず、ローダーの縮小デコードを待つ (読み込み中の表示を一瞬経由する)。画素が
+ * ソフトウェア側に置かれる環境 (エミュレータ・JVM 上のテスト) では、表示側がその場で縮小して
+ * 即座に描く。実機でも、ローダーは端末の資源が逼迫するとグラフィックス側への配置を自ら止めるため、
+ * どちらになるかは端末とローダーの判断による。ハードウェア支援を切って挙動を揃えることはしない — 切ると描画のたびに
+ * 画素の転送費用が乗り、スクロールの滑らかさを損なうため。
  *
  * プリフェッチの要求には表示サイズを付けない (元寸のまま取得する)。表示時の制約付きの要求は、
  * この元寸のキャッシュ項目から作られる。
@@ -35,10 +43,9 @@ internal class KsCoilImageLoading(private val context: Context) : KsImageLoading
                     .memoryCachePolicy(CachePolicy.DISABLED)
                     .decoderFactory(BlackholeDecoder.Factory())
 
-            // 端末のデコードは既定でグラフィックス側に画素を置く構成を選ぶことがあり、その
-            // 画像は画素を読み出せないため表示側で枠の大きさへ縮小できない。縮小の材料に
-            // するには、読み出せる構成でデコードさせる必要がある。
-            KsPrefetchDestination.Memory -> builder.allowHardware(false)
+            // 到達点メモリは既定のまま取得する。デコード済みの画像は既定でメモリキャッシュへ
+            // 載るため、足す指定は無い。
+            KsPrefetchDestination.Memory -> Unit
         }
         val disposable = SingletonImageLoader.get(context).enqueue(builder.build())
         return KsImageRequestHandle { disposable.dispose() }

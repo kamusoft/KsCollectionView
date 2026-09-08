@@ -69,16 +69,23 @@ android {
 
     // Kotlin ソースルートは `src/<構成>/kotlin` に揃える (本体モジュールと同じ形)。
     //
-    // 計測用の画面とテンプレート呼び出しカウンタは構成ごとに実体を差し替える。
+    // 計測用の画面と計数の仕組みは構成ごとに実体を差し替える。
     //   - measurement / noMeasurement: 比較対象画面と、その画面への入口の登録
-    //   - counterEnabled / counterDisabled: テンプレート呼び出しカウンタの実体と空実装
+    //   - counterEnabled / counterDisabled: テンプレート呼び出しと読み込み中スロットの
+    //     計数の実体と空実装
     // release にはどちらも空実装だけが入り、計測用のコードは含まれない。
+    //
+    // unit test は全構成共通の `src/test` に加えて debug 専用の `src/testDebug` を持つ。
+    // 計数の実体 (counterEnabled) を前提にするテストは後者に置き、置き場が前提を表すようにする。
     sourceSets {
         named("main") {
             kotlin.directories += "src/main/kotlin"
         }
         named("test") {
             kotlin.directories += "src/test/kotlin"
+        }
+        named("testDebug") {
+            kotlin.directories += "src/testDebug/kotlin"
         }
         named("debug") {
             kotlin.directories += "src/measurement/kotlin"

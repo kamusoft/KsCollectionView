@@ -87,6 +87,9 @@ class ImageGridBenchmark {
             },
         ) {
             device.flingFor(FlingDurationMillis)
+            // 対象アプリが落ちても計測は「描かれたわずかなフレーム」を集計して成功で終わる。
+            // 描画が成り立たなかったのは未判定であり、緑にしてはならない。
+            device.assertMeasurementScreenAlive(route, "フリックの後")
         }
     }
 

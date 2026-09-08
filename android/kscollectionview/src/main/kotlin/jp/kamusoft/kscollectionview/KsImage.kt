@@ -185,6 +185,9 @@ private fun KsPreparedImageContent(
     // ローダーの描画状態は最初の構成では必ず「未開始」になり、メモリキャッシュにある画像でも
     // 状態が決まるまで一拍ある。読み込み中の表示を挟まないよう、その間はメモリから同期で
     // 引いておいた画像を描く。
+    // 同期で引ける画像が無い場合 (メモリに何も無いか、載っている元寸の画素を読み出せず
+    // その場で縮小できない場合) は読み込み中の表示から始まる。実機で到達点メモリの先読みが
+    // 載せた元寸は後者に当たり、初回の表示が読み込み中を一瞬経由する。
     val cachedHolder = remember(prepared, context) {
         mutableStateOf(prepared.cachedImage?.asPainter(context))
     }

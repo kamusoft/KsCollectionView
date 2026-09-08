@@ -78,6 +78,7 @@ class LargeDataScrollBenchmark {
             },
         ) {
             device.flingFor(FlingDurationMillis)
+            device.assertMeasurementScreenAlive(route, "フリックの後")
         }
     }
 
@@ -112,6 +113,28 @@ internal fun UiDevice.awaitMeasurementScreen(route: String) {
 
 /** 目的の画面が載るのを待つ上限。 */
 private const val ScreenReadyTimeoutMillis = 30_000L
+
+/**
+ * 計測対象の画面がまだ載っていることを確かめる。
+ *
+ * フリックの計測は、対象アプリが途中で落ちても・別の画面へ移っても、描かれたわずかな
+ * フレームを集計して成功で終わる。**描画が成り立たなかったのは未判定であり緑にしてはならない**
+ * ため、フリックの後にこの確認を挟む (メモリの計測が持つ「到達できなかったら失敗させる」と
+ * 同じ趣旨)。
+ *
+ * 見ているのは画面の印の有無であり、フレームが何枚描かれたかではない。計測の集計値は
+ * 実行後にしか読めないため、frameCount そのものの下限はここでは判定できない。
+ *
+ * @param route 開いた経路
+ * @param phase 確認した時点の呼び名 (失敗したときに読む)
+ */
+internal fun UiDevice.assertMeasurementScreenAlive(route: String, phase: String) {
+    assertTrue(
+        "$phase に計測対象の画面が見つかりません (経路: $route)。" +
+            "対象アプリが落ちたか、別の画面へ移っています",
+        hasObject(By.desc(MeasurementTarget.screenDescription(route))),
+    )
+}
 
 /**
  * 画面の実座標を上下にフリックし続ける。

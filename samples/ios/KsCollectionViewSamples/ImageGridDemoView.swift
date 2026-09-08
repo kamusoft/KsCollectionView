@@ -6,10 +6,13 @@ import SwiftUI
 ///
 /// 件数・列数・間隔・文言・初期選択は Android Sample の同名画面とそろえる (cross/ADR-0004)。
 struct ImageGridDemoView: View {
-    @State private var choice = ImagePrefetchChoice.disk
+    /// 初期選択は「ディスクまで」。起動引数 `--prefetch` があればそれに従う (計測用)。
+    @State private var choice = ImagePrefetchChoice.resolved
 
     var body: some View {
         VStack(spacing: 0) {
+            // 数えることを要求した実行でだけ現れる印。要求しない既定のデモでは何も出ない。
+            ImageLoadingSlotMark()
             collection
             Divider()
                 .overlay(SampleTheme.separator)

@@ -40,6 +40,9 @@ fun ImageGridDemoScreen(modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize()) {
         val destination = choice.destination
 
+        // 数えることを要求した実行でだけ現れる印。要求しない既定のデモでは何も出ない。
+        ImageLoadingSlotMark()
+
         KsCollectionView(
             items = items,
             key = { it.id },

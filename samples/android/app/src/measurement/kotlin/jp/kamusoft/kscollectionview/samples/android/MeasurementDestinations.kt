@@ -5,6 +5,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -262,16 +263,22 @@ fun ImageGridMeasurementScreen(
     modifier: Modifier = Modifier,
 ) {
     val items = remember(count) { ImageGridFixture.items(count) }
-    KsCollectionView(
-        items = items,
-        key = { it.id },
-        modifier = modifier.fillMaxSize(),
-        layout = ImageGridFixture.layout,
-        contentPadding = ImageGridFixture.contentPadding,
-        prefetchResources = ImageGridFixture.resources(choice.destination),
-        prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
-    ) {
-        template { item -> ImageGridCell(item) }
+    Column(modifier = modifier.fillMaxSize()) {
+        // 数えることを要求した実行でだけ現れる印。frameOverrun を測る実行 (数えない) では
+        // 出ないため、土俵の高さは要求しない限りデモ画面と同じままになる。
+        ImageLoadingSlotMark()
+
+        KsCollectionView(
+            items = items,
+            key = { it.id },
+            modifier = Modifier.weight(1f),
+            layout = ImageGridFixture.layout,
+            contentPadding = ImageGridFixture.contentPadding,
+            prefetchResources = ImageGridFixture.resources(choice.destination),
+            prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
+        ) {
+            template { item -> ImageGridCell(item) }
+        }
     }
 }
 
