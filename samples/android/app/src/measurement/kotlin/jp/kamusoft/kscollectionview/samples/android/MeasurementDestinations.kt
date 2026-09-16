@@ -57,6 +57,9 @@ object MeasurementRoutes {
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
         "${Prefix}memory/$count/$maxRoundTrips"
 
+    /** 自動往復が置換の後に離脱する先。離脱後の同時生存をここで読む。 */
+    fun memoryResult(): String = "${Prefix}memory-result"
+
     /** 到達点を渡す引数の名前。 */
     const val DestinationArgument = "destination"
 
@@ -88,8 +91,12 @@ object MeasurementRoutes {
  * 計測用の画面を経路に加える。
  *
  * @param onBack 戻る導線の処理
+ * @param onLeaveTo 自動走査が画面を離れて別の経路へ移る処理 (離れた画面は残さない)
  */
-fun NavGraphBuilder.measurementDestinations(onBack: () -> Unit) {
+fun NavGraphBuilder.measurementDestinations(
+    onBack: () -> Unit,
+    onLeaveTo: (from: String, to: String) -> Unit,
+) {
     val countArguments = listOf(
         navArgument(MeasurementRoutes.CountArgument) { type = NavType.IntType },
     )
@@ -166,12 +173,33 @@ fun NavGraphBuilder.measurementDestinations(onBack: () -> Unit) {
                 items = items,
                 maxRoundTrips = maxRoundTrips,
                 modifier = Modifier.markMeasurementScreen(route),
+                replacementItems = { replacementItems(count) },
+                onLeave = { onLeaveTo(route, MeasurementRoutes.memoryResult()) },
+            )
+        }
+    }
+
+    composable(route = MeasurementRoutes.memoryResult()) {
+        SampleScaffold(title = "計測: 解放の確認") {
+            MeasurementResultScreen(
+                modifier = Modifier.markMeasurementScreen(MeasurementRoutes.memoryResult()),
             )
         }
     }
 
     imageMeasurementDestinations(onBack)
 }
+
+/**
+ * 置換の段階で差し替える、同じ件数で識別子の重ならない配列を作る。
+ *
+ * 識別子が重なると同じ項目として扱われてテンプレートが作り直されず、置換前の項目のための
+ * 保持が解放されたかどうかを見られない。
+ *
+ * @param count 作る件数
+ */
+private fun replacementItems(count: Int): List<DemoItem> =
+    DemoData.largeItems(count).map { item -> item.copy(id = item.id + count) }
 
 /**
  * 画像グリッドの計測用の画面を経路に加える。

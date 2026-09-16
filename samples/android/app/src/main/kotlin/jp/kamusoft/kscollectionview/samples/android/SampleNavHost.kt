@@ -74,7 +74,14 @@ fun SampleNavHost(startRoute: String? = null) {
             }
         }
 
-        measurementDestinations(onBack = { navController.popBackStack() })
+        measurementDestinations(
+            onBack = { navController.popBackStack() },
+            // 離れた画面は積み残さない。残すと、離脱後の保持を読む計測が「戻れる画面の分だけ
+            // 生きている」状態を測ることになる。
+            onLeaveTo = { from, to ->
+                navController.navigate(to) { popUpTo(from) { inclusive = true } }
+            },
+        )
     }
 
     LaunchedEffect(startRoute) {

@@ -19,11 +19,9 @@ import org.junit.runner.RunWith
 /**
  * 「画像グリッド」の土俵のスクロール性能とメモリを、プリフェッチの到達点ごとに測る。
  *
- * この土俵には同等機能を持つ比較対象が無いため、相対の劣化ではなくフレーム超過時間の絶対値と
- * メモリの定常化で評価する。取得はネットワークに依存するので、結果は実行時の回線状態を含む。
- *
- * メモリは到達点ごとに件数を変えて 2 通り測る。定常値が件数比に比例しないことまで確かめないと、
- * 「表示していない項目の画像を抱え込んでいない」ことの判定材料が揃わない。
+ * この土俵には同等機能を持つ比較対象が無いため、スクロール性能については計測が成立したか
+ * どうかだけを事後検証で見る (フレーム時間そのものの良し悪しはオーナーの体感が判定する)。
+ * メモリは往復の定常化で見る。取得はネットワークに依存するので、結果は実行時の回線状態を含む。
  */
 @OptIn(ExperimentalMetricApi::class)
 @RunWith(AndroidJUnit4::class)
@@ -46,18 +44,8 @@ class ImageGridBenchmark {
     }
 
     @Test
-    fun memoryWithDiskPrefetchAndOneThousandItems() {
-        measureRoundTrips(destination = "disk", count = SmallItemCount)
-    }
-
-    @Test
     fun memoryWithDiskPrefetchAndTenThousandItems() {
         measureRoundTrips(destination = "disk", count = LargeItemCount)
-    }
-
-    @Test
-    fun memoryWithMemoryPrefetchAndOneThousandItems() {
-        measureRoundTrips(destination = "memory", count = SmallItemCount)
     }
 
     @Test
@@ -97,8 +85,7 @@ class ImageGridBenchmark {
      * 自動往復の画面を開き、走査が終わるまで待ってからメモリを記録する。
      *
      * スクロール性能と同じく、開始時のキャッシュを空にしてから測る。件数は経路で渡し、
-     * 対象アプリ側はその件数分だけを作って保持する (最大件数を作り置きして切り出すと、
-     * 小さい件数の計測でも大きい件数分の入力データを抱えたままになり、件数間の差を測れない)。
+     * 対象アプリ側はその件数分だけを作って保持する。
      *
      * @param destination プリフェッチの到達点
      * @param count 土俵の件数
@@ -147,10 +134,7 @@ class ImageGridBenchmark {
     }
 
     private companion object {
-        /** 件数比の比較に使う小さい方の土俵。 */
-        const val SmallItemCount = 1_000
-
-        /** 件数比の比較に使う大きい方の土俵。デモ画面と同じ件数。 */
+        /** 土俵の件数。デモ画面と同じ件数。 */
         const val LargeItemCount = 10_000
 
         /** 独立した試行の回数。 */

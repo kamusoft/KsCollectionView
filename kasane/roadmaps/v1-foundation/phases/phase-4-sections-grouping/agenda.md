@@ -27,6 +27,21 @@ sticky ヘッダ付きグループ化と、画面向きで列数が変わる可�
 - 区切り線は両プラットフォームとも content の前面に描く (core/ADR-0010 accepted)。Android は項目単位の `drawWithContent`、iOS はセルのサブビューで、いずれも「行間に区切り線用の item / decoration を挿入する」形ではない。セクション境界の装飾はこの前提 (項目単位の描画) の上で設計する
 - Android の `LazyVerticalGrid` は `stickyHeader` を持つ (Foundation 1.8 以上、android/ADR-0001)。論点「グリッドでの sticky 可否が未確定」の Android 側はこれで解ける
 
+### performance-criteria-review からの申し送り (2026-09-15)
+
+- **利用者の論理セクションと、内部の分割単位の責務**: 両者は別物で、内部分割は利用者の語彙に現れない (core/ADR-0006 の単一コンポーネントを守る)。phase-4 の 2 段 ID (論理セクション ID + 項目 ID) と内部分割の ID をどう重ねるかは本フェーズで決める
+
+背景: iOS の compositional layout は estimated 高さの再解決 (solver) をセクション単位で行い、1 セクション 10,000 件では少数派の行が可視になるたびに全件を解き直す (最頻値化後も主スレッドの 36%、2,000 件の 4.1 倍。`kasane/changes/performance-criteria-review/evidence/manual-largeData-ios-2026-09-15.md`)。対策として「1 論理セクションを列数の倍数の塊 (内部セクション) に分けて snapshot を組む」内部セクション分割を performance-criteria-review の提案改訂で追加する。
+
+- 内部分割が満たすべき 3 条件 (phase-4 のセクション設計はこの条件を壊さないこと):
+  1. sticky ヘッダが内部分割の末尾で止まらない (pinned の単位は論理セクション)
+  2. 列数に合わない分割で不完全な行を作らない (塊の件数は列数の倍数。画面向きで列数が変わっても崩れない)
+  3. 先頭挿入で塊の所属が変わるときの差分更新と位置維持 (スクロール位置のアンカーは項目 ID で持ち、塊の境界に依存しない)
+
+- 内部分割の決定は ios/ADR-0009 (proposed、2026-09-16) と performance-criteria-review の design Decision 10〜12 にある。本フェーズのセクション設計はこの上に「論理セクション ID + 項目 ID」を重ねる
+
+決定の要点: 塊の件数は 500 を列数候補の最小公倍数の倍数に切り上げる (向き別列数は回転で組み直さない)。境界は行間・余白・区切り線・ヘッダー / フッターのいずれにも出さない。位置維持は項目 ID のアンカーで行う。
+
 ## 決定事項
 
 (議論で確定したらここに移動)

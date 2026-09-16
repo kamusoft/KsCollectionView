@@ -57,6 +57,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         compactLiveCells()
         return liveCells.count
     }
+
+    // 現在の推定高さ。推定が多数派の高さに達したかを観測するために読む。
+    // 自己サイズの計数は `KsLayoutDiagnostics` が 1 か所で持つ。
+    var currentEstimatedHeight: CGFloat {
+        estimatedHeight.value
+    }
     #endif
     // 未登録テンプレートキーは snapshot の準備時点で検知する。検知結果だけを観測したい呼び出しでは
     // このフラグを下ろして assertion の発生を抑止する。
@@ -310,8 +316,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let content = configuration.registry.content(for: key, item: item)
         // 内容を適用したセルの計測だけを推定高さに数えるため、content と対で設定する
         // (prepareForReuse で内容と一緒に解除される)。
-        cell.onMeasuredSize = { [weak self] size in
-            self?.estimatedHeight.record(height: size.height, width: size.width)
+        cell.onMeasuredSize = { [weak self] size, original in
+            self?.recordMeasuredSize(size, original: original)
         }
         // 行の高さが content のサイズ変化に 1 パス遅れて追いつく間、ホスト View の既定の
         // 中央配置だと content が上方向にもはみ出す。KsRowContentPlacement で上端へ固定する。
@@ -319,6 +325,24 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             KsRowContentPlacement { content }
         }
         .margins(.all, 0)
+    }
+
+    // セルが自己サイズで返した高さを推定高さへ入れます。
+    // 一致の判定は、そのセルに渡されていた高さ (original) と測った高さの比較で行います。
+    // レイアウトの解き直しが起きるかを決めるのはこの 2 つの比較であり、比較の相手を
+    // 「いまの推定値」にすると、レイアウトを渡した後に推定値が動いた分だけ数え違えます。
+    // 標本に加えるのは比較を終えてからです。
+    private func recordMeasuredSize(_ size: CGSize, original: CGSize) {
+        let scale = collectionView.traitCollection.displayScale
+        #if DEBUG
+        KsLayoutDiagnostics.recordSelfSizedCell(
+            matchesEstimate: KsLayoutDiagnostics.matchesLayout(
+                measured: size.height,
+                original: original.height
+            )
+        )
+        #endif
+        estimatedHeight.record(height: size.height, width: size.width, scale: scale)
     }
 
     private func configure(cell: KsHostingCell, at indexPath: IndexPath) {

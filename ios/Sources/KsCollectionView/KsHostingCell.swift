@@ -16,7 +16,9 @@ internal final class KsHostingCell: UICollectionViewCell {
 
     /// 自己サイズの計測結果を受け取るハンドラ。推定高さを実測へ寄せるために使う。
     /// 高さは測ったときの行の幅と対で意味を持つため、サイズごと渡す。
-    var onMeasuredSize: ((CGSize) -> Void)?
+    /// レイアウトの解き直しが起きるかは、測った高さとこのセルに渡されていた高さの比較で
+    /// 決まるため、渡されていた側 (`original`) も対で渡す。
+    var onMeasuredSize: ((_ measured: CGSize, _ original: CGSize) -> Void)?
 
     var isTopSeparatorVisible: Bool {
         !topSeparatorView.isHidden
@@ -84,7 +86,7 @@ internal final class KsHostingCell: UICollectionViewCell {
         _ layoutAttributes: UICollectionViewLayoutAttributes
     ) -> UICollectionViewLayoutAttributes {
         let attributes = super.preferredLayoutAttributesFitting(layoutAttributes)
-        onMeasuredSize?(attributes.size)
+        onMeasuredSize?(attributes.size, layoutAttributes.size)
         return attributes
     }
 

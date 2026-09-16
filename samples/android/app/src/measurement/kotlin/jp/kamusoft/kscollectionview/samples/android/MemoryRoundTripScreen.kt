@@ -2,9 +2,11 @@ package jp.kamusoft.kscollectionview.samples.android
 
 import android.os.Debug
 import android.util.Log
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,6 +16,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -36,6 +40,9 @@ private const val SteadyRatio = 0.02
 /** 1 段階の到達を待つ上限 (ミリ秒)。 */
 private const val StepDeadlineMillis = 10_000L
 
+/** 置換前の項目が解放されるのを待つ上限 (ミリ秒)。 */
+private const val ReleaseDeadlineMillis = 10_000L
+
 /**
  * メモリの定常判定のために、全要素を通過する往復を自動で重ねる画面。
  *
@@ -55,6 +62,8 @@ private const val StepDeadlineMillis = 10_000L
  * @param contentPadding 土俵の外周の余白
  * @param prefetchResources プリフェッチする URL の宣言。宣言しないときは null
  * @param prefetchDestination プリフェッチの到達点
+ * @param replacementItems 定常に達した後に差し替える配列を作る処理。渡さないときは置換しない
+ * @param onLeave 置換の後に画面を離れる処理。渡さないときは離れず、この画面が結果を出す
  * @param row 1 項目の見た目
  */
 @Composable
@@ -66,10 +75,24 @@ fun MemoryRoundTripScreen(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     prefetchResources: ((DemoItem) -> List<String>)? = null,
     prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
+    replacementItems: (() -> List<DemoItem>)? = null,
+    onLeave: (() -> Unit)? = null,
     row: @Composable (DemoItem) -> Unit = { DemoListRow(it) },
 ) {
     val controller = rememberKsScrollController()
     var status by remember { mutableStateOf("running") }
+    // いま描いている配列。定常に達した後の段階でここを差し替える。
+    var shown by remember(items) { mutableStateOf(items) }
+    // 見える範囲の件数を数える。同時生存の上限をこの観測から独立に決めるために使う。
+    val visibleItems = remember(items) { VisibleItemTracker() }
+    // 数え直しはコンポジションの段階で 1 回だけ行う。この関数の本体は子より先に走るため、
+    // 最初に見える分のテンプレートが数え始めるより前であることが保証される。効果 (LaunchedEffect)
+    // の本体はディスパッチされたコルーチンで始まるので、そこに置くと前後が保証されず、
+    // 最初に見える分の呼び出しだけを数え落として同時生存が負に振れる。
+    remember(items) {
+        MeasurementLifetime.reset()
+        visibleItems.reset()
+    }
     // いま載っている項目の識別子。1 段階の到達判定はこの集合に対象が入ったことで行う。
     val composed = remember(items) { mutableSetOf<Int>() }
     // 走査中に載った項目の識別子 (往復ごとに数え直す)。全項目を通過したことをこの大きさで確かめる。
@@ -114,12 +137,53 @@ fun MemoryRoundTripScreen(
             }
         }
 
-        status = when {
+        val unfinished = when {
             failure != null -> failure
-            settledAt > 0 -> "steady:$settledAt"
+            settledAt > 0 -> null
             else -> "notSteady:${readings.size}:${readings.joinToString("/")}"
         }
-        Log.i("KsMemoryRoundTrip", "items=${items.size} result=$status series=$readings")
+        if (unfinished != null) {
+            status = unfinished
+            Log.i("KsMemoryRoundTrip", "items=${items.size} result=$status series=$readings")
+            return@LaunchedEffect
+        }
+
+        val replace = replacementItems
+        if (replace == null || onLeave == null) {
+            status = "steady:$settledAt"
+            Log.i("KsMemoryRoundTrip", "items=${items.size} result=$status series=$readings")
+            return@LaunchedEffect
+        }
+
+        val peak = MeasurementLifetime.peakAlive
+        val peakVisible = visibleItems.peakVisible
+        val previousIds = items.mapTo(HashSet()) { it.id }
+        val replaced = replace()
+        shown = replaced
+        val arrival = awaitArrival(replaced.first().id, composed) { id ->
+            controller.scrollTo(id, KsScrollPosition.Start, false)
+        }
+        if (arrival != null) {
+            status = arrival
+            Log.i("KsMemoryRoundTrip", "items=${items.size} result=$status")
+            return@LaunchedEffect
+        }
+        val release = awaitPreviousItemsReleased(previousIds, composed)
+        if (release != null) {
+            status = release
+            Log.i("KsMemoryRoundTrip", "items=${items.size} result=$status")
+            return@LaunchedEffect
+        }
+        val aliveAfterReplacement = MeasurementLifetime.alive
+        MeasurementScanResult.record(settledAt, peak, peakVisible, aliveAfterReplacement)
+        Log.i(
+            "KsMemoryRoundTrip",
+            "items=${items.size} steady=$settledAt peakAlive=$peak peakVisible=$peakVisible " +
+                "aliveAfterReplacement=$aliveAfterReplacement series=$readings",
+        )
+        // 離脱後の同時生存は、この画面が消えた後でないと読めない。判定に使う値は離脱先の
+        // 結果画面が進捗の印として出す。
+        onLeave()
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -131,7 +195,11 @@ fun MemoryRoundTripScreen(
         // 土俵の配置と 1 項目の見た目はデモ画面と同じ宣言元から取る。走査の到達確認のために
         // 項目が載ったことを記録する点だけがデモ画面との違い。
         KsCollectionView(
-            items = items,
+            items = shown,
+            // 見える範囲は、土俵そのものが画面上で占める矩形として読む。
+            modifier = Modifier.onGloballyPositioned { coordinates ->
+                visibleItems.setViewport(coordinates.boundsInWindow())
+            },
             key = { it.id },
             scrollController = controller,
             layout = layout,
@@ -143,9 +211,24 @@ fun MemoryRoundTripScreen(
                 DisposableEffect(item.id) {
                     composed += item.id
                     visited += item.id
-                    onDispose { composed -= item.id }
+                    // 同時生存はプロセスに属する計数へも記録する。画面を離れた後の残りを
+                    // 読む相手が、画面の中にあると一緒に消えてしまうため。
+                    MeasurementLifetime.enter()
+                    onDispose {
+                        composed -= item.id
+                        MeasurementLifetime.leave()
+                        visibleItems.removeItem(item.id)
+                    }
                 }
-                row(item)
+                // 見える範囲に載っているかどうかは、項目の矩形と土俵の矩形の重なりで見る。
+                // 包む箱を 1 つ足すのはこの観測のためで、フレーム時間を測る土俵ではない。
+                Box(
+                    modifier = Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                        visibleItems.setItem(item.id, coordinates.boundsInWindow())
+                    },
+                ) {
+                    row(item)
+                }
             }
         }
     }
@@ -201,6 +284,32 @@ private suspend fun awaitArrival(id: Int, composed: Set<Int>, scrollTo: (Any) ->
         delay(4)
     }
     return "unreached:$id"
+}
+
+/**
+ * 置換前の項目が 1 つも載っていない状態になるまで待つ。
+ *
+ * 数が動かなくなったことで区切ると、破棄が始まる前の値で確定しうる。待つべきなのは「置換前の
+ * 項目が残っていないこと」そのものなので、識別子の集合で判定する。上限は実時間で区切り、
+ * 超えたときは黙って戻らず、そのとき残っていた件数を失敗の印として返す。
+ *
+ * @param previousIds 置換前の項目の識別子
+ * @param composed いま載っている項目を持つ集合
+ * @return 残ったまま上限を超えた場合の失敗の印。解放されたら null
+ */
+private suspend fun awaitPreviousItemsReleased(
+    previousIds: Set<Int>,
+    composed: Set<Int>,
+): String? {
+    val deadline = System.currentTimeMillis() + ReleaseDeadlineMillis
+    var remaining = composed.count { it in previousIds }
+    while (System.currentTimeMillis() < deadline) {
+        if (remaining == 0) return null
+        // 破棄の処理へ実行機会を譲る。
+        delay(4)
+        remaining = composed.count { it in previousIds }
+    }
+    return if (remaining == 0) null else "notReleased:$remaining/${previousIds.size}"
 }
 
 /** 連続する 2 往復の増分がいずれも 2% 以内なら定常とみなす。 */

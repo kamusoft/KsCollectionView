@@ -9,8 +9,8 @@ struct KsCollectionViewSamplesApp: App {
         KsImagePipeline.enableSharedDiskCache()
         // 観測を要求されたときだけ、共有パイプラインを観測付きに置き換える。
         ImageLoadingObservation.enableIfRequested()
-        // 計測窓の印を要求されたときだけ、駆動側からの通知を待ち受ける。
-        ScrollWindowSignpost.enableIfRequested()
+        // 件数の指定が受け取れないときは、既定件数へ黙って戻さずに起動を止める。
+        LargeDataCount.failIfInvalid()
     }
 
     var body: some Scene {

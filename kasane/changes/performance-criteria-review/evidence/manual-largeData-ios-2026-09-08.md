@@ -9,11 +9,21 @@
 | 機種 / OS | iPhone 11 (基準機) / iOS 18.7.8 |
 | 構成 | Release、削除してから入れ直し |
 | fixture | Sample「大量件数」(10,000 件・2 列・固定高と 7 件ごとの長文の混在)。起動引数 `--screen 大量件数` で直接開く |
-| 駆動 | オーナーの手動フリック (自動化なし)。記録 60 秒 |
-| 記録 | Instruments Animation Hitches テンプレートをプロセス名指定で接続 (`xctrace record --template 'Animation Hitches' --attach <プロセス名>`)。pid 指定は「見つからない」で失敗し、名前指定なら接続できた |
-| 熱状態 | 全区間 Nominal |
+| 駆動 | オーナーの手動フリック (自動化なし) |
+| 記録 | Instruments Animation Hitches テンプレートをプロセス名指定で接続 (`xctrace record --template 'Animation Hitches' --attach <プロセス名>`)。pid 指定は「見つからない」で失敗し、名前指定なら接続できた。記録窓 60 秒 (指定長。trace の区間長と一致) |
+| 熱状態 | 全区間 Nominal (Instruments の thermal state。全区間の観測値) |
 
-## オーナーの体感 (合否の主語)
+## 操作条件
+
+| 項目 | 値 |
+|---|---|
+| 操作列 | **固定の操作列の制定前**の記録。初めて通る範囲への下向きフリック → 休止 → 既訪範囲の再訪 → 連続フリックを自由な順で反復した (段階ごとの所要は未記録) |
+| 開始位置 / 到達範囲 | 先頭から開始。到達した件数は未記録 |
+| 文字サイズ / キャッシュ状態 | 端末の既定 (値は未記録) / 削除してから入れ直した直後 (cold) |
+
+操作列が固定される前の記録であるため、固定の操作列で採る以後の記録とは**比較不能**。
+
+## オーナーの体感 (合否の主語。数値を見る前に聞き取り)
 
 - 初めて通る部分は少し重い。一度スクロール済みのところはスムーズ
 - スクロールを連続すると重くなる。少し止めてからやるとスムーズに戻る
@@ -24,7 +34,7 @@
 | 指標 | 値 |
 |---|---|
 | hitch 件数 (60 秒) | 554 (High 368 / Moderate 75 / Low 111) |
-| hitch time ratio | 638 ms/s (60 秒窓)。参考: Apple の目安は 5 ms/s 以下 Good / 10 以上 Critical |
+| hitch time ratio (Instruments Animation Hitches、ms/s) | 638 ms/s (60 秒窓)。参考スケール: WWDC20「Eliminate animation hitches with XCTest」の推奨値は 5 ms/s 未満が Good、10 ms/s 以上が Critical (合否には読み替えない) |
 | hitch の長さ | 中央値 66.7 ms、p90 133.3 ms、最長 233.3 ms |
 | hitch の種類 | Commit to Render latency 431、Expensive Commit(s) 101、Pre-Commit(s) latency 20 |
 | 描画 (surface swaps / 秒) | 操作中の多くの秒で 7〜15 回。40〜57 回の秒もあり大きく揺れる |
@@ -48,6 +58,8 @@
 
 ## 判定
 
+- **体感の合否: 不合格** (「初めて通る部分は少し重い」「連続すると重くなる」「ムラがある」)。数値 (3 桁の hitch time ratio、描画 7〜15 回/秒の秒) とも一致する
+- **前回との比較可否**: 過去の自動駆動の記録とは駆動も窓も違うため比較不能。固定の操作列で採る以後の記録とも比較不能
 - **自動駆動の足場は主因ではない。** 自動化なしでも hitch time ratio は 3 桁で、体感も不合格 (「少し重い」「連続で重くなる」「ムラがある」)。論点 6 の分岐は「体感 NG = エンジンの土台の問題」
 - **主因は compositional layout の estimated 高さの solver。** 新しく可視になったセルが preferred size を返すたびに、1 セクション 10,000 件の solver が offsets を再構築する。既に解決済みの範囲では solver が走らないため「一度通ったところはスムーズ」、連続フリックで未解決のセルが供給され続けると solver が主スレッドを飽和させ、止めると溜まりが捌けて戻る
 - hosting (SwiftUI) のセル計測は 7.5% で、`UIHostingConfiguration` 方式そのものは主因ではない

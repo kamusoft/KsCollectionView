@@ -22,7 +22,8 @@ enum DemoData {
         )
     }
 
-    static let largeItems = (1...10_000).map { index in
+    /// 「大量件数」画面の項目。件数は起動引数で変えられ、内容は ID から決まるため件数に依らない。
+    static let largeItems = (1...LargeDataCount.value).map { index in
         DemoItem(
             id: index,
             title: "Item \(index)",

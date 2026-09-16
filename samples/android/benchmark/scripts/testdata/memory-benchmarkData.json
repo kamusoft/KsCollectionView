@@ -1,0 +1,82 @@
+{
+    "context": {
+        "build": {
+            "brand": "google",
+            "device": "sunfish",
+            "fingerprint": "google/sunfish/sunfish:13/TQ3A.230805.001.S2/12655424:user/release-keys",
+            "id": "TQ3A.230805.001.S2",
+            "model": "Pixel 4a",
+            "type": "user",
+            "version": {
+                "codename": "REL",
+                "sdk": 33
+            }
+        },
+        "cpuCoreCount": 8,
+        "cpuLocked": true,
+        "cpuMaxFreqHz": 2208000000,
+        "memTotalBytes": 5876060160,
+        "sustainedPerformanceModeEnabled": false,
+        "artMainlineVersion": 371000140,
+        "osCodenameAbbreviated": "T",
+        "compilationMode": "run-from-apk",
+        "payload": {}
+    },
+    "benchmarks": [
+        {
+            "name": "memoryWithMemoryPrefetchAndTenThousandItems",
+            "params": {},
+            "className": "jp.kamusoft.kscollectionview.samples.android.benchmark.ImageGridBenchmark",
+            "totalRunTimeNs": 667370343566,
+            "metrics": {
+                "memoryGpuLastKb": {
+                    "minimum": 62036.0,
+                    "maximum": 62036.0,
+                    "median": 62036.0,
+                    "coefficientOfVariation": 0.0,
+                    "runs": [
+                        62036.0
+                    ]
+                },
+                "memoryHeapSizeLastKb": {
+                    "minimum": 11155.0,
+                    "maximum": 11155.0,
+                    "median": 11155.0,
+                    "coefficientOfVariation": 0.0,
+                    "runs": [
+                        11155.0
+                    ]
+                },
+                "memoryRssAnonLastKb": {
+                    "minimum": 49144.0,
+                    "maximum": 49144.0,
+                    "median": 49144.0,
+                    "coefficientOfVariation": 0.0,
+                    "runs": [
+                        49144.0
+                    ]
+                },
+                "memoryRssFileLastKb": {
+                    "minimum": 115688.0,
+                    "maximum": 115688.0,
+                    "median": 115688.0,
+                    "coefficientOfVariation": 0.0,
+                    "runs": [
+                        115688.0
+                    ]
+                }
+            },
+            "sampledMetrics": {},
+            "warmupIterations": 1,
+            "repeatIterations": 1,
+            "thermalThrottleSleepSeconds": 0,
+            "profilerOutputs": [
+                {
+                    "type": "PerfettoTrace",
+                    "label": "Trace Iteration 0",
+                    "filename": "ImageGridBenchmark_memoryWithMemoryPrefetchAndTenThousandItems_iter000_2026-09-08-05-55-41.perfetto-trace"
+                }
+            ]
+        }
+    ]
+}

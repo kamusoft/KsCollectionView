@@ -14,8 +14,12 @@ object MeasurementRoutes {
  * 計測用の画面を経路に加える。この構成では何も加えない。
  *
  * @param onBack 戻る導線の処理 (使わない)
+ * @param onLeaveTo 自動走査が画面を離れる処理 (使わない)
  */
 @Suppress("UNUSED_PARAMETER")
-fun NavGraphBuilder.measurementDestinations(onBack: () -> Unit) {
+fun NavGraphBuilder.measurementDestinations(
+    onBack: () -> Unit,
+    onLeaveTo: (from: String, to: String) -> Unit,
+) {
     // 配布する構成に計測用の画面は入れない。
 }

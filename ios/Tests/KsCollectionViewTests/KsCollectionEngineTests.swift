@@ -1,6 +1,6 @@
 import SwiftUI
 import XCTest
-@testable import KsCollectionView
+@_spi(KsMeasurement) @testable import KsCollectionView
 
 @MainActor
 final class KsCollectionEngineTests: XCTestCase {
@@ -32,6 +32,63 @@ final class KsCollectionEngineTests: XCTestCase {
         }
 
         func updateUIView(_ uiView: UIButton, context: Context) {}
+    }
+
+    // 固定高と可変行高が 6 : 1 で混ざる行。7 件ごとに長文が付く (Sample「大量件数」と同じ混ざり方)。
+    private struct MixedHeightRow: View {
+        let item: Item
+
+        private var detail: String? {
+            item.id.isMultiple(of: 7)
+                ? "可変行高を確認するための固定シード長文データ \(item.id) — KsCollectionView"
+                : nil
+        }
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.body)
+                if let detail {
+                    Text(detail)
+                        .font(.subheadline)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
+    }
+
+    // どの項目でも同じ高さになる行。
+    private struct UniformHeightRow: View {
+        let item: Item
+
+        var body: some View {
+            Text(item.title)
+                .font(.body)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+        }
+    }
+
+    // 偶数番だけに長文が付く行。2 列に並べると各行の片方だけが高くなる。
+    private struct AlternatingHeightRow: View {
+        let item: Item
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .font(.body)
+                if item.id.isMultiple(of: 2) {
+                    Text("可変行高を確認するための固定シード長文データ \(item.id) — KsCollectionView")
+                        .font(.subheadline)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+        }
     }
 
     private final class PrefetchRecorder: KsPrefetching {
@@ -720,20 +777,9 @@ final class KsCollectionEngineTests: XCTestCase {
         // 端点間を飛ばさず、表示範囲の半分ずつ送って全項目を通過する。
         // 前後の可視範囲が十分に重ならない刻みでは、UIKit は再利用ではなく作り直しになる。
         var maxLiveCellCount = 0
-        let advanced = await advanceUntilVisible(
-            item: itemCount - 1,
-            in: controller,
-            step: controller.collectionView.bounds.height / 2,
-            maxLiveCellCount: &maxLiveCellCount
-        )
-        XCTAssertTrue(advanced, "末尾まで送り切れませんでした")
-        let returned = await advanceUntilVisible(
-            item: 0,
-            in: controller,
-            step: -controller.collectionView.bounds.height / 2,
-            maxLiveCellCount: &maxLiveCellCount
-        )
-        XCTAssertTrue(returned, "先頭まで戻り切れませんでした")
+        await advanceRoundTrip(itemCount: itemCount, in: controller) {
+            maxLiveCellCount = max(maxLiveCellCount, controller.liveCellCount)
+        }
 
         // 全項目を 2 度通過してもなお、同時生存セルは可視範囲と再利用プールの規模に留まる。
         // 件数に依存しないことがこの上限の意味である。
@@ -745,7 +791,303 @@ final class KsCollectionEngineTests: XCTestCase {
                 + "(可視 \(visibleCellCount) 件 / 実測の最大 \(maxLiveCellCount) 件 / 上限 \(liveCellLimit) 件)"
         )
     }
+
+    // 推定高さが多数派の高さに達した後は、新しく可視になるセルのほとんどが推定と同じ高さに測られ、
+    // レイアウトの解き直しを起こさない。不一致率は解き直しの回数の上界であり (同一と見なす幅を
+    // 最下位桁の丸め誤差までに限っており、その幅では解き直しが起きないことを
+    // `KsSelfSizingInvalidationTests` で確かめている)、件数にも操作量にも依らない値として読める。
+    func test高さ2種類が6対1で混ざる2000件で推定と違うセルの割合を0_20以下に保つ() async {
+        let itemCount = 2_000
+        let controller = KsCollectionViewController(
+            configuration: makeMixedHeightGridConfiguration(itemCount: itemCount)
+        )
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        let majorityHeight = await settleMajorityEstimate(in: controller)
+
+        // 推定が多数派に達した後の区間だけを数える。
+        KsLayoutDiagnostics.reset()
+        let advanced = await advanceUntilVisible(
+            item: itemCount / 2,
+            in: controller,
+            step: controller.collectionView.bounds.height / 2
+        )
+        XCTAssertTrue(advanced, "中程まで送り切れませんでした")
+
+        XCTAssertGreaterThan(
+            KsLayoutDiagnostics.selfSizedCellCount,
+            itemCount / 4,
+            "自己サイズを返したセルが少なすぎ、割合の標本になりません"
+        )
+        XCTAssertLessThanOrEqual(
+            KsLayoutDiagnostics.estimateMismatchRate,
+            0.20,
+            "推定と違う高さに測られたセルの割合が上限を超えています "
+                + "(多数派の高さ \(majorityHeight) / 自己サイズ \(KsLayoutDiagnostics.selfSizedCellCount) 件 / "
+                + "不一致 \(KsLayoutDiagnostics.estimateMismatchCount) 件 / 率 \(KsLayoutDiagnostics.estimateMismatchRate))"
+        )
+    }
+
+    // 一致の判定は、そのセルに渡されていた高さと測った高さの比較で行う。
+    // レイアウトを渡した後に推定値が動くと「いまの推定値」とは食い違うため、比較の相手を
+    // 取り違えると不一致を数え落とす (または過剰に数える)。
+    func testレイアウトを渡した後に推定値が動いても渡された高さと比べて数える() async {
+        let itemCount = 100
+        let controller = KsCollectionViewController(
+            configuration: makeUniformHeightListConfiguration(itemCount: itemCount)
+        )
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        await waitUntil("自己サイズの反映", value: { itemFrames(in: controller, items: [0]).first?.height }) {
+            ($0 ?? 0) > 0
+        }
+
+        let rowWidth = itemFrames(in: controller, items: [0])[0].width
+        let cell = tryUnwrapCell(controller, item: 0)
+        // このセルが返す高さを先に確かめる。比較の相手の違いは、この高さを基準にしないと作れない。
+        let measuredHeight = cell.preferredLayoutAttributesFitting(
+            layoutAttributes(width: rowWidth, height: KsEstimatedHeight.defaultValue)
+        ).size.height
+        // 以下の 2 つの向きのうち、少なくとも一方は比較の相手の違いで結果が変わる。いまの推定値が
+        // このセルの返す高さと違えば前者 (一致のはずが不一致に数えられる) が、同じなら後者
+        // (不一致のはずが一致に数えられる) が食い違うためで、どちらになるかは環境で変わる。
+        KsLayoutDiagnostics.reset()
+        _ = cell.preferredLayoutAttributesFitting(
+            layoutAttributes(width: rowWidth, height: measuredHeight)
+        )
+        XCTAssertEqual(KsLayoutDiagnostics.selfSizedCellCount, 1)
+        XCTAssertEqual(
+            KsLayoutDiagnostics.estimateMismatchCount,
+            0,
+            "渡された高さと同じに測られたのに不一致として数えています "
+                + "(いまの推定値 \(controller.currentEstimatedHeight) / 測った高さ \(measuredHeight))"
+        )
+
+        _ = cell.preferredLayoutAttributesFitting(
+            layoutAttributes(width: rowWidth, height: measuredHeight + 20)
+        )
+        XCTAssertEqual(KsLayoutDiagnostics.selfSizedCellCount, 2)
+        XCTAssertEqual(
+            KsLayoutDiagnostics.estimateMismatchCount,
+            1,
+            "渡された高さと違う高さに測られたのに一致として数えています "
+                + "(いまの推定値 \(controller.currentEstimatedHeight) / 測った高さ \(measuredHeight))"
+        )
+    }
     #endif
+
+    // 行の高さは行内で最も高いセルに揃い、各セルはコンテンツに必要な高さで表示される。
+    // 自己サイズの正しさは推定の決め方に依らない。
+    func test2列で片方だけ高い配列では行の高さが高い方に揃う() async {
+        let itemCount = 200
+        var configuration = makeConfiguration(items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }) {
+            // 偶数番のセルだけに長文が付く配列。2 列なので各行の片方だけが高くなる。
+            AlternatingHeightRow(item: $0)
+        }
+        configuration.layout = .grid(columns: .fixed(2), rowSpacing: 1, columnSpacing: 1)
+        configuration.showsSeparators = false
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        await waitUntil("自己サイズの反映", value: { itemFrames(in: controller, items: [0, 1]) }) { frames in
+            guard frames.count == 2 else { return false }
+            return frames[0].height != frames[1].height
+        }
+
+        let frames = itemFrames(in: controller, items: [0, 1, 2, 3])
+        XCTAssertEqual(frames.count, 4, "先頭 2 行のレイアウト属性を取得できませんでした")
+        XCTAssertGreaterThan(frames[0].height, frames[1].height, "長文の付いたセルが高くなっていません")
+        XCTAssertEqual(frames[0].minY, frames[1].minY, accuracy: 0.5, "同じ行のセルの上端が揃っていません")
+        // 次の行は、行内で最も高いセルの下端より下から始まる (= 行の高さが高い方に揃っている)。
+        XCTAssertGreaterThanOrEqual(
+            frames[2].minY,
+            max(frames[0].maxY, frames[1].maxY),
+            "次の行が高いセルに重なっています"
+        )
+    }
+
+    // 行の高さが一様な配列で、合計高さの見積もり (初回表示のコンテンツ高さと、末尾までの
+    // contentSize の変化回数) が壊れないことを固定する。行 = セルになるため、推定値は行の
+    // 高さそのものを言い当てられる。
+    //
+    // 行の高さが混在する複数列のグリッドはこの基準の対象にしない。行の高さが列内の最も高い
+    // セルで決まるのに対し、実測として拾えるのはセル単位の高さであり、コレクション全体で
+    // 1 つの推定値をどう選んでも行の高さを言い当てられないためである (参考の実測: 2 列で
+    // 高さ 2 種類が 6 : 1 の 2,000 件では、最頻値で誤差 34.5% / 変化 134 回、平均でも
+    // 誤差 12.0% / 変化 134 回。iPhone 17 Pro Max Simulator / iOS 26.0、全件を刻んで走査し
+    // 到達後の contentSize と比べる計測形での値で、このテストの計測形では採り直していない)。
+    func test行高が一様な配列で初回表示の合計高さの見積もりを損ねない() async {
+        let itemCount = 2_000
+        let controller = KsCollectionViewController(
+            configuration: makeUniformHeightListConfiguration(itemCount: itemCount)
+        )
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        await settleContentSize(in: controller)
+
+        // 行 = セルで高さが一様なので、コンテンツ全体の実際の高さは「実測した行の高さ × 件数」で
+        // 決まる。初回表示の contentSize をこの値と比べることで、見積もりの当たり具合を、
+        // どこまで解き終えたかに依らず測れる。
+        // 行の高さは、先頭 20 行のうち最も多く現れた高さを採る。ごく一部の行は、表示の過程で
+        // 提案された高さのまま伸びることがあり (推定の決め方に依らない)、その行を基準にすると
+        // 合計を測れないため。
+        let sampledHeights = itemFrames(in: controller, items: Array(0..<20)).map(\.height)
+        XCTAssertEqual(sampledHeights.count, 20, "先頭の行のレイアウト属性を取得できませんでした")
+        var heightCounts: [CGFloat: Int] = [:]
+        sampledHeights.forEach { heightCounts[$0, default: 0] += 1 }
+        guard let rowHeight = heightCounts.max(by: { $0.value < $1.value })?.key else {
+            XCTFail("行の高さを取得できませんでした")
+            return
+        }
+        XCTAssertGreaterThanOrEqual(
+            heightCounts[rowHeight] ?? 0,
+            14,
+            "行の高さが一様ではありません (\(heightCounts.sorted { $0.key < $1.key }))"
+        )
+        let actualHeight = rowHeight * CGFloat(itemCount)
+
+        // 見積もりが外れていれば、末尾へ送っている間に行位置の積み上げが何度も引き直され、
+        // contentSize が段階的に伸びる。
+        let initialHeight = controller.collectionView.contentSize.height
+        var observedHeights: [CGFloat] = []
+        let observation = controller.collectionView.observe(\.contentSize, options: [.new]) { collectionView, _ in
+            let height = collectionView.contentSize.height
+            if observedHeights.last != height {
+                observedHeights.append(height)
+            }
+        }
+        defer { observation.invalidate() }
+
+        controller.collectionView.scrollToItem(
+            at: IndexPath(item: itemCount - 1, section: 0),
+            at: .bottom,
+            animated: false
+        )
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("末尾の可視化", value: { isVisible(item: itemCount - 1, in: controller) }) { $0 }
+        await settleContentSize(in: controller)
+
+        let measuredHeight = controller.collectionView.contentSize.height
+        XCTAssertGreaterThan(actualHeight, 0)
+        let error = abs(initialHeight - actualHeight) / actualHeight
+        XCTAssertLessThanOrEqual(
+            error,
+            0.05,
+            "初回表示のコンテンツ高さの誤差が ±5% を超えています "
+                + "(初回 \(initialHeight) / 実測 \(actualHeight) = 行 \(rowHeight) × \(itemCount) / "
+                + "誤差 \(error))"
+        )
+
+        // 数えるのは合計高さの 0.1% を超える引き直しだけとする。件数が多いほど、どの推定値でも
+        // 到達直前に微小な引き直し (合計の 0.03% 未満) が数回入り、その回数は機種によって変わる。
+        // 捕まえたいのは「見積もりが外れて段階的に伸びる」動き (推定を固定値にすると 1 回あたり
+        // 合計の数 % の伸びが何十回も入る) なので、微小な引き直しは回数に数えない。
+        let significantThreshold = actualHeight * 0.001
+        var significantChanges: [CGFloat] = []
+        var minorChangeCount = 0
+        var previousHeight = initialHeight
+        for height in observedHeights where height != previousHeight {
+            if abs(height - previousHeight) > significantThreshold {
+                significantChanges.append(height - previousHeight)
+            } else {
+                minorChangeCount += 1
+            }
+            previousHeight = height
+        }
+        XCTAssertLessThanOrEqual(
+            significantChanges.count,
+            3,
+            "末尾までの contentSize の大きな変化の回数が上限を超えています "
+                + "(0.1% 超 \(significantChanges.count) 回 \(significantChanges) / "
+                + "0.1% 以下 \(minorChangeCount) 回 / 合計 \(actualHeight))"
+        )
+        // 次回との比較のため、閾値に届かなかった引き直しの回数も残す。
+        print(
+            "KS 合計高さの見積もり: 初回 \(initialHeight) / 実測 \(actualHeight) / 到達後 \(measuredHeight) / 誤差 \(error) / "
+                + "0.1% 超 \(significantChanges.count) 回 / 0.1% 以下 \(minorChangeCount) 回"
+        )
+    }
+
+    #if DEBUG
+    // 配列を置き換えても、置換前の項目のために作ったセルは保持されない。
+    func test配列の置換で同時生存セルが可視範囲の規模に戻る() async {
+        let itemCount = 2_000
+        let controller = KsCollectionViewController(
+            configuration: makeConfiguration(
+                items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+            )
+        )
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        let visibleCellCount = controller.collectionView.indexPathsForVisibleItems.count
+        XCTAssertGreaterThan(visibleCellCount, 0, "初期表示の可視セルを取得できませんでした")
+        let liveCellLimit = visibleCellCount * 4
+
+        // 再利用プールが埋まるまで全件を往復する。
+        await advanceRoundTrip(itemCount: itemCount, in: controller)
+
+        var replaced = makeConfiguration(
+            items: (itemCount..<(itemCount * 2)).map { Item(id: $0, title: "置換 \($0)") }
+        )
+        replaced.layout = .list
+        controller.update(configuration: replaced)
+        await waitUntil("置換後の snapshot", value: { controller.appliedItemIdentifiers.first }) {
+            $0 == AnyHashable(itemCount)
+        }
+
+        // 置換の直後は前の項目のセルが解放される機会をまだ得ていないため、収束を待つ。
+        await waitUntil("置換後の同時生存セル", value: { controller.liveCellCount }) { $0 < liveCellLimit }
+        XCTAssertLessThan(
+            controller.liveCellCount,
+            liveCellLimit,
+            "置換後も同時生存セルが可視範囲と再利用プールの規模を超えています "
+                + "(可視 \(visibleCellCount) 件 / 実測 \(controller.liveCellCount) 件 / 上限 \(liveCellLimit) 件)"
+        )
+    }
+    #endif
+
+    // コレクションへの強参照を手放すと、エンジンとそれが持つセル・ホスティングが解放される。
+    // 破棄後は同じインスタンスの計数を読めないため、弱参照が nil になることで確かめる。
+    func testコレクションへの強参照を手放すとエンジンが解放される() async {
+        let itemCount = 2_000
+        weak var engine: KsCollectionViewController<Item>?
+        var window: UIWindow? = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+
+        do {
+            let controller = KsCollectionViewController(
+                configuration: makeConfiguration(
+                    items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+                )
+            )
+            engine = controller
+            window?.rootViewController = controller
+            window?.makeKeyAndVisible()
+            controller.loadViewIfNeeded()
+            controller.view.layoutIfNeeded()
+            await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+            // 再利用プールと多数のホスティングを通過した状態から解放する。
+            // 走査が成立しなければ、その前提を作れていないので破棄の確認へ進まない。
+            let traversed = await advanceRoundTrip(itemCount: itemCount, in: controller)
+            XCTAssertTrue(traversed, "全件を往復できなかったため破棄の確認へ進みません")
+            guard traversed else { return }
+            XCTAssertNotNil(engine)
+        }
+
+        window?.rootViewController = nil
+        window?.isHidden = true
+        window = nil
+
+        await waitUntil("エンジンの解放", value: { engine == nil }) { $0 }
+        XCTAssertNil(engine, "コレクションを手放してもエンジンが解放されていません")
+    }
 
     func test左右の内側余白を変えてもスクロールインジケータをコンポーネント端に保つ() async {
         var configuration = makeConfiguration(items: (0..<80).map { Item(id: $0, title: "項目 \($0)") })
@@ -1262,6 +1604,111 @@ final class KsCollectionEngineTests: XCTestCase {
         )
     }
 
+    // 固定高と可変行高が 6 : 1 で混ざる 2 列グリッドの構成。
+    private func makeMixedHeightGridConfiguration(itemCount: Int) -> KsCollectionConfiguration<Item> {
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        ) { item in
+            MixedHeightRow(item: item)
+        }
+        configuration.layout = .grid(columns: .fixed(2), rowSpacing: 1, columnSpacing: 1)
+        configuration.showsSeparators = false
+        return configuration
+    }
+
+    // 行の高さが一様な 1 列リストの構成。行 = セルになる。
+    private func makeUniformHeightListConfiguration(itemCount: Int) -> KsCollectionConfiguration<Item> {
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        ) { item in
+            UniformHeightRow(item: item)
+        }
+        configuration.layout = .list
+        configuration.showsSeparators = false
+        return configuration
+    }
+
+    // セルへ渡すレイアウト属性を組み立てる。
+    private func layoutAttributes(width: CGFloat, height: CGFloat) -> UICollectionViewLayoutAttributes {
+        let attributes = UICollectionViewLayoutAttributes(forCellWith: IndexPath(item: 0, section: 0))
+        attributes.frame = CGRect(x: 0, y: 0, width: width, height: height)
+        return attributes
+    }
+
+    // 指定した項目のレイアウト属性の矩形を返す。
+    private func itemFrames(
+        in controller: KsCollectionViewController<Item>,
+        items: [Int]
+    ) -> [CGRect] {
+        items.compactMap {
+            controller.collectionView.collectionViewLayout.layoutAttributesForItem(
+                at: IndexPath(item: $0, section: 0)
+            )?.frame
+        }
+    }
+
+    #if DEBUG
+    // 推定高さが多数派の高さ (長文の付かない行の高さ = 可視セルの最小の高さ) に達するまで送り、
+    // その高さを返す。達しないまま締切を過ぎたら失敗させる。
+    private func settleMajorityEstimate(
+        in controller: KsCollectionViewController<Item>
+    ) async -> CGFloat {
+        let step = controller.collectionView.bounds.height / 2
+        var majority: CGFloat = 0
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(10)
+        var steps = 0
+        while clock.now < deadline {
+            let heights = controller.collectionView.indexPathsForVisibleItems.compactMap {
+                controller.collectionView.collectionViewLayout.layoutAttributesForItem(at: $0)?.frame.height
+            }
+            if let shortest = heights.min() {
+                majority = shortest
+                if abs(controller.currentEstimatedHeight - shortest) < 0.5 {
+                    return shortest
+                }
+            }
+            controller.collectionView.setContentOffset(
+                CGPoint(
+                    x: controller.collectionView.contentOffset.x,
+                    y: controller.collectionView.contentOffset.y + step
+                ),
+                animated: false
+            )
+            controller.collectionView.layoutIfNeeded()
+            steps += 1
+            if steps.isMultiple(of: 4) {
+                try? await Task.sleep(for: .milliseconds(1))
+            }
+        }
+        XCTFail(
+            "推定高さが多数派の高さに達しませんでした "
+                + "(推定 \(controller.currentEstimatedHeight) / 多数派 \(majority))"
+        )
+        return majority
+    }
+    #endif
+
+    // contentSize が動かなくなるまで待つ。初回表示の見積もりを読む基準点にする。
+    private func settleContentSize(in controller: KsCollectionViewController<Item>) async {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(5)
+        var lastHeight = controller.collectionView.contentSize.height
+        var quietSince = clock.now
+        while clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+            controller.collectionView.layoutIfNeeded()
+            let height = controller.collectionView.contentSize.height
+            if height != lastHeight {
+                lastHeight = height
+                quietSince = clock.now
+            } else if clock.now - quietSince >= .milliseconds(200) {
+                return
+            }
+        }
+        XCTFail("初回表示の contentSize が期限内に静止しませんでした。実測値: \(lastHeight)")
+    }
+
     private func waitForVisibleItemCount(
         _ count: Int,
         in controller: KsCollectionViewController<Item>
@@ -1387,13 +1834,12 @@ final class KsCollectionEngineTests: XCTestCase {
         return anchor
     }
 
-    #if DEBUG
-    // 目的の位置が表示されるまで `step` ずつ送り、各段階で生存セル数を採る。
+    // 目的の位置が表示されるまで `step` ずつ送る。各段階の後に `onStep` を呼ぶ。
     private func advanceUntilVisible(
         item: Int,
         in controller: KsCollectionViewController<Item>,
         step: CGFloat,
-        maxLiveCellCount: inout Int
+        onStep: () -> Void = {}
     ) async -> Bool {
         let limit = 4_000
         var steps = 0
@@ -1415,11 +1861,31 @@ final class KsCollectionEngineTests: XCTestCase {
             if steps.isMultiple(of: 8) {
                 try? await Task.sleep(for: .milliseconds(1))
             }
-            maxLiveCellCount = max(maxLiveCellCount, controller.liveCellCount)
+            onStep()
         }
         return isVisible(item: item, in: controller)
     }
-    #endif
+
+    // 末尾まで送ってから先頭へ戻る。再利用プールが埋まった状態を作るために使う。
+    @discardableResult
+    private func advanceRoundTrip(
+        itemCount: Int,
+        in controller: KsCollectionViewController<Item>,
+        onStep: () -> Void = {}
+    ) async -> Bool {
+        let step = controller.collectionView.bounds.height / 2
+        let advanced = await advanceUntilVisible(
+            item: itemCount - 1,
+            in: controller,
+            step: step,
+            onStep: onStep
+        )
+        XCTAssertTrue(advanced, "末尾まで送り切れませんでした")
+        guard advanced else { return false }
+        let returned = await advanceUntilVisible(item: 0, in: controller, step: -step, onStep: onStep)
+        XCTAssertTrue(returned, "先頭まで戻り切れませんでした")
+        return returned
+    }
 
     private func isVisible(
         item: Int,
