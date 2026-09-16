@@ -1,8 +1,13 @@
 import XCTest
 
-/// 計測専用のドライバです。アサーションを持たず、Instruments からの計測窓を開くために動かします。
-/// 通常のテストスイート (`KsCollectionViewSamples` スキーム) からは除外し、
-/// `KsCollectionViewSamplesPerformance` スキームでのみ実行します。
+/// 計測専用のドライバです。Instruments からの計測窓を開くため、または計測そのものを自動で
+/// 回すために動かします。通常のテストスイート (`KsCollectionViewSamples` スキーム) からは
+/// 除外し、`KsCollectionViewSamplesPerformance` スキームでのみ実行します。
+///
+/// 合否の持ち方は駆動ごとに違います。画像の読み込みのような**観測のための駆動**は判定を持たず、
+/// 緑は「駆動が最後まで動いた」ことしか意味しません (合否は記録側のログと画面の印を突き合わせて
+/// 証跡の側で決めます)。一方、メモリの往復は**判定を持ち**、定常化に届かなかった走行を失敗させます。
+/// したがってこのスキームの成功件数には、判定を持つテストと持たない駆動の両方が含まれます。
 ///
 /// スクロールの滑らかさは自動では駆動しません。自動駆動は主スレッドを占めて計測の土俵そのものを
 /// 汚すため、フリックはオーナーが固定の操作列で行い、ここに置くのは足場の問題が無い駆動だけです。
@@ -13,7 +18,7 @@ final class PerformanceDriverUITests: XCTestCase {
     /// 送る ④同じ操作を逆向きに行って戻す、の 4 段で動かします。各段の印と可視の要素は
     /// `KS74` を先頭に付けて出力し、記録側のログと突き合わせます。
     ///
-    /// 判定はしません (このファイルの他の駆動と同じく、計測窓を開くために動かすだけです)。
+    /// 判定はしません (観測のための駆動であり、動かすこと自体が目的です)。
     /// 合否は証跡の側で、印とログの両方を突き合わせて決めます。
     @MainActor
     func test画像グリッドで基準点を切り送って戻す() {
@@ -134,9 +139,40 @@ final class PerformanceDriverUITests: XCTestCase {
         print("KS74 phase=\(phase) mark=[\(mark.label)] visible=\(visible)")
     }
 
+    /// メモリの自動往復です。定常化するまで往復を重ね、往復ごとの記録を残します。
+    ///
+    /// 定常の規則 (連続する 2 往復の増分がいずれも 1 往復後の値の 2% 以内) は app 側が持ち、
+    /// ここはその判定を読んで往復を止めます。規則を両側に書くと、片方だけ直したときに
+    /// 判定が食い違ったまま緑になります。
+    ///
+    /// 上限まで重ねても定常化しなければ**失敗**させます。未判定は証跡に使えない結果であり、
+    /// 緑として通すと「定常化を確かめた」ことにされてしまうためです。
+    ///
     /// 1 往復は端点間のジャンプではなく可視範囲の半分ずつ送る全件走査のため、往復ごとの待ち時間を長めに取ります。
     @MainActor
-    func test大量件数を全件通過で2往復してメモリを表示する() {
+    func test大量件数を全件通過で定常化するまで往復してメモリを記録する() {
+        assertSteadies(within: Self.maximumRoundTrips)
+    }
+
+    /// 上限までに定常化しなかった走行が、成功として終わらないことを確かめます。
+    ///
+    /// 定常の判定には 3 往復ぶんの実測が要るため、上限を 1 往復にすれば定常化に届かない状態を
+    /// 作れます。このときドライバが緑で終わると、証跡に使えない走行が「定常化を確かめた」
+    /// 結果として通ってしまいます。
+    @MainActor
+    func test上限までに定常化しなければ未判定として失敗する() {
+        let options = XCTExpectedFailure.Options()
+        options.issueMatcher = { $0.compactDescription.contains("定常化しませんでした") }
+        XCTExpectFailure("上限までに定常化しない走行は失敗する", options: options)
+
+        assertSteadies(within: 1)
+    }
+
+    /// 定常化するまで往復を重ね、往復ごとの記録を出して、定常化したことを確かめます。
+    ///
+    /// - Parameter limit: 重ねる往復数の上限
+    @MainActor
+    private func assertSteadies(within limit: Int) {
         let app = XCUIApplication()
         app.launchArguments = ["--verify-performance"]
         app.terminate()
@@ -144,27 +180,52 @@ final class PerformanceDriverUITests: XCTestCase {
 
         let roundTrip = app.buttons["performance.roundTrip"]
         XCTAssertTrue(roundTrip.waitForExistence(timeout: 10))
+        let completed = app.staticTexts["performance.completedRoundTrips"]
+        let memory = app.staticTexts["performance.memory.last"]
+        let visited = app.staticTexts["performance.visitedItems"]
+        let judgement = app.staticTexts["performance.judgement"]
 
-        // 通過件数は往復ごとに数え直されるため、各往復の直後に全項目を通過したことを確認する。
-        // 刻みが可視範囲より粗いと通過しない項目が残る。
-        roundTrip.tap()
-        XCTAssertTrue(app.staticTexts["performance.completedRoundTrips"]
-            .waitForLabel("完了: 1", timeout: 300))
-        let first = app.staticTexts["performance.memory.first"].label
-        XCTAssertTrue(first.hasSuffix(" bytes"), first)
-        XCTAssertEqual(
-            app.staticTexts["performance.visitedItems"].label,
-            "直近往復の通過: 10000 / 10000"
-        )
+        var lastJudgement = ""
+        for round in 1...limit {
+            roundTrip.tap()
+            XCTAssertTrue(
+                completed.waitForLabel("完了: \(round)", timeout: Self.roundTripTimeout),
+                "\(round) 往復目が \(Int(Self.roundTripTimeout)) 秒以内に終わりませんでした"
+            )
 
-        roundTrip.tap()
-        XCTAssertTrue(app.staticTexts["performance.completedRoundTrips"]
-            .waitForLabel("完了: 2", timeout: 300))
-        let second = app.staticTexts["performance.memory.second"].label
-        XCTAssertTrue(second.hasSuffix(" bytes"), second)
+            // 通過件数は往復ごとに数え直されるため、各往復の直後に全項目を通過したことを確認する。
+            // 刻みが可視範囲より粗いと通過しない項目が残る。
+            XCTAssertEqual(visited.label, "直近往復の通過: 10000 / 10000")
+            let footprint = memory.label
+            XCTAssertTrue(footprint.hasSuffix(" bytes"), footprint)
+
+            lastJudgement = Self.judgementValue(in: judgement.label)
+            // 証跡に転記する数値はこの行から採る。
+            print("KS_PERF_ROUND=\(round) \(footprint) \(visited.label) 判定=\(lastJudgement)")
+            XCTAssertNotEqual(lastJudgement, "無効", "\(round) 往復目の走査が成立しませんでした")
+            if lastJudgement == "定常" { break }
+        }
+
+        print("KS_PERF_JUDGEMENT=\(lastJudgement) 往復=\(completed.label)")
         XCTAssertEqual(
-            app.staticTexts["performance.visitedItems"].label,
-            "直近往復の通過: 10000 / 10000"
+            lastJudgement,
+            "定常",
+            "上限 \(limit) 往復までに定常化しませんでした (未判定)"
         )
+    }
+
+    /// 定常化を待つ往復数の上限です。app 側の上限と同じ値にします。
+    private static let maximumRoundTrips = 10
+
+    /// 1 往復あたりの待ち上限です。
+    private static let roundTripTimeout: TimeInterval = 300
+
+    /// 判定の表示から判定そのものを取り出します。
+    ///
+    /// - Parameter label: 判定の表示 (`判定: 定常` の形)
+    /// - Returns: 判定の文字列。読み取れなければ表示のまま
+    private static func judgementValue(in label: String) -> String {
+        guard let range = label.range(of: "判定: ") else { return label }
+        return String(label[range.upperBound...])
     }
 }

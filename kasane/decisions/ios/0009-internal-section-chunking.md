@@ -53,4 +53,37 @@ phase-4 (セクション / グループ化) の利用者向けの論理セクシ
 - phase-4 で論理セクションを入れるとき (2 段構造の責務を確定する)
 - UIKit が estimated 高さの解き直しの費用を件数に依らない形にしたとき
 
-出典: kasane/changes/performance-criteria-review/exploration.md (論点 6 と相談役の助言) / kasane/changes/performance-criteria-review/design.md (Decision 10〜13) / kasane/changes/performance-criteria-review/evidence/manual-largeData-ios-2026-09-15.md (判定) / kasane/roadmaps/v1-foundation/phases/phase-4-sections-grouping/agenda.md (performance-criteria-review からの申し送り)
+## 実装後の補足 (2026-09-17)
+
+出典の変更 (performance-criteria-review) で本決定を実装し、基準機での手動フリック計測まで通した。proposed の間に確かめられたことと、design から動いた点を記す。
+
+### Context の前提は実機計測で確かめられた
+
+前提「compositional layout の estimated 高さの解き直しがセクション単位である」(profile からの推論) は、試作の段階で実機計測により確認された。初回区間の solver 占有率の件数比 (10,000 件 / 2,000 件) は、最頻値化だけのとき 4.1 倍だったものが、塊分割の試作で 0.90 倍、本実装の最終ビルドで 1.04 倍になった (いずれも基準は 1.5 倍以下)。Revisit When の 1 つ目「費用が全セクションに比例すると分かったとき」は起こらず、`.absolute` 併用と自前レイアウトの改訂案は発動していない。
+
+塊の基準件数 500 も据え置いた。試作の時点で件数比例が消えたため、200 件へ下げる案 (出典の Open Question) を採る理由が無くなっている。
+
+### Decision の各項が実装でどう実現されたか
+
+塊分け・境界の見た目・項目 ID によるスクロール命令と位置維持は Decision のとおり実装した。推定高さも「1 コレクション 1 値のまま全塊に渡す」を維持している — 複数列の合計高さを行の高さの実測で見積もる案が別途あったが、行ごとの推定値が行の配置に使われるという前提が実機の A/B で崩れ、オーナー判断で出典の変更から取り下げられたためである。
+
+design から動いたのは位置維持の内側で、次の 2 つを足した。どちらも公開 API は変えない。
+
+- 回転時のアンカーの捕捉。向き別列数では塊を組み直さないため既存の経路に乗らず、表示範囲の先頭の項目を回転の開始時に控え、解決した列数が変わったときだけレイアウト後の実行機会に復元する
+- アンカーの決め方の幾何化。「可視セル一覧の最小の indexPath」では遠くへ送った直後に画面外の項目が選ばれるため、「レイアウト属性の矩形が表示範囲と重なる項目のうち先頭」に変えた。控えは利用者のドラッグ開始で捨て、復元は世代番号で要求元の適用に紐づける
+
+### 実装して分かった観測 (帰結ではない)
+
+差分更新の挙動は Decision で「実装で確かめる」としていた部分が確定した。塊の所属が変わる可視セルは**作り直されずに同じセルのまま移動する** (先頭への挿入・削除とも該当は 1 件)。また先頭に 1 件挿入したとき表示範囲の先頭の項目の位置は **0.0 pt しか動かない** — UIKit が表示中の内容を留めるためで、Decision が許容していた「挿入分だけ下がる」動きは観測されなかった。
+
+負の帰結に挙げた「塊の境界の項目が隣の塊へ移る差分が毎回発生する」ことは変わらないが、その差分が可視セルの作り直しを伴わない点で、費用の見積もりは当初より軽い。
+
+### 既知の窓
+
+phase-4 への制約 (論理セクション × 内部の塊の 2 段、sticky ヘッダ・不完全な行・先頭挿入の 3 条件) は Decision から導けるまま維持する。これに加えて、実装の側に閉じきれていない窓が 3 つ残る。
+
+- 塊の件数が変わる適用の最中に配列と layout 値の更新が重なると、遅延復元が世代不一致で取り下げられ、新しい控えの復元先が無いまま残る
+- adaptive は「解決した列数を知る時点」と「組み直せる時点」が原理的に 1 実行機会ずれるため、塊の境界に列数に満たない行が 1 フレーム出うる
+- 列数が変わる大量件数の fixture が Sample に無く、回転と adaptive の組み直しを実機で目視できていない。裏付けは Simulator のテスト (回転経由の A/B、境界の幾何) に留まる
+
+出典: kasane/changes/performance-criteria-review/exploration.md (論点 6 と相談役の助言) / kasane/changes/performance-criteria-review/design.md (Decision 10〜13) / kasane/changes/performance-criteria-review/evidence/manual-largeData-ios-2026-09-15.md (最頻値化のみの判定) / kasane/changes/performance-criteria-review/evidence/manual-largeData-ios-2026-09-16-prototype.md (試作の判定) / kasane/changes/performance-criteria-review/evidence/manual-largeData-ios-2026-09-17.md (最終の判定) / kasane/changes/performance-criteria-review/deviation.md (実装時の観測) / kasane/roadmaps/v1-foundation/phases/phase-4-sections-grouping/agenda.md (performance-criteria-review からの申し送り)

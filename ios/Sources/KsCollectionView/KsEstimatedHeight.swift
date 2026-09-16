@@ -4,8 +4,10 @@ import CoreGraphics
 ///
 /// compositional layout の `NSCollectionLayoutSize.estimated` は item / group の定義単位であり
 /// index path ごとには変えられないため、テンプレートキー別ではなくコレクション全体で 1 つの値を持ちます。
-/// 行の幅ごとに実測値を持ち、幅が変われば前の幅の値を捨てます (list / grid の切り替え・回転・
-/// adaptive や向き指定での列数変化はいずれも行の幅を変えます)。
+/// 行の幅と画面の倍率ごとに実測値を持ち、どちらかが変われば前の値を捨てます (list / grid の
+/// 切り替え・回転・adaptive や向き指定での列数変化はいずれも行の幅を変え、別の画面への移動は
+/// 倍率を変えます)。倍率が変わるとピクセル格子の刻みも変わるため、混ざったままでは同じ見た目の
+/// 高さが別の格子に散り、最頻値が成立しなくなります。
 ///
 /// 使うのは直近の実測値の**最頻値**です。セルが自己サイズで返した高さ (preferred) が、その
 /// セルに渡されていた高さ (original) と同じなら再解決は起きません。UIKit はこの 2 つの差で
@@ -35,8 +37,9 @@ internal struct KsEstimatedHeight {
     /// `samples` を測ったときの行の幅。
     private var sampledWidth: CGFloat?
 
-    /// `samples` を量子化したときの画面の倍率。平均を格子に載せ直すのに使う。
-    private var sampledScale: CGFloat = 1
+    /// `samples` を量子化したときの画面の倍率 (正規化後)。平均を格子に載せ直すのと、
+    /// 倍率が変わったことの判定に使う。
+    private var sampledScale: CGFloat?
 
     /// 現在の推定高さ。
     ///
@@ -66,7 +69,7 @@ internal struct KsEstimatedHeight {
 
         guard modeCount > 1 else {
             let average = samples.reduce(0) { $0 + $1.measured } / CGFloat(samples.count)
-            return Self.quantized(average, scale: sampledScale)
+            return Self.quantized(average, scale: sampledScale ?? 1)
         }
         return mode
     }
@@ -74,24 +77,28 @@ internal struct KsEstimatedHeight {
     /// 実測した行の高さを、それを測ったときの行の幅・画面の倍率とともに記録します。
     /// 有限で正の値だけを採用します。
     ///
-    /// 前と違う幅で測った値が来たら、それまでの実測値をこの時点で捨てます。別の幅で測った
-    /// 高さは推定の役に立たないためです。捨てるのを幅が変わった瞬間ではなく次の実測が来た
-    /// ときまで遅らせるのは、幅の変化で走る再レイアウトに既定値を読ませないためです
+    /// 前と違う幅、または前と違う画面の倍率で測った値が来たら、それまでの実測値をこの時点で
+    /// 捨てます。別の幅で測った高さは推定の役に立たず、別の倍率で測った高さは格子の刻みが
+    /// 違うため同じ土俵で数えられないためです。捨てるのを幅・倍率が変わった瞬間ではなく次の
+    /// 実測が来たときまで遅らせるのは、その変化で走る再レイアウトに既定値を読ませないためです
     /// (捨てた直後の再レイアウトは実測を 1 件も持たない状態になり、推定が既定値へ戻る)。
-    /// この遅延により、新しい幅の実測が入るまでは前の幅の推定値が使われます。
+    /// この遅延により、新しい幅・倍率の実測が入るまでは前の推定値が使われます。
     ///
     /// - Parameters:
     ///   - height: 実測した高さ
     ///   - width: それを測ったときの行の幅
-    ///   - scale: 画面のピクセル格子の倍率 (量子化の刻みは 1 / scale pt)
+    ///   - scale: 画面のピクセル格子の倍率 (量子化の刻みは 1 / scale pt)。
+    ///     有限で正でなければ 1 として扱う (`quantized` の丸めと同じ扱い)
     internal mutating func record(height: CGFloat, width: CGFloat, scale: CGFloat) {
         guard height.isFinite, height > 0, width.isFinite, width > 0 else { return }
-        if let sampledWidth, sampledWidth != width {
+        // 有効でない倍率はすべて同じ刻み (1 pt) に落ちるため、捨てるかの判定も正規化後で行う。
+        let normalizedScale = scale.isFinite && scale > 0 ? scale : 1
+        if sampledWidth != nil, sampledWidth != width || sampledScale != normalizedScale {
             samples.removeAll()
         }
         sampledWidth = width
-        sampledScale = scale.isFinite && scale > 0 ? scale : 1
-        samples.append((measured: height, grid: Self.quantized(height, scale: scale)))
+        sampledScale = normalizedScale
+        samples.append((measured: height, grid: Self.quantized(height, scale: normalizedScale)))
         if samples.count > Self.sampleCapacity {
             samples.removeFirst(samples.count - Self.sampleCapacity)
         }

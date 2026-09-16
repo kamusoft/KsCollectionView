@@ -1,5 +1,5 @@
 import Darwin
-import KsCollectionView
+@_spi(KsMeasurement) import KsCollectionView
 import SwiftUI
 import UIKit
 
@@ -9,11 +9,21 @@ struct PerformanceVerificationView: View {
     var fixture: PerformanceFixture = .largeData
 
     @State private var completedRoundTrips = 0
-    @State private var memoryAfterFirstRoundTrip = "未計測"
-    @State private var memoryAfterSecondRoundTrip = "未計測"
+    @State private var memoryAfterLastRoundTrip = "未計測"
+    @State private var judgement = Judgement.undetermined
     @State private var visitedItemsInLastRoundTrip: Set<Int> = []
     @State private var footprints: [UInt64] = []
     @State private var isRunning = false
+
+    /// 往復を重ねた結果の判定です。
+    enum Judgement: String {
+        /// 連続する 2 往復の増分が許容差に収まった。
+        case steady = "定常"
+        /// まだ増分が収まっていない (上限まで重ねた後なら、これが最終の判定になる)。
+        case undetermined = "未判定"
+        /// 走査そのものが成立しなかった往復があり、定常化を判定できない。
+        case invalid = "無効"
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -21,17 +31,19 @@ struct PerformanceVerificationView: View {
                 Button("1 往復する") {
                     runRoundTrip()
                 }
-                .disabled(isRunning || completedRoundTrips >= 2)
+                .disabled(isRunning || completedRoundTrips >= Self.maximumRoundTrips)
                 .accessibilityIdentifier("performance.roundTrip")
 
                 Text("完了: \(completedRoundTrips)")
                     .accessibilityIdentifier("performance.completedRoundTrips")
             }
 
-            Text("1 往復後: \(memoryAfterFirstRoundTrip)")
-                .accessibilityIdentifier("performance.memory.first")
-            Text("2 往復後: \(memoryAfterSecondRoundTrip)")
-                .accessibilityIdentifier("performance.memory.second")
+            // 往復ごとに読めればよいので、直近 1 往復の値だけを出す。定常判定はこの値の列から
+            // app 側が決め、駆動側 (UI テスト) はその判定を読んで往復を止める。
+            Text(verbatim: "直近往復のメモリ: \(memoryAfterLastRoundTrip)")
+                .accessibilityIdentifier("performance.memory.last")
+            Text(verbatim: "判定: \(judgement.rawValue)")
+                .accessibilityIdentifier("performance.judgement")
             // 通過件数は往復ごとに数え直すため、直近 1 往復の結果であることを表示に明示する。
             // 桁区切りが入ると読み取り側の期待値がロケール依存になるため、そのままの数字で表示する。
             Text(verbatim: "直近往復の通過: \(visitedItemsInLastRoundTrip.count) / \(fixture.itemCount)")
@@ -41,8 +53,9 @@ struct PerformanceVerificationView: View {
         }
         .task {
             guard automaticallyRuns else { return }
-            await runUntilSteady()
-            exit(EXIT_SUCCESS)
+            let isSteady = await runUntilSteady()
+            // 定常化しないまま終わった走行を成功として終わらせない (未判定が緑にならない)。
+            exit(isSteady ? EXIT_SUCCESS : EXIT_FAILURE)
         }
     }
 
@@ -90,24 +103,22 @@ struct PerformanceVerificationView: View {
 
     /// 増加が止まるまで往復を重ねます。上限まで重ねても止まらなければ、未判定として記録します。
     /// 走査が成立しなかった往復に出会った時点で打ち切り、定常化を主張せずに終了します。
+    ///
+    /// - Returns: 定常化したなら `true`
     @MainActor
-    private func runUntilSteady() async {
-        var everyRoundTripIsValid = true
+    @discardableResult
+    private func runUntilSteady() async -> Bool {
         for _ in 0..<Self.maximumRoundTrips {
-            everyRoundTripIsValid = await performRoundTrip()
-            if !everyRoundTripIsValid {
-                break
-            }
-            if Self.hasSteadied(footprints) {
-                break
-            }
+            guard await performRoundTrip() else { break }
+            if judgement == .steady { break }
         }
         print(
             "KS_PERF_VISITED_ITEMS_LAST_ROUND="
                 + "\(visitedItemsInLastRoundTrip.count)/\(fixture.itemCount)"
         )
-        let isSteady = everyRoundTripIsValid && Self.hasSteadied(footprints)
-        print("KS_PERF_STEADY=\(isSteady ? "yes" : "no")")
+        print("KS_PERF_ROUND_TRIPS=\(completedRoundTrips)")
+        print("KS_PERF_JUDGEMENT=\(judgement.rawValue)")
+        return judgement == .steady
     }
 
     /// 先頭から末尾まで、そして末尾から先頭までを可視範囲の半分ずつ送り、通過した項目を記録します。
@@ -121,6 +132,7 @@ struct PerformanceVerificationView: View {
 
         guard let collectionView = await Self.awaitCollectionView() else {
             print("KS_PERF_ERROR=コレクションを取得できませんでした")
+            judgement = .invalid
             return false
         }
 
@@ -135,14 +147,11 @@ struct PerformanceVerificationView: View {
 
         guard let footprint = Self.physicalFootprint() else {
             print("KS_PERF_ERROR=phys_footprint を取得できませんでした")
+            judgement = .invalid
             return false
         }
         let text = "\(footprint) bytes"
-        if completedRoundTrips == 1 {
-            memoryAfterFirstRoundTrip = text
-        } else if completedRoundTrips == 2 {
-            memoryAfterSecondRoundTrip = text
-        }
+        memoryAfterLastRoundTrip = text
         print(
             "KS_PERF_MEMORY_ROUND_\(completedRoundTrips)=\(text) "
                 + "visited=\(visited.count)/\(fixture.itemCount)"
@@ -157,9 +166,11 @@ struct PerformanceVerificationView: View {
                     + "reachedBothEnds=\(reachedBothEnds) settledEveryStep=\(settledEveryStep) "
                     + "visited=\(visited.count)/\(fixture.itemCount)"
             )
+            judgement = .invalid
             return false
         }
         footprints.append(footprint)
+        judgement = Self.hasSteadied(footprints) ? .steady : .undetermined
         return true
     }
 
@@ -221,10 +232,18 @@ struct PerformanceVerificationView: View {
         return false
     }
 
+    /// 可視項目を「全体の順番」(先頭の項目を 0 とする通し番号) で記録します。
+    /// コレクションは内部で項目を複数のセクションに分けて載せることがあり、`indexPath.item` は
+    /// セクションごとに 0 から始まります。item だけで数えると別のセクションの項目と重なり、
+    /// 全件を通過しても件数が足りないまま (かつ重複して) 数えられます。
+    /// 変換は本体の `KsItemOffsetLookup` を使い、通過記録とエンジン側の数え方を 1 つの実装に揃えます。
     @MainActor
     private static func record(_ collectionView: UICollectionView, into visited: inout Set<Int>) {
         for indexPath in collectionView.indexPathsForVisibleItems {
-            visited.insert(indexPath.item)
+            guard let offset = KsItemOffsetLookup.itemOffset(of: indexPath, in: collectionView) else {
+                continue
+            }
+            visited.insert(offset)
         }
     }
 

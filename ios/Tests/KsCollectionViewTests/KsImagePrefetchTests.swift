@@ -199,7 +199,7 @@ final class KsImagePrefetchTests: XCTestCase {
         let controller = KsCollectionViewController(configuration: configuration)
         controller.loadViewIfNeeded()
         await waitUntil("data source 件数", value: {
-            controller.collectionView.numberOfItems(inSection: 0)
+            ksTotalItemCount(in: controller.collectionView)
         }) { $0 == configuration.items.count }
         return controller
     }
@@ -213,13 +213,13 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 2, section: 0), IndexPath(item: 3, section: 0)]
+            prefetchItemsAt: [2, 3].map { ksIndexPath(forItemOffset: $0, in: controller.collectionView) }
         )
         XCTAssertEqual(recorder.startedURLs, [url("2.jpg"), url("3.jpg")])
 
         controller.collectionView(
             controller.collectionView,
-            cancelPrefetchingForItemsAt: [IndexPath(item: 3, section: 0)]
+            cancelPrefetchingForItemsAt: [ksIndexPath(forItemOffset: 3, in: controller.collectionView)]
         )
         XCTAssertEqual(recorder.cancelledURLs, [url("3.jpg")])
     }
@@ -233,11 +233,11 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 0, section: 0)]
+            prefetchItemsAt: [ksIndexPath(forItemOffset: 0, in: controller.collectionView)]
         )
         controller.collectionView(
             controller.collectionView,
-            cancelPrefetchingForItemsAt: [IndexPath(item: 0, section: 0)]
+            cancelPrefetchingForItemsAt: [ksIndexPath(forItemOffset: 0, in: controller.collectionView)]
         )
 
         XCTAssertTrue(recorder.starts.isEmpty)
@@ -254,7 +254,7 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 1, section: 0), IndexPath(item: 2, section: 0)]
+            prefetchItemsAt: [1, 2].map { ksIndexPath(forItemOffset: $0, in: controller.collectionView) }
         )
         XCTAssertEqual(recorder.startedURLs, [url("1.jpg"), url("2.jpg")])
 
@@ -275,7 +275,7 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 1, section: 0)]
+            prefetchItemsAt: [ksIndexPath(forItemOffset: 1, in: controller.collectionView)]
         )
         XCTAssertEqual(recorder.startedURLs, [url("v1-1.jpg")])
 
@@ -297,7 +297,7 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 0, section: 0), IndexPath(item: 1, section: 0)]
+            prefetchItemsAt: [0, 1].map { ksIndexPath(forItemOffset: $0, in: controller.collectionView) }
         )
         controller.disconnect()
 
@@ -314,7 +314,7 @@ final class KsImagePrefetchTests: XCTestCase {
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 0, section: 0)]
+            prefetchItemsAt: [ksIndexPath(forItemOffset: 0, in: controller.collectionView)]
         )
         // 配列が同じ更新では台帳が保たれ、開始済みの要求は取り消されない。
         controller.update(configuration: configuration)
@@ -323,7 +323,7 @@ final class KsImagePrefetchTests: XCTestCase {
         // 台帳が保たれているため、同じ項目の再通知では要求を積み増さない。
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 0, section: 0)]
+            prefetchItemsAt: [ksIndexPath(forItemOffset: 0, in: controller.collectionView)]
         )
         XCTAssertEqual(recorder.startedURLs, [url("0.jpg")])
     }

@@ -109,11 +109,11 @@ final class KsCollectionEngineTests: XCTestCase {
         let controller = KsCollectionViewController(configuration: makeConfiguration(items: items))
         controller.loadViewIfNeeded()
 
-        await waitUntil("data source 件数", value: { controller.collectionView.numberOfItems(inSection: 0) }) {
+        await waitUntil("data source 件数", value: { ksTotalItemCount(in: controller.collectionView) }) {
             $0 == 100
         }
 
-        XCTAssertEqual(controller.collectionView.numberOfItems(inSection: 0), 100)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 100)
     }
 
     func test初回表示前にセル登録を準備して再利用セルを生成する() async {
@@ -136,13 +136,13 @@ final class KsCollectionEngineTests: XCTestCase {
         configuration.onItemTap = { tapped = $0 }
         let controller = KsCollectionViewController(configuration: configuration)
         controller.loadViewIfNeeded()
-        await waitUntil("data source 件数", value: { controller.collectionView.numberOfItems(inSection: 0) }) {
+        await waitUntil("data source 件数", value: { ksTotalItemCount(in: controller.collectionView) }) {
             $0 == 1
         }
 
         controller.collectionView(
             controller.collectionView,
-            didSelectItemAt: IndexPath(item: 0, section: 0)
+            didSelectItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
         )
 
         XCTAssertEqual(tapped, item)
@@ -152,7 +152,7 @@ final class KsCollectionEngineTests: XCTestCase {
         let initial = (0..<20).map { Item(id: $0, title: "項目 \($0)") }
         let controller = KsCollectionViewController(configuration: makeConfiguration(items: initial))
         controller.loadViewIfNeeded()
-        await waitUntil("初期 data source 件数", value: { controller.collectionView.numberOfItems(inSection: 0) }) {
+        await waitUntil("初期 data source 件数", value: { ksTotalItemCount(in: controller.collectionView) }) {
             $0 == 20
         }
 
@@ -160,11 +160,11 @@ final class KsCollectionEngineTests: XCTestCase {
         var configuration = makeConfiguration(items: updated)
         configuration.layout = .grid(columns: .fixed(2), rowSpacing: 8, columnSpacing: 8)
         controller.update(configuration: configuration)
-        await waitUntil("更新後 data source 件数", value: { controller.collectionView.numberOfItems(inSection: 0) }) {
+        await waitUntil("更新後 data source 件数", value: { ksTotalItemCount(in: controller.collectionView) }) {
             $0 == 30
         }
 
-        XCTAssertEqual(controller.collectionView.numberOfItems(inSection: 0), 30)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 30)
     }
 
     func testリスト区切り線を全幅で先頭と行間に表示し即時に切り替える() async {
@@ -358,7 +358,7 @@ final class KsCollectionEngineTests: XCTestCase {
         await waitUntil("supplementary 再構成", value: {
             headerBuilds.last == "更新" && footerBuilds.last == 2
         }) { $0 }
-        XCTAssertEqual(controller.collectionView.numberOfItems(inSection: 0), 2)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 2)
     }
 
     func test不透明な内容の上へ指定色のtouchFeedbackを表示して消す() async {
@@ -378,7 +378,10 @@ final class KsCollectionEngineTests: XCTestCase {
         cell.layoutIfNeeded()
         let normalImage = renderedImageData(of: cell)
 
-        controller.collectionView(controller.collectionView, didHighlightItemAt: IndexPath(item: 0, section: 0))
+        controller.collectionView(
+            controller.collectionView,
+            didHighlightItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
         cell.layoutIfNeeded()
 
         XCTAssertTrue(cell.isTouchFeedbackVisible)
@@ -386,7 +389,10 @@ final class KsCollectionEngineTests: XCTestCase {
         XCTAssertGreaterThan(cell.touchFeedbackZPosition, cell.contentViewZPosition)
         XCTAssertNotEqual(normalImage, renderedImageData(of: cell))
 
-        controller.collectionView(controller.collectionView, didUnhighlightItemAt: IndexPath(item: 0, section: 0))
+        controller.collectionView(
+            controller.collectionView,
+            didUnhighlightItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
         XCTAssertFalse(cell.isTouchFeedbackVisible)
     }
 
@@ -405,8 +411,11 @@ final class KsCollectionEngineTests: XCTestCase {
         let longPress = controller.longPressRecognizer
         XCTAssertEqual(longPress?.cancelsTouchesInView, true)
         XCTAssertEqual(longPress?.isEnabled, true)
-        controller.performLongPress(at: IndexPath(item: 0, section: 0))
-        controller.collectionView(controller.collectionView, didSelectItemAt: IndexPath(item: 0, section: 0))
+        controller.performLongPress(at: ksIndexPath(forItemOffset: 0, in: controller.collectionView))
+        controller.collectionView(
+            controller.collectionView,
+            didSelectItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
 
         XCTAssertEqual(longTaps, [item])
         XCTAssertEqual(taps, [item])
@@ -433,7 +442,7 @@ final class KsCollectionEngineTests: XCTestCase {
         }
 
         // 実タッチと同じ経路でセルの hitTest を通し、操作要素が当たったことを判定させる。
-        let indexPath = IndexPath(item: 0, section: 0)
+        let indexPath = ksIndexPath(forItemOffset: 0, in: controller.collectionView)
         let point = cell.convert(
             CGPoint(x: button.bounds.midX, y: button.bounds.midY),
             from: button
@@ -457,16 +466,16 @@ final class KsCollectionEngineTests: XCTestCase {
         let controller = KsCollectionViewController(configuration: configuration)
         controller.loadViewIfNeeded()
         await waitUntil("data source 件数", value: {
-            controller.collectionView.numberOfItems(inSection: 0)
+            ksTotalItemCount(in: controller.collectionView)
         }) { $0 == 4 }
 
         controller.collectionView(
             controller.collectionView,
-            prefetchItemsAt: [IndexPath(item: 2, section: 0), IndexPath(item: 0, section: 0)]
+            prefetchItemsAt: [2, 0].map { ksIndexPath(forItemOffset: $0, in: controller.collectionView) }
         )
         controller.collectionView(
             controller.collectionView,
-            cancelPrefetchingForItemsAt: [IndexPath(item: 1, section: 0)]
+            cancelPrefetchingForItemsAt: [ksIndexPath(forItemOffset: 1, in: controller.collectionView)]
         )
 
         XCTAssertEqual(recorder.prefetched, [items[2], items[0]])
@@ -508,12 +517,8 @@ final class KsCollectionEngineTests: XCTestCase {
         defer { window.isHidden = true }
 
         await waitUntil("adaptive 実レイアウト", value: {
-            let first = controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: 0, section: 0)
-            )?.frame
-            let second = controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: 1, section: 0)
-            )?.frame
+            let first = itemFrames(in: controller, items: [0]).first
+            let second = itemFrames(in: controller, items: [1]).first
             return (first, second)
         }) { frames in
             guard let first = frames.0, let second = frames.1 else { return false }
@@ -552,7 +557,7 @@ final class KsCollectionEngineTests: XCTestCase {
         }
 
         XCTAssertTrue(controller.collectionView.collectionViewLayout === initialLayout)
-        XCTAssertEqual(controller.collectionView.numberOfItems(inSection: 0), 30)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 30)
     }
 
     func testグリッドからリストへ切替後にスクロールしても全セルが一列になる() async {
@@ -568,13 +573,13 @@ final class KsCollectionEngineTests: XCTestCase {
         controller.update(configuration: configuration)
         controller.collectionView.layoutIfNeeded()
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: 50, section: 0),
+            at: ksIndexPath(forItemOffset: 50, in: controller.collectionView),
             at: .bottom,
             animated: false
         )
         controller.collectionView.layoutIfNeeded()
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: 0, section: 0),
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView),
             at: .top,
             animated: false
         )
@@ -624,7 +629,7 @@ final class KsCollectionEngineTests: XCTestCase {
             return abs(spacing - 40) < 1
         }
         controller.collectionView.layoutIfNeeded()
-        XCTAssertEqual(visibleIdentifiers(in: controller).first, anchor)
+        XCTAssertEqual(onScreenLeadingIdentifier(in: controller), anchor)
         XCTAssertEqual(
             anchorOffsetFromTop(anchor, in: controller) ?? .nan,
             offsetBefore,
@@ -654,9 +659,9 @@ final class KsCollectionEngineTests: XCTestCase {
             controller.collectionView.layoutIfNeeded()
 
             XCTAssertEqual(
-                visibleIdentifiers(in: controller).first,
+                onScreenLeadingIdentifier(in: controller),
                 anchor,
-                "行間 \(Double(step) * 6) への変更で先頭可視要素が変わりました"
+                "行間 \(Double(step) * 6) への変更で画面上の先頭の項目が変わりました"
             )
             XCTAssertEqual(
                 anchorOffsetFromTop(anchor, in: controller) ?? .nan,
@@ -752,6 +757,750 @@ final class KsCollectionEngineTests: XCTestCase {
         }) { $0.contains(anchor) }
     }
 
+    // 配列は内部で固定件数の塊に分けて載る。塊ごとに item が 0 から始まるため、item だけで
+    // 数えると別の塊の項目と重なる。全体の順番 (塊をまたいだ通し番号) なら全件を一意に数えられる。
+    func test塊に分かれても項目を全体の順番で一意に数えられる() async {
+        let itemCount = 2_000
+        let controller = KsCollectionViewController(
+            configuration: makeConfiguration(
+                items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+            )
+        )
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        let sectionCount = controller.collectionView.numberOfSections
+        XCTAssertGreaterThan(sectionCount, 1, "配列が 1 つの塊に収まっており、塊をまたぐ検証になっていません")
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), itemCount)
+
+        var offsets: Set<Int> = []
+        for section in 0..<sectionCount {
+            for item in 0..<controller.collectionView.numberOfItems(inSection: section) {
+                let indexPath = IndexPath(item: item, section: section)
+                guard let offset = ksItemOffset(for: indexPath, in: controller.collectionView) else {
+                    XCTFail("\(indexPath) の全体の順番を求められませんでした")
+                    return
+                }
+                XCTAssertTrue(
+                    offsets.insert(offset).inserted,
+                    "全体の順番 \(offset) が重複しています (\(indexPath))"
+                )
+                XCTAssertEqual(
+                    ksIndexPathIfPresent(forItemOffset: offset, in: controller.collectionView),
+                    indexPath,
+                    "全体の順番 \(offset) が元の位置へ戻りません"
+                )
+            }
+        }
+        XCTAssertEqual(offsets, Set(0..<itemCount), "全件を通し番号で数え切れていません")
+
+        // 塊の境界では item が 0 に戻り、次の塊の先頭になる。
+        let firstChunkCount = controller.collectionView.numberOfItems(inSection: 0)
+        XCTAssertEqual(
+            ksIndexPath(forItemOffset: firstChunkCount - 1, in: controller.collectionView),
+            IndexPath(item: firstChunkCount - 1, section: 0)
+        )
+        XCTAssertEqual(
+            ksIndexPath(forItemOffset: firstChunkCount, in: controller.collectionView),
+            IndexPath(item: 0, section: 1)
+        )
+        XCTAssertNil(ksIndexPathIfPresent(forItemOffset: itemCount, in: controller.collectionView))
+
+        // 通し番号の変換は本体の入口を通る。Sample の通過記録も同じ入口を使う。
+        XCTAssertEqual(
+            KsItemOffsetLookup.itemOffset(of: IndexPath(item: 0, section: 1), in: controller.collectionView),
+            firstChunkCount
+        )
+        XCTAssertEqual(KsItemOffsetLookup.totalItemCount(in: controller.collectionView), itemCount)
+    }
+
+    // 塊の件数は列数の倍数へ切り上げた値になる。layout から列数、列数から塊の件数、塊の件数から
+    // snapshot の section までが繋がっていることを、表示形態ごとに実際の snapshot で確かめる。
+    func test塊の件数と数がlayoutごとの列数の倍数になる() async {
+        let itemCount = 2_000
+
+        await assertChunkStructure(
+            layout: .list,
+            itemCount: itemCount,
+            expected: [500, 500, 500, 500]
+        )
+        // 500 は 3 で割り切れないため 501 件ずつに割れる。
+        await assertChunkStructure(
+            layout: .grid(columns: .fixed(3)),
+            itemCount: itemCount,
+            expected: [501, 501, 501, 497]
+        )
+        // 向き別列数では両方の列数の最小公倍数 (2 と 3 で 6) の倍数にする。
+        await assertChunkStructure(
+            layout: .grid(columns: .fixed(portrait: 2, landscape: 3)),
+            itemCount: itemCount,
+            expected: [504, 504, 504, 488]
+        )
+    }
+
+    // 塊の境界が行の切れ目に落ちることを位置で確かめる。件数が列数で割り切れることが境界の条件に
+    // なるのは「塊の先頭の項目が行頭に置かれる」前提の下だけなので、その前提ごと固定する。
+    func test塊の境界の直前の行が埋まり直後の項目が行頭に置かれる() async {
+        let itemCount = 2_000
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .fixed(2))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        let counts = sectionItemCounts(in: controller)
+        XCTAssertEqual(counts, [500, 500, 500, 500])
+        let boundary = counts[0]
+
+        let frames = itemFrames(
+            in: controller,
+            items: [boundary - 2, boundary - 1, boundary, boundary + 1]
+        )
+        guard frames.count == 4 else {
+            XCTFail("境界の前後の項目のレイアウト属性を取得できませんでした (\(frames.count) 件)")
+            return
+        }
+        // 境界の直前の行は 2 列とも埋まる。
+        XCTAssertEqual(frames[0].minY, frames[1].minY, accuracy: 1, "境界の直前の 2 項目が同じ行にありません")
+        XCTAssertLessThan(frames[0].minX, frames[1].minX, "境界の直前の 2 項目が同じ列に重なっています")
+        // 境界の直後の項目 (次の塊の先頭) は新しい行の行頭に置かれる。
+        XCTAssertEqual(frames[2].minX, frames[0].minX, accuracy: 1, "塊の先頭の項目が行頭に置かれていません")
+        XCTAssertGreaterThan(frames[2].minY, frames[1].minY, "塊の先頭の項目が直前の行に残っています")
+        XCTAssertEqual(frames[3].minY, frames[2].minY, accuracy: 1, "境界の直後の 2 項目が同じ行にありません")
+        XCTAssertEqual(frames[3].minX, frames[1].minX, accuracy: 1, "境界の直後の 2 項目の列が揃っていません")
+    }
+
+    // adaptive の列数は最初のレイアウトパスまで決まらないため、初回は列数 1 として 500 件ずつに割れる。
+    // 列数が確定した時点で、解決した列数 (幅 390 / 最小幅 120 で 3 列) の倍数へ自動で組み直す。
+    // 更新が 1 度も届かない画面でも境界に不完全な行を残さないため、確定そのものを契機にする。
+    func testadaptiveは列数が確定した最初のレイアウトで塊を組み直す() async {
+        let itemCount = 2_000
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .adaptive(minItemWidth: 120))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        await waitUntil("組み直した塊の件数", value: { sectionItemCounts(in: controller) }) {
+            $0 == [501, 501, 501, 497]
+        }
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), itemCount)
+    }
+
+    // 塊の件数が変わる更新は早期 return を抜けて組み直しへ進む。そこでも同値配列の可視セルは
+    // 作り直す (ios/ADR-0006)。テンプレートが親の状態を捕捉していると、作り直さないセルは
+    // 古い値のまま取り残される。
+    func test塊を組み直す同値配列の更新でも可視セルを作り直す() async {
+        for itemCount in [2_000, 300] {
+            let builds = BuildRecorder()
+            var configuration = makeConfiguration(
+                items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+            ) { item in
+                let _ = builds.record(item.id)
+                Text(item.title)
+            }
+            configuration.layout = .grid(columns: .adaptive(minItemWidth: 120))
+            let controller = KsCollectionViewController(configuration: configuration)
+            let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+            defer { window.isHidden = true }
+            await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+            // 幅 390 / 最小幅 120 で 3 列に解決し、塊は 501 件へ組み直される。
+            await waitUntil("列数の解決後の組み直し", value: { controller.chunkRebuildCount }) { $0 == 1 }
+            XCTAssertEqual(
+                sectionItemCounts(in: controller),
+                itemCount <= 501 ? [itemCount] : [501, 501, 501, 497]
+            )
+
+            // 幅を狭めて 1 列にすると塊の件数は 500 へ戻る。組み直しの予約が走る前に更新を届けると、
+            // 同値配列のまま塊の件数だけが変わる更新になる。項目数が塊の件数以下なら 1 つの塊に
+            // 収まり、組み直しても snapshot は同一になる (差分適用では何も起きない状況)。
+            resize(window: window, controller: controller, to: CGSize(width: 180, height: 844))
+            let visibleOffsets = visibleItemOffsets(in: controller)
+            XCTAssertFalse(visibleOffsets.isEmpty, "可視セルが無く、作り直しを観測できません (件数 \(itemCount))")
+            let buildsBeforeUpdate = builds.counts
+
+            controller.update(configuration: configuration)
+            controller.collectionView.layoutIfNeeded()
+            XCTAssertEqual(
+                sectionItemCounts(in: controller),
+                itemCount <= 500 ? [itemCount] : [500, 500, 500, 500],
+                "塊の件数が変わる更新になっていません (件数 \(itemCount))"
+            )
+
+            for offset in visibleOffsets {
+                XCTAssertGreaterThanOrEqual(
+                    builds.counts[offset] ?? 0,
+                    (buildsBeforeUpdate[offset] ?? 0) + 1,
+                    "項目 \(offset) のテンプレートが呼び直されていません (件数 \(itemCount))"
+                )
+            }
+        }
+    }
+
+    // 塊の境界は見た目に現れない。境界の前後の行間は他の行間と同じで、内側余白は配列全体の
+    // 上下にだけ付く。
+    func test塊の境界に行間だけが入り内側余白は配列全体の上下にだけ付く() async {
+        let itemCount = 1_200
+        var configuration = makeUniformHeightListConfiguration(itemCount: itemCount)
+        configuration.layout = .list(rowSpacing: 8)
+        configuration.contentPadding = EdgeInsets(top: 20, leading: 0, bottom: 24, trailing: 0)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        XCTAssertGreaterThan(
+            controller.collectionView.numberOfSections,
+            1,
+            "配列が 1 つの塊に収まっており、境界の検証になっていません"
+        )
+
+        let boundary = controller.collectionView.numberOfItems(inSection: 0)
+        let frames = itemFrames(
+            in: controller,
+            items: [0, boundary - 2, boundary - 1, boundary, itemCount - 1]
+        )
+        XCTAssertEqual(frames.count, 5, "境界の前後のレイアウト属性を取得できませんでした")
+        guard frames.count == 5 else { return }
+        let spacingWithinChunk = frames[2].minY - frames[1].maxY
+        let spacingAtBoundary = frames[3].minY - frames[2].maxY
+        XCTAssertEqual(spacingWithinChunk, 8, accuracy: 0.5, "塊の中の行間が宣言と違います")
+        XCTAssertEqual(
+            spacingAtBoundary,
+            spacingWithinChunk,
+            accuracy: 0.5,
+            "塊の境界の行間が他の行間と違います (境界 \(spacingAtBoundary) / 他 \(spacingWithinChunk))"
+        )
+        XCTAssertEqual(frames[0].minY, 20, accuracy: 0.5, "先頭の上の内側余白が反映されていません")
+        XCTAssertEqual(
+            controller.collectionView.contentSize.height - frames[4].maxY,
+            24,
+            accuracy: 0.5,
+            "末尾の下の内側余白が反映されていません"
+        )
+    }
+
+    // ヘッダーは配列全体の先頭に 1 つ、フッターは末尾に 1 つだけ付く。項目が空でも両方が出る。
+    func testヘッダーとフッターは塊が増えても1つずつで空配列でも表示される() async {
+        let itemCount = 1_200
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.header = { AnyView(Text("ヘッダー")) }
+        configuration.footer = { AnyView(Text("フッター")) }
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        XCTAssertGreaterThan(
+            controller.collectionView.numberOfSections,
+            1,
+            "配列が 1 つの塊に収まっており、境界の検証になっていません"
+        )
+
+        let counts = supplementaryKindCounts(in: controller)
+        XCTAssertEqual(
+            counts[UICollectionView.elementKindSectionHeader] ?? 0,
+            1,
+            "ヘッダーが塊の数だけ作られています (\(counts))"
+        )
+        XCTAssertEqual(
+            counts[UICollectionView.elementKindSectionFooter] ?? 0,
+            1,
+            "フッターが塊の数だけ作られています (\(counts))"
+        )
+        // ヘッダーは先頭の項目の上、フッターは末尾の項目の下に置かれる。
+        let frames = itemFrames(in: controller, items: [0, itemCount - 1])
+        XCTAssertEqual(frames.count, 2)
+        if let header = headerFrame(in: controller), frames.count == 2 {
+            XCTAssertLessThanOrEqual(header.maxY, frames[0].minY + 0.5)
+        } else {
+            XCTFail("ヘッダーのレイアウト属性を取得できませんでした")
+        }
+        if let footer = footerFrame(in: controller), frames.count == 2 {
+            XCTAssertGreaterThanOrEqual(footer.minY, frames[1].maxY - 0.5)
+        } else {
+            XCTFail("フッターのレイアウト属性を取得できませんでした")
+        }
+
+        configuration.items = []
+        controller.update(configuration: configuration)
+        await waitUntil("空配列の snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == 0 }
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("空配列のヘッダー", value: { visibleHeaderCount(in: controller) }) { $0 == 1 }
+        await waitUntil("空配列のフッター", value: {
+            controller.collectionView.visibleSupplementaryViews(
+                ofKind: UICollectionView.elementKindSectionFooter
+            ).count
+        }) { $0 == 1 }
+    }
+
+    // 上端の区切り線は配列全体の先頭の行にだけ出る。塊の境界では位置の item が 0 に戻るが、
+    // そこに線を出してはいけない。
+    func test塊の境界で上端の区切り線が出ない() async {
+        let itemCount = 1_200
+        var configuration = makeUniformHeightListConfiguration(itemCount: itemCount)
+        configuration.showsSeparators = true
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        XCTAssertGreaterThan(
+            controller.collectionView.numberOfSections,
+            1,
+            "配列が 1 つの塊に収まっており、境界の検証になっていません"
+        )
+        controller.collectionView.layoutIfNeeded()
+        XCTAssertTrue(
+            tryUnwrapCell(controller, item: 0).isTopSeparatorVisible,
+            "配列全体の先頭に上端の区切り線が出ていません"
+        )
+
+        let boundary = controller.collectionView.numberOfItems(inSection: 0)
+        let reached = await advanceUntilVisible(
+            item: boundary,
+            in: controller,
+            step: controller.collectionView.bounds.height / 2
+        )
+        XCTAssertTrue(reached, "塊の境界まで送り切れませんでした")
+        guard reached else { return }
+        controller.collectionView.layoutIfNeeded()
+        let boundaryCell = tryUnwrapCell(controller, item: boundary)
+        XCTAssertFalse(
+            boundaryCell.isTopSeparatorVisible,
+            "塊の境界の先頭の項目に上端の区切り線が出ています"
+        )
+        XCTAssertTrue(boundaryCell.isBottomSeparatorVisible)
+    }
+
+    // 向き別列数の塊の件数は両方の列数の最小公倍数の倍数なので、回転しても組み直さずに
+    // 境界が行の切れ目に落ちる。
+    func test向き別列数では回転しても塊を組み直さず不完全な行が出ない() async {
+        let itemCount = 1_200
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .fixed(portrait: 2, landscape: 3))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        let portraitCounts = sectionItemCounts(in: controller)
+        XCTAssertEqual(portraitCounts, [504, 504, 192])
+        let rebuildsBeforeRotation = controller.chunkRebuildCount
+
+        // 塊の境界より先まで送ってから回す。アンカーは送り切った後に実際に画面の先頭にあった
+        // 項目から採る (送り先が画面の上端に丁度収まるかは行の高さ次第で変わるため)。
+        let anchor = await leadingOffsetAfterScrolling(to: 600, in: controller)
+
+        rotate(window: window, controller: controller, to: CGSize(width: 844, height: 390))
+        await waitUntil("横向きの列数", value: { columnCount(in: controller) }) { $0 == 3 }
+
+        XCTAssertEqual(sectionItemCounts(in: controller), portraitCounts, "回転で塊を組み直しています")
+        XCTAssertEqual(
+            controller.chunkRebuildCount,
+            rebuildsBeforeRotation,
+            "最小公倍数で組んだ塊は回転で組み直さないはずです"
+        )
+        // 最終の塊を除く塊の件数は、縦横どちらの列数でも割り切れる (境界に不完全な行が無い)。
+        for count in portraitCounts.dropLast() {
+            XCTAssertEqual(count % 2, 0, "縦向きの列数で割り切れません (\(count))")
+            XCTAssertEqual(count % 3, 0, "横向きの列数で割り切れません (\(count))")
+        }
+
+        // 塊を組み直さない回転でも、表示範囲の先頭にあった項目は先頭の行に留まる。
+        await assertLeadingItemSharesRow(with: anchor, in: controller)
+
+        // 戻す向きでも同じく先頭の行に留まる。
+        rotate(window: window, controller: controller, to: CGSize(width: 390, height: 844))
+        await waitUntil("戻した後の列数", value: { columnCount(in: controller) }) { $0 == 2 }
+        await assertLeadingItemSharesRow(with: anchor, in: controller)
+    }
+
+    // adaptive では列数がレイアウトで決まるため、塊の件数が新しい列数で割り切れなくなったら
+    // 組み直す。組み直しても表示範囲の先頭にあった項目は先頭に留まる。
+    func testadaptiveで列数が変わると塊を組み直して先頭の項目を保つ() async {
+        let itemCount = 2_000
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .adaptive(minItemWidth: 120))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        // 幅 390 / 最小幅 120 で 3 列に解決し、塊は 3 の倍数 (501) へ組み直される。
+        await waitUntil("列数の解決後の塊", value: { sectionItemCounts(in: controller) }) {
+            $0 == [501, 501, 501, 497]
+        }
+
+        // アンカーは送り切った後に実際に画面の先頭にあった項目から採る。定数で決め打ちして待つと、
+        // 行の高さが機種の文字設定で変わったときに送り先が半端な位置に落ちて前提が崩れる。
+        let anchor = await leadingOffsetAfterScrolling(to: 900, in: controller)
+
+        // 幅を狭めると 1 列になり、501 件では列数の倍数のまま塊を保てない。
+        resize(window: window, controller: controller, to: CGSize(width: 180, height: 844))
+        await waitUntil("組み直した塊", value: { sectionItemCounts(in: controller) }) {
+            $0 == [500, 500, 500, 500]
+        }
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), itemCount)
+        await assertLeadingItemSharesRow(with: anchor, in: controller)
+    }
+
+    // 列数が変わっても現在の塊の件数が割り切れるなら組み直さない。
+    func test割り切れる列数の変化では塊を組み直さない() async {
+        let itemCount = 2_000
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .adaptive(minItemWidth: 180))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        // 幅 390 / 最小幅 180 で 2 列。500 は 2 で割り切れるので組み直しは起きない。
+        await waitUntil("初期の列数", value: { columnCount(in: controller) }) { $0 == 2 }
+        XCTAssertEqual(sectionItemCounts(in: controller), [500, 500, 500, 500])
+        XCTAssertEqual(controller.chunkRebuildCount, 0, "割り切れる列数の解決で塊を組み直しています")
+
+        // 幅を広げて 4 列にしても 500 は 4 で割り切れる。
+        resize(window: window, controller: controller, to: CGSize(width: 800, height: 844))
+        await waitUntil("広げた後の列数", value: { columnCount(in: controller) }) { $0 == 4 }
+        XCTAssertEqual(sectionItemCounts(in: controller), [500, 500, 500, 500])
+        XCTAssertEqual(controller.chunkRebuildCount, 0, "割り切れる列数の変化で塊を組み直しています")
+    }
+
+    // 表示形態の切り替えでも塊の件数は変わる (1 列の 500 件から 3 列の 501 件へ)。件数が変われば
+    // 先頭の塊を除くほぼ全項目が隣の塊へ移るため、列数の解決で組み直すときと同じ緩和 (アニメーションを
+    // 付けない・復元を適用の後の実行機会まで待つ) を通す (ios/ADR-0009)。
+    func test表示形態の切り替えで塊の件数が変わっても先頭の項目を保つ() async {
+        var configuration = makeUniformHeightListConfiguration(itemCount: 2_000)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == 2_000 }
+        XCTAssertEqual(sectionItemCounts(in: controller), [500, 500, 500, 500])
+
+        configuration.layout = .grid(columns: .fixed(3))
+        await assertAnchorSurvivesChunkSizeChange(
+            configuration: configuration,
+            in: controller,
+            expectedSectionItemCounts: [501, 501, 501, 497]
+        )
+    }
+
+    // 列数の指定を変えるだけでも塊の件数は変わる (2 列の 500 件から 3 列の 501 件へ)。
+    func test列数の指定の変更で塊の件数が変わっても先頭の項目を保つ() async {
+        var configuration = makeUniformHeightListConfiguration(itemCount: 2_000)
+        configuration.layout = .grid(columns: .fixed(2))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == 2_000 }
+        XCTAssertEqual(sectionItemCounts(in: controller), [500, 500, 500, 500])
+
+        configuration.layout = .grid(columns: .fixed(3))
+        await assertAnchorSurvivesChunkSizeChange(
+            configuration: configuration,
+            in: controller,
+            expectedSectionItemCounts: [501, 501, 501, 497]
+        )
+    }
+
+    // 表示の変化に備えて控えた位置は、利用者がドラッグを始めた時点で捨てる。捨てずに残すと、
+    // 適用が重なって復元が遅れている間に利用者が動かした位置を、後から控えた位置へ引き戻す。
+    func testドラッグを始めると控えた位置を捨てる() async {
+        let itemCount = 200
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = .grid(columns: .fixed(2))
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        // 表示領域の大きさが変わる直前の経路で位置を控えさせる (frame はまだ差し替えない)。
+        controller.viewWillTransition(
+            to: CGSize(width: 844, height: 390),
+            with: TransitionCoordinatorStub(containerView: window)
+        )
+        XCTAssertTrue(controller.hasPendingAnchor, "表示領域の変化の直前に位置を控えていません")
+
+        controller.scrollViewWillBeginDragging(controller.collectionView)
+        XCTAssertFalse(controller.hasPendingAnchor, "ドラッグを始めても控えた位置が残っています")
+    }
+
+    // 深い位置まで送ってから構成を差し替え、塊の件数が変わった後も表示範囲の先頭にあった項目が
+    // 先頭付近に留まることを確かめる。
+    private func assertAnchorSurvivesChunkSizeChange(
+        configuration: KsCollectionConfiguration<Item>,
+        in controller: KsCollectionViewController<Item>,
+        expectedSectionItemCounts: [Int]
+    ) async {
+        let anchor = await leadingOffsetAfterScrolling(to: 900, in: controller)
+
+        controller.update(configuration: configuration)
+
+        await waitUntil("差し替え後の塊", value: { sectionItemCounts(in: controller) }) {
+            $0 == expectedSectionItemCounts
+        }
+        // 塊の件数が変わると先頭の塊を除くほぼ全項目が隣の塊へ移るが、画面の先頭にあった項目は
+        // 先頭の行に留まる。列数が増えると同じ行の行頭はアンカーより前の項目になるため、
+        // 画面の先頭の項目そのものの一致ではなく、同じ行にいることで見る。
+        await assertLeadingItemSharesRow(with: anchor, in: controller)
+    }
+
+    // 指定した位置まで送り、位置が落ち着いた時点で実際に画面の先頭にあった項目の全体の順番を返す。
+    // 先頭を定数で決め打ちして待つと、行の高さが機種の文字設定で変わったときに送り先が半端な
+    // 位置に落ち、1 つ手前の項目が上端に残ったままテストの前提が崩れる。
+    private func leadingOffsetAfterScrolling(
+        to item: Int,
+        in controller: KsCollectionViewController<Item>
+    ) async -> Int {
+        controller.collectionView.scrollToItem(
+            at: ksIndexPath(forItemOffset: item, in: controller.collectionView),
+            at: .top,
+            animated: false
+        )
+        controller.collectionView.layoutIfNeeded()
+        // 送った直後は途中の行が推定のままで位置が動き続けるため、静止してから先頭を読む。
+        await settleContentSize(in: controller)
+        guard let offset = onScreenItemOffsets(in: controller).first else {
+            XCTFail("送った後の画面上の先頭の項目を取得できませんでした")
+            return item
+        }
+        return offset
+    }
+
+    // 画面の先頭にある項目がアンカーと同じ行にいることを確かめる。行の同一性はレイアウト属性の
+    // 上端で見る — 列数が変わると 1 行に入る件数が変わるため、順番の差では決められない。
+    private func assertLeadingItemSharesRow(
+        with anchor: Int,
+        in controller: KsCollectionViewController<Item>,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        await waitUntil(
+            "画面の先頭の項目とアンカー (項目 \(anchor)) の行の上端",
+            value: { leadingRowComparison(with: anchor, in: controller) },
+            predicate: { comparison in
+                guard let comparison else { return false }
+                return abs(comparison.leadingRowTop - comparison.anchorRowTop) < 1
+            },
+            file: file,
+            line: line
+        )
+    }
+
+    // 画面の先頭にある項目の順番と、その項目およびアンカーの行の上端。
+    private func leadingRowComparison(
+        with anchor: Int,
+        in controller: KsCollectionViewController<Item>
+    ) -> (leadingItem: Int, leadingRowTop: CGFloat, anchorRowTop: CGFloat)? {
+        guard let leading = onScreenItemOffsets(in: controller).first else { return nil }
+        let frames = itemFrames(in: controller, items: [leading, anchor])
+        guard frames.count == 2 else { return nil }
+        return (leading, frames[0].minY, frames[1].minY)
+    }
+
+    // 先頭に 1 件挿入すると全項目の順番が 1 つずれ、塊の境界の項目は隣の塊へ移る。
+    // 表示範囲の先頭の項目は挿入した行の分だけ動き、それ以外に飛ばない。
+    // 塊の所属が変わらない可視セルは作り直されない。
+    func test先頭への挿入で塊の所属が変わっても位置が飛ばない() async {
+        let itemCount = 2_000
+        var configuration = makeUniformHeightListConfiguration(itemCount: itemCount)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        let boundary = controller.collectionView.numberOfItems(inSection: 0)
+        XCTAssertGreaterThan(controller.collectionView.numberOfSections, 1)
+
+        // 塊の境界が表示範囲に入る位置まで、行を解かせながら送る。飛ばして送ると境界より上の行が
+        // 推定のまま残り、挿入による位置の動きが行の高さと比べられなくなる。
+        let anchor = await advanceToSolvedPosition(item: boundary - 4, in: controller)
+        let rowHeight = anchorHeight(anchor, in: controller) ?? 0
+        XCTAssertGreaterThan(rowHeight, 0)
+        guard let offsetBefore = anchorOffsetFromTop(anchor, in: controller) else {
+            XCTFail("挿入前のアンカー位置を取得できませんでした")
+            return
+        }
+        let chunksBefore = chunkIndexesByIdentifier(in: controller)
+        let cellsBefore = visibleCellsByIdentifier(in: controller)
+
+        configuration.items.insert(Item(id: -1, title: "先頭"), at: 0)
+        controller.update(configuration: configuration)
+        await waitUntil("挿入後の snapshot", value: { controller.appliedItemIdentifiers.count }) {
+            $0 == itemCount + 1
+        }
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("挿入後のアンカーの位置", value: { anchorOffsetFromTop(anchor, in: controller) }) {
+            $0 != nil
+        }
+
+        guard let offsetAfter = anchorOffsetFromTop(anchor, in: controller) else {
+            XCTFail("挿入後のアンカー位置を取得できませんでした")
+            return
+        }
+        // 動きは挿入した 1 行の分までに収まる (実測では UIKit が表示中の内容を留めるため動かない)。
+        // これを超えて動けば、塊の境界で位置が飛んでいる。
+        XCTAssertLessThanOrEqual(
+            abs(offsetAfter - offsetBefore),
+            rowHeight + configuration.layout.rowSpacing + 2,
+            "挿入した 1 行を超えて位置が飛んでいます (前 \(offsetBefore) / 後 \(offsetAfter) / 行 \(rowHeight))"
+        )
+        XCTAssertTrue(
+            visibleIdentifiers(in: controller).contains(anchor),
+            "挿入後にアンカーが表示範囲から外れています"
+        )
+        print("KS 先頭への挿入でのアンカーの動き: \(offsetAfter - offsetBefore) (行 \(rowHeight))")
+        assertVisibleCellsSurviveWhereChunkUnchanged(
+            in: controller,
+            chunksBefore: chunksBefore,
+            cellsBefore: cellsBefore,
+            label: "先頭への挿入"
+        )
+    }
+
+    // 先頭の 1 件を削除したときも、位置は削除した行の分だけ動く。
+    func test先頭の削除で塊の所属が変わっても位置が飛ばない() async {
+        let itemCount = 2_000
+        var configuration = makeUniformHeightListConfiguration(itemCount: itemCount)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        let boundary = controller.collectionView.numberOfItems(inSection: 0)
+        XCTAssertGreaterThan(controller.collectionView.numberOfSections, 1)
+
+        let anchor = await advanceToSolvedPosition(item: boundary - 4, in: controller)
+        let rowHeight = anchorHeight(anchor, in: controller) ?? 0
+        XCTAssertGreaterThan(rowHeight, 0)
+        guard let offsetBefore = anchorOffsetFromTop(anchor, in: controller) else {
+            XCTFail("削除前のアンカー位置を取得できませんでした")
+            return
+        }
+        let chunksBefore = chunkIndexesByIdentifier(in: controller)
+        let cellsBefore = visibleCellsByIdentifier(in: controller)
+
+        configuration.items.removeFirst()
+        controller.update(configuration: configuration)
+        await waitUntil("削除後の snapshot", value: { controller.appliedItemIdentifiers.count }) {
+            $0 == itemCount - 1
+        }
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("削除後のアンカーの位置", value: { anchorOffsetFromTop(anchor, in: controller) }) {
+            $0 != nil
+        }
+
+        guard let offsetAfter = anchorOffsetFromTop(anchor, in: controller) else {
+            XCTFail("削除後のアンカー位置を取得できませんでした")
+            return
+        }
+        // 動きは削除した 1 行の分までに収まる (実測では UIKit が表示中の内容を留めるため動かない)。
+        XCTAssertLessThanOrEqual(
+            abs(offsetBefore - offsetAfter),
+            rowHeight + configuration.layout.rowSpacing + 2,
+            "削除した 1 行を超えて位置が飛んでいます (前 \(offsetBefore) / 後 \(offsetAfter) / 行 \(rowHeight))"
+        )
+        XCTAssertTrue(
+            visibleIdentifiers(in: controller).contains(anchor),
+            "削除後にアンカーが表示範囲から外れています"
+        )
+        print("KS 先頭の削除でのアンカーの動き: \(offsetBefore - offsetAfter) (行 \(rowHeight))")
+        assertVisibleCellsSurviveWhereChunkUnchanged(
+            in: controller,
+            chunksBefore: chunksBefore,
+            cellsBefore: cellsBefore,
+            label: "先頭の削除"
+        )
+    }
+
+    // 末尾の塊にある項目を先頭へ移しても、移動しなかった可視セルは作り直されない。
+    func test塊をまたぐ並べ替えで移動しない可視セルを作り直さない() async {
+        let itemCount = 2_000
+        var configuration = makeUniformHeightListConfiguration(itemCount: itemCount)
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+        XCTAssertEqual(
+            ksIndexPath(forItemOffset: itemCount - 1, in: controller.collectionView).section,
+            controller.collectionView.numberOfSections - 1,
+            "末尾の項目が末尾の塊にありません"
+        )
+        controller.collectionView.layoutIfNeeded()
+        let chunksBefore = chunkIndexesByIdentifier(in: controller)
+        let cellsBefore = visibleCellsByIdentifier(in: controller)
+
+        let moved = configuration.items.removeLast()
+        configuration.items.insert(moved, at: 0)
+        controller.update(configuration: configuration)
+        await waitUntil("並べ替え後の先頭", value: { controller.appliedItemIdentifiers.first }) {
+            $0 == AnyHashable(itemCount - 1)
+        }
+        controller.collectionView.layoutIfNeeded()
+
+        XCTAssertEqual(
+            ksIndexPath(forItemOffset: 0, in: controller.collectionView),
+            IndexPath(item: 0, section: 0)
+        )
+        XCTAssertTrue(
+            visibleIdentifiers(in: controller).contains(AnyHashable(itemCount - 1)),
+            "先頭へ移した項目が表示されていません"
+        )
+        assertVisibleCellsSurviveWhereChunkUnchanged(
+            in: controller,
+            chunksBefore: chunksBefore,
+            cellsBefore: cellsBefore,
+            label: "塊をまたぐ並べ替え",
+            ignoring: [AnyHashable(itemCount - 1)],
+            // 表示は配列の先頭にあり、塊の境界は表示範囲に入らない (所属が変わる可視セルは無い)。
+            expectsMovedCells: false
+        )
+    }
+
+    // ID へのスクロール命令と末尾への命令は、塊に依らず解決される。
+    func testスクロール命令は塊をまたいで解決する() async {
+        let itemCount = 2_000
+        let scrollController = KsScrollController()
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.scrollController = scrollController
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        let target = itemCount - 20
+        XCTAssertEqual(
+            ksIndexPath(forItemOffset: target, in: controller.collectionView).section,
+            controller.collectionView.numberOfSections - 1,
+            "対象の項目が末尾の塊にありません"
+        )
+
+        scrollController.scrollTo(id: target, animated: false)
+        await waitUntil("ID 命令の処理", value: { controller.lastScrollTargetIdentifier }) {
+            $0 == AnyHashable(target)
+        }
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("対象の可視化", value: { isVisible(item: target, in: controller) }) { $0 }
+
+        scrollController.scrollToEnd(animated: false)
+        await waitUntil("末尾命令の処理", value: { controller.lastScrollTargetIdentifier }) {
+            $0 == AnyHashable(itemCount - 1)
+        }
+        controller.collectionView.layoutIfNeeded()
+        await waitUntil("末尾の可視化", value: { isVisible(item: itemCount - 1, in: controller) }) { $0 }
+    }
+
     #if DEBUG
     // 同時生存セルの計数 (`liveCellCount` / `cellProviderCallCount`) は debug ビルドにだけ載るため、
     // このテストも debug 構成でだけ実行する。
@@ -767,9 +1516,10 @@ final class KsCollectionEngineTests: XCTestCase {
         await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
 
         // 上限は可視セル数から導く。件数ではなく画面に載る量で決めることで、項目数を変えても同じ意味の上限になる。
-        // この窓 (390x844) では可視 39 件に対して同時生存の実測最大が 115 件 (可視の約 3 倍) であり、
-        // 先読みと再利用プールの分を含めて 4 倍を上限に置く。再利用が壊れれば生存数は走査した件数に比例するため、
-        // この幅でも仮想化の破綻は捕まえられる。
+        // 配列を内部の塊へ分けた後の実測 (2 機種・各複数走行) では、収束後の同時生存数の最大は
+        // 可視の約 3.4 倍 (可視 39 件に対して 132 件) であり、先読みと再利用プールの分を含めて
+        // 4 倍を上限に置く。再利用が壊れれば生存数は走査した件数に比例するため、この幅でも
+        // 仮想化の破綻は捕まえられる。
         let visibleCellCount = controller.collectionView.indexPathsForVisibleItems.count
         XCTAssertGreaterThan(visibleCellCount, 0, "初期表示の可視セルを取得できませんでした")
         let liveCellLimit = visibleCellCount * 4
@@ -778,7 +1528,10 @@ final class KsCollectionEngineTests: XCTestCase {
         // 前後の可視範囲が十分に重ならない刻みでは、UIKit は再利用ではなく作り直しになる。
         var maxLiveCellCount = 0
         await advanceRoundTrip(itemCount: itemCount, in: controller) {
-            maxLiveCellCount = max(maxLiveCellCount, controller.liveCellCount)
+            maxLiveCellCount = max(
+                maxLiveCellCount,
+                await settledLiveCellCount(in: controller, below: liveCellLimit)
+            )
         }
 
         // 全項目を 2 度通過してもなお、同時生存セルは可視範囲と再利用プールの規模に留まる。
@@ -964,7 +1717,7 @@ final class KsCollectionEngineTests: XCTestCase {
         defer { observation.invalidate() }
 
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: itemCount - 1, section: 0),
+            at: ksIndexPath(forItemOffset: itemCount - 1, in: controller.collectionView),
             at: .bottom,
             animated: false
         )
@@ -1127,7 +1880,7 @@ final class KsCollectionEngineTests: XCTestCase {
         XCTAssertTrue(frameBefore.intersects(controller.collectionView.bounds))
 
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: 60, section: 0),
+            at: ksIndexPath(forItemOffset: 60, in: controller.collectionView),
             at: .top,
             animated: false
         )
@@ -1172,7 +1925,10 @@ final class KsCollectionEngineTests: XCTestCase {
         let normalImage = renderedImageData(of: cell)
         let normalPixels = renderedPixels(of: cell, at: [samplePoint])
 
-        controller.collectionView(controller.collectionView, didHighlightItemAt: IndexPath(item: 0, section: 0))
+        controller.collectionView(
+            controller.collectionView,
+            didHighlightItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
         cell.layoutIfNeeded()
         let highlightedPixels = renderedPixels(of: cell, at: [samplePoint])
 
@@ -1512,12 +2268,15 @@ final class KsCollectionEngineTests: XCTestCase {
         let controller = KsCollectionViewController(configuration: configuration)
         controller.loadViewIfNeeded()
         await waitUntil("data source 件数", value: {
-            controller.collectionView.numberOfItems(inSection: 0)
+            ksTotalItemCount(in: controller.collectionView)
         }) { $0 == 1 }
         let recognizer = controller.longPressRecognizer
 
         XCTAssertEqual(recognizer?.isEnabled, false)
-        controller.collectionView(controller.collectionView, didSelectItemAt: IndexPath(item: 0, section: 0))
+        controller.collectionView(
+            controller.collectionView,
+            didSelectItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
         XCTAssertEqual(taps, [item])
 
         configuration.onItemLongTap = { _ in }
@@ -1566,6 +2325,191 @@ final class KsCollectionEngineTests: XCTestCase {
         }
     }
     #endif
+
+    // レイアウトに載っている補助ビューの種類ごとの数。
+    private func supplementaryKindCounts(
+        in controller: KsCollectionViewController<Item>
+    ) -> [String: Int] {
+        let rect = CGRect(origin: .zero, size: controller.collectionView.contentSize)
+        var counts: [String: Int] = [:]
+        let attributes = controller.collectionView.collectionViewLayout
+            .layoutAttributesForElements(in: rect) ?? []
+        for element in attributes {
+            guard let kind = element.representedElementKind else { continue }
+            counts[kind, default: 0] += 1
+        }
+        return counts
+    }
+
+    private func footerFrame(
+        in controller: KsCollectionViewController<Item>
+    ) -> CGRect? {
+        let lastSection = controller.collectionView.numberOfSections - 1
+        guard lastSection >= 0 else { return nil }
+        return controller.collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
+            ofKind: UICollectionView.elementKindSectionFooter,
+            at: IndexPath(item: 0, section: lastSection)
+        )?.frame
+    }
+
+    // 目的の位置まで、途中の行を解かせながら送る。送り終えたときの先頭可視要素を返す。
+    // 飛ばして送ると途中の行が推定のまま残り、位置の動きを行の高さと比べられない。
+    private func advanceToSolvedPosition(
+        item: Int,
+        in controller: KsCollectionViewController<Item>
+    ) async -> AnyHashable {
+        let reached = await advanceUntilVisible(
+            item: item,
+            in: controller,
+            step: controller.collectionView.bounds.height / 2
+        )
+        XCTAssertTrue(reached, "項目 \(item) まで送り切れませんでした")
+        controller.collectionView.scrollToItem(
+            at: ksIndexPath(forItemOffset: item, in: controller.collectionView),
+            at: .top,
+            animated: false
+        )
+        controller.collectionView.layoutIfNeeded()
+        await settleContentSize(in: controller)
+        guard let anchor = onScreenLeadingIdentifier(in: controller) else {
+            XCTFail("画面上の先頭の要素を取得できませんでした")
+            return AnyHashable(0)
+        }
+        return anchor
+    }
+
+    // 項目 ID と、その項目が載っている塊の順番の対応。
+    private func chunkIndexesByIdentifier(
+        in controller: KsCollectionViewController<Item>
+    ) -> [AnyHashable: Int] {
+        let identifiers = controller.appliedItemIdentifiers
+        var result: [AnyHashable: Int] = [:]
+        for offset in identifiers.indices {
+            guard
+                let indexPath = ksIndexPathIfPresent(forItemOffset: offset, in: controller.collectionView)
+            else {
+                continue
+            }
+            result[identifiers[offset]] = indexPath.section
+        }
+        return result
+    }
+
+    // 可視セルを項目 ID から引けるようにした対応。セルの同一性 (作り直されたかどうか) を見る。
+    private func visibleCellsByIdentifier(
+        in controller: KsCollectionViewController<Item>
+    ) -> [AnyHashable: ObjectIdentifier] {
+        let identifiers = controller.appliedItemIdentifiers
+        var result: [AnyHashable: ObjectIdentifier] = [:]
+        for indexPath in controller.collectionView.indexPathsForVisibleItems {
+            guard
+                let offset = ksItemOffset(for: indexPath, in: controller.collectionView),
+                identifiers.indices.contains(offset),
+                let cell = controller.collectionView.cellForItem(at: indexPath)
+            else {
+                continue
+            }
+            result[identifiers[offset]] = ObjectIdentifier(cell)
+        }
+        return result
+    }
+
+    // 塊の所属が変わらなかった可視セルが作り直されていないことを確かめる。
+    // 所属が変わった可視セルの扱いは契約の外なので、観測結果を出力するだけにする。
+    private func assertVisibleCellsSurviveWhereChunkUnchanged(
+        in controller: KsCollectionViewController<Item>,
+        chunksBefore: [AnyHashable: Int],
+        cellsBefore: [AnyHashable: ObjectIdentifier],
+        label: String,
+        ignoring: Set<AnyHashable> = [],
+        expectsMovedCells: Bool = true,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let chunksAfter = chunkIndexesByIdentifier(in: controller)
+        let cellsAfter = visibleCellsByIdentifier(in: controller)
+        var checkedCount = 0
+        var movedCount = 0
+        var movedReusedCount = 0
+        for (identifier, cellBefore) in cellsBefore where !ignoring.contains(identifier) {
+            guard
+                let before = chunksBefore[identifier],
+                let after = chunksAfter[identifier],
+                let cellAfter = cellsAfter[identifier]
+            else {
+                continue
+            }
+            if before == after {
+                checkedCount += 1
+                XCTAssertEqual(
+                    cellAfter,
+                    cellBefore,
+                    "\(label)で塊の所属が変わらない可視セルが作り直されています (項目 \(identifier))",
+                    file: file,
+                    line: line
+                )
+            } else {
+                movedCount += 1
+                if cellAfter == cellBefore {
+                    movedReusedCount += 1
+                }
+            }
+        }
+        XCTAssertGreaterThan(
+            checkedCount,
+            0,
+            "\(label)で所属が変わらない可視セルを 1 つも確かめられていません",
+            file: file,
+            line: line
+        )
+        // 送り先が塊の境界から外れると、所属が変わる可視セルが 1 件も無いまま緑になる。
+        // 境界が表示範囲に入っていることを前提にする検査では、その前提をここで固定する。
+        if expectsMovedCells {
+            XCTAssertGreaterThan(
+                movedCount,
+                0,
+                "\(label)で塊の所属が変わる可視セルが 1 件もありません (送り先が塊の境界から外れています)",
+                file: file,
+                line: line
+            )
+        }
+        print("KS 塊の所属が変わった可視セル (\(label)): \(movedCount) 件中 \(movedReusedCount) 件が同じセルのまま")
+    }
+
+    // 塊ごとの件数を先頭から並べて返す。
+    private func sectionItemCounts(in controller: KsCollectionViewController<Item>) -> [Int] {
+        (0..<controller.collectionView.numberOfSections).map {
+            controller.collectionView.numberOfItems(inSection: $0)
+        }
+    }
+
+    // 可視セルの位置を全体の順番で並べて返す。
+    private func visibleItemOffsets(in controller: KsCollectionViewController<Item>) -> [Int] {
+        controller.collectionView.indexPathsForVisibleItems.compactMap {
+            ksItemOffset(for: $0, in: controller.collectionView)
+        }.sorted()
+    }
+
+    // 指定した表示形態で配列を載せ、塊ごとの件数が期待どおりに割れることを確かめる。
+    private func assertChunkStructure(
+        layout: KsCollectionLayout,
+        itemCount: Int,
+        expected: [Int],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        var configuration = makeConfiguration(
+            items: (0..<itemCount).map { Item(id: $0, title: "項目 \($0)") }
+        )
+        configuration.layout = layout
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = showInWindow(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == itemCount }
+
+        XCTAssertEqual(sectionItemCounts(in: controller), expected, file: file, line: line)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), itemCount, file: file, line: line)
+    }
 
     private func makeConfiguration(items: [Item]) -> KsCollectionConfiguration<Item> {
         makeConfiguration(items: items) { item in
@@ -1640,10 +2584,14 @@ final class KsCollectionEngineTests: XCTestCase {
         in controller: KsCollectionViewController<Item>,
         items: [Int]
     ) -> [CGRect] {
-        items.compactMap {
-            controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: $0, section: 0)
-            )?.frame
+        items.compactMap { offset in
+            guard
+                let indexPath = ksIndexPathIfPresent(forItemOffset: offset, in: controller.collectionView)
+            else {
+                return nil
+            }
+            return controller.collectionView.collectionViewLayout
+                .layoutAttributesForItem(at: indexPath)?.frame
         }
     }
 
@@ -1723,10 +2671,10 @@ final class KsCollectionEngineTests: XCTestCase {
         in controller: KsCollectionViewController<Item>
     ) async {
         await waitUntil("\(itemCount) 件の data source", value: {
-            controller.collectionView.numberOfItems(inSection: 0)
+            ksTotalItemCount(in: controller.collectionView)
         }) { $0 == itemCount }
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: 0, section: 0),
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView),
             at: .top,
             animated: false
         )
@@ -1780,12 +2728,74 @@ final class KsCollectionEngineTests: XCTestCase {
         controller.view.layoutIfNeeded()
     }
 
+    // 画面の向きが変わるときは、表示領域の frame が差し替わる前に viewWillTransition(to:with:)
+    // が届く。本番と同じ順序で駆動するため、テストでもこの経路を通してから frame を差し替える。
+    private func rotate(
+        window: UIWindow,
+        controller: UIViewController,
+        to size: CGSize
+    ) {
+        controller.viewWillTransition(
+            to: size,
+            with: TransitionCoordinatorStub(containerView: window)
+        )
+        resize(window: window, controller: controller, to: size)
+    }
+
+    // viewWillTransition(to:with:) を呼ぶためだけの調整役。位置の維持は size だけで決まるため、
+    // 併走アニメーションの登録はいずれも受け取って何もしない。
+    private final class TransitionCoordinatorStub: NSObject, UIViewControllerTransitionCoordinator {
+        let containerView: UIView
+
+        init(containerView: UIView) {
+            self.containerView = containerView
+        }
+
+        var isAnimated: Bool { false }
+        var presentationStyle: UIModalPresentationStyle { .none }
+        var initiallyInteractive: Bool { false }
+        var isInterruptible: Bool { false }
+        var isInteractive: Bool { false }
+        var isCancelled: Bool { false }
+        var transitionDuration: TimeInterval { 0 }
+        var percentComplete: CGFloat { 0 }
+        var completionVelocity: CGFloat { 0 }
+        var completionCurve: UIView.AnimationCurve { .linear }
+        var targetTransform: CGAffineTransform { .identity }
+
+        func viewController(forKey key: UITransitionContextViewControllerKey) -> UIViewController? { nil }
+        func view(forKey key: UITransitionContextViewKey) -> UIView? { nil }
+
+        func animate(
+            alongsideTransition animation: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?,
+            completion: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?
+        ) -> Bool {
+            false
+        }
+
+        func animateAlongsideTransition(
+            in view: UIView?,
+            animation: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?,
+            completion: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?
+        ) -> Bool {
+            false
+        }
+
+        func notifyWhenInteractionEnds(
+            _ handler: @escaping (any UIViewControllerTransitionCoordinatorContext) -> Void
+        ) {}
+
+        func notifyWhenInteractionChanges(
+            _ handler: @escaping (any UIViewControllerTransitionCoordinatorContext) -> Void
+        ) {}
+    }
+
     private func tryUnwrapCell(
         _ controller: KsCollectionViewController<Item>,
         item: Int
     ) -> KsHostingCell {
         guard let cell = controller.collectionView.cellForItem(
-            at: IndexPath(item: item, section: 0)
+            at: ksIndexPath(forItemOffset: item, in: controller.collectionView)
         ) as? KsHostingCell else {
             XCTFail("項目 \(item) のセルを取得できませんでした")
             return KsHostingCell(frame: .zero)
@@ -1797,9 +2807,42 @@ final class KsCollectionEngineTests: XCTestCase {
         in controller: KsCollectionViewController<Item>
     ) -> [AnyHashable] {
         let identifiers = controller.appliedItemIdentifiers
-        return controller.collectionView.indexPathsForVisibleItems.sorted().compactMap {
-            identifiers.indices.contains($0.item) ? identifiers[$0.item] : nil
+        return controller.collectionView.indexPathsForVisibleItems.sorted().compactMap { indexPath in
+            guard let offset = ksItemOffset(for: indexPath, in: controller.collectionView) else {
+                return nil
+            }
+            return identifiers.indices.contains(offset) ? identifiers[offset] : nil
         }
+    }
+
+    // 画面と実際に重なっている項目の全体の順番。可視セルの一覧には、遠くへ送った直後に送る前の
+    // セルが残ることがあるため、レイアウト属性の矩形で表示範囲と重なるものだけに絞る。
+    private func onScreenItemOffsets(in controller: KsCollectionViewController<Item>) -> [Int] {
+        let bounds = controller.collectionView.bounds
+        return controller.collectionView.indexPathsForVisibleItems.compactMap { indexPath -> Int? in
+            guard
+                let attributes = controller.collectionView.collectionViewLayout
+                    .layoutAttributesForItem(at: indexPath),
+                attributes.frame.intersects(bounds)
+            else {
+                return nil
+            }
+            return ksItemOffset(for: indexPath, in: controller.collectionView)
+        }.sorted()
+    }
+
+    // 画面と実際に重なっている項目のうち、全体の順番が先頭のものの ID。
+    private func onScreenLeadingIdentifier(
+        in controller: KsCollectionViewController<Item>
+    ) -> AnyHashable? {
+        let identifiers = controller.appliedItemIdentifiers
+        guard
+            let offset = onScreenItemOffsets(in: controller).first,
+            identifiers.indices.contains(offset)
+        else {
+            return nil
+        }
+        return identifiers[offset]
     }
 
     // 表示範囲の先頭にある 2 行の間隔 (行間の反映を観測するために使う)。
@@ -1813,22 +2856,24 @@ final class KsCollectionEngineTests: XCTestCase {
         return frames[1].minY - frames[0].maxY
     }
 
-    // 指定位置まで送り、そのときの先頭可視要素を返す (レイアウト切り替えのアンカーになる要素)。
+    // 指定位置まで送り、そのときの画面上の先頭の要素を返す (レイアウト切り替えのアンカーになる要素)。
+    // 送り先が画面の先頭に来たことは、可視セルの一覧ではなく表示範囲と重なる矩形で確かめる。
+    // 一覧には送る前のセルが残ることがあり、そのままでは送る前の項目を先頭だと見なしてしまう。
     private func scrollToDeepPosition(
         item: Int,
         in controller: KsCollectionViewController<Item>
     ) async -> AnyHashable {
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: item, section: 0),
+            at: ksIndexPath(forItemOffset: item, in: controller.collectionView),
             at: .top,
             animated: false
         )
         controller.collectionView.layoutIfNeeded()
-        await waitUntil("深い位置の可視セル", value: { visibleIdentifiers(in: controller).first }) {
-            $0 != nil
+        await waitUntil("送った後の画面上の先頭の項目", value: { onScreenItemOffsets(in: controller).first }) {
+            $0 == item
         }
-        guard let anchor = visibleIdentifiers(in: controller).first else {
-            XCTFail("先頭可視要素を取得できませんでした")
+        guard let anchor = onScreenLeadingIdentifier(in: controller) else {
+            XCTFail("画面上の先頭の要素を取得できませんでした")
             return AnyHashable(0)
         }
         return anchor
@@ -1839,7 +2884,7 @@ final class KsCollectionEngineTests: XCTestCase {
         item: Int,
         in controller: KsCollectionViewController<Item>,
         step: CGFloat,
-        onStep: () -> Void = {}
+        onStep: () async -> Void = {}
     ) async -> Bool {
         let limit = 4_000
         var steps = 0
@@ -1861,7 +2906,7 @@ final class KsCollectionEngineTests: XCTestCase {
             if steps.isMultiple(of: 8) {
                 try? await Task.sleep(for: .milliseconds(1))
             }
-            onStep()
+            await onStep()
         }
         return isVisible(item: item, in: controller)
     }
@@ -1871,7 +2916,7 @@ final class KsCollectionEngineTests: XCTestCase {
     private func advanceRoundTrip(
         itemCount: Int,
         in controller: KsCollectionViewController<Item>,
-        onStep: () -> Void = {}
+        onStep: () async -> Void = {}
     ) async -> Bool {
         let step = controller.collectionView.bounds.height / 2
         let advanced = await advanceUntilVisible(
@@ -1887,12 +2932,35 @@ final class KsCollectionEngineTests: XCTestCase {
         return returned
     }
 
+    #if DEBUG
+    // 落ち着いた同時生存セルの数。送りの直後に読んだ値は、新しいセルが作られてから古いセルが
+    // 再利用プールへ戻って余剰が破棄されるまでの過渡の値になるため、そのまま標本にすると
+    // 送りの瞬間しだいで上下する。レイアウトを確定させ、実行機会を譲りながら規模の内側へ
+    // 収まるまで待ってから読む。期限まで収まらなければその時点の実測値を返し、呼び出し側の
+    // アサーションの失敗メッセージに載せる。
+    private func settledLiveCellCount(
+        in controller: KsCollectionViewController<Item>,
+        below limit: Int
+    ) async -> Int {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .milliseconds(500)
+        controller.collectionView.layoutIfNeeded()
+        var current = controller.liveCellCount
+        while current >= limit, clock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(1))
+            controller.collectionView.layoutIfNeeded()
+            current = controller.liveCellCount
+        }
+        return current
+    }
+    #endif
+
     private func isVisible(
         item: Int,
         in controller: KsCollectionViewController<Item>
     ) -> Bool {
         controller.collectionView.indexPathsForVisibleItems.contains {
-            $0.section == 0 && $0.item == item
+            ksItemOffset(for: $0, in: controller.collectionView) == item
         }
     }
 
@@ -1900,10 +2968,13 @@ final class KsCollectionEngineTests: XCTestCase {
         _ anchor: AnyHashable,
         in controller: KsCollectionViewController<Item>
     ) -> UICollectionViewLayoutAttributes? {
-        guard let index = controller.appliedItemIdentifiers.firstIndex(of: anchor) else { return nil }
-        return controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-            at: IndexPath(item: index, section: 0)
-        )
+        guard
+            let index = controller.appliedItemIdentifiers.firstIndex(of: anchor),
+            let indexPath = ksIndexPathIfPresent(forItemOffset: index, in: controller.collectionView)
+        else {
+            return nil
+        }
+        return controller.collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath)
     }
 
     // アンカー上端と表示範囲上端の差。復元方式を数値で固定するための観測値。
@@ -1929,7 +3000,7 @@ final class KsCollectionEngineTests: XCTestCase {
         fraction: CGFloat
     ) -> (anchor: AnyHashable, offsetFromTop: CGFloat) {
         guard
-            let leading = visibleIdentifiers(in: controller).first,
+            let leading = onScreenLeadingIdentifier(in: controller),
             let offset = anchorOffsetFromTop(leading, in: controller),
             let height = anchorHeight(leading, in: controller)
         else {
@@ -1945,7 +3016,7 @@ final class KsCollectionEngineTests: XCTestCase {
         )
         controller.collectionView.layoutIfNeeded()
         guard
-            let clipped = visibleIdentifiers(in: controller).first,
+            let clipped = onScreenLeadingIdentifier(in: controller),
             let clippedOffset = anchorOffsetFromTop(clipped, in: controller)
         else {
             XCTFail("クリップ後の先頭可視要素を取得できませんでした")
@@ -2017,11 +3088,7 @@ final class KsCollectionEngineTests: XCTestCase {
     private func columnCount(
         in controller: KsCollectionViewController<Item>
     ) -> Int {
-        let positions = (0..<8).compactMap {
-            controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: $0, section: 0)
-            )?.frame.minX
-        }
+        let positions = itemFrames(in: controller, items: Array(0..<8)).map(\.minX)
         return positions.reduce(into: [CGFloat]()) { columns, position in
             if !columns.contains(where: { abs($0 - position) < 1 }) {
                 columns.append(position)
@@ -2082,7 +3149,9 @@ final class KsCollectionEngineTests: XCTestCase {
     private func waitUntil<Value>(
         _ label: String,
         value: () -> Value,
-        predicate: (Value) -> Bool
+        predicate: (Value) -> Bool,
+        file: StaticString = #filePath,
+        line: UInt = #line
     ) async {
         let clock = ContinuousClock()
         let deadline = clock.now + .seconds(2)
@@ -2093,6 +3162,10 @@ final class KsCollectionEngineTests: XCTestCase {
             }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        XCTFail("\(label) が期限内に収束しませんでした。実測値: \(String(describing: value()))")
+        XCTFail(
+            "\(label) が期限内に収束しませんでした。実測値: \(String(describing: value()))",
+            file: file,
+            line: line
+        )
     }
 }

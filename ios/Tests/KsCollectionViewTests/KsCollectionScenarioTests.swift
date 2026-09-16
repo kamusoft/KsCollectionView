@@ -95,7 +95,9 @@ final class KsCollectionScenarioTests: XCTestCase {
         let window = show(controller: controller, size: CGSize(width: 390, height: 844))
         defer { window.isHidden = true }
         await waitUntil("初期描画", value: { recorder.lastText[0] }) { $0 == "本文 0" }
-        let cellBeforeUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0))
+        let cellBeforeUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
         XCTAssertNotNil(cellBeforeUpdate)
 
         configuration.items[0] = KeyedItem(id: 0, kind: .message, title: "更新後の本文")
@@ -103,7 +105,9 @@ final class KsCollectionScenarioTests: XCTestCase {
 
         await waitUntil("更新後の描画", value: { recorder.lastText[0] }) { $0 == "更新後の本文" }
         XCTAssertTrue(
-            controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0)) === cellBeforeUpdate
+            controller.collectionView.cellForItem(
+                at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+            ) === cellBeforeUpdate
         )
     }
 
@@ -117,7 +121,9 @@ final class KsCollectionScenarioTests: XCTestCase {
         let window = show(controller: controller, size: CGSize(width: 390, height: 844))
         defer { window.isHidden = true }
         await waitUntil("初期描画", value: { recorder.lastText[0] }) { $0 == "本文 0" }
-        guard let cellBeforeUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0)) else {
+        guard let cellBeforeUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        ) else {
             XCTFail("置換前のセルを取得できませんでした")
             return
         }
@@ -128,7 +134,9 @@ final class KsCollectionScenarioTests: XCTestCase {
         await waitUntil("広告テンプレートでの描画", value: { recorder.lastText[0] }) {
             $0 == "広告: 本文 0"
         }
-        guard let cellAfterUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0)) else {
+        guard let cellAfterUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        ) else {
             XCTFail("置換後のセルを取得できませんでした")
             return
         }
@@ -146,7 +154,9 @@ final class KsCollectionScenarioTests: XCTestCase {
         let window = show(controller: controller, size: CGSize(width: 390, height: 844))
         defer { window.isHidden = true }
         await waitUntil("初期描画", value: { recorder.lastText[0] }) { $0 == "本文 0" }
-        guard let cellBeforeUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0)) else {
+        guard let cellBeforeUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        ) else {
             XCTFail("置換前のセルを取得できませんでした")
             return
         }
@@ -158,13 +168,15 @@ final class KsCollectionScenarioTests: XCTestCase {
         await waitUntil("広告テンプレートでの描画", value: { recorder.lastText[0] }) {
             $0 == "広告: 本文 0"
         }
-        guard let cellAfterUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 0, section: 0)) else {
+        guard let cellAfterUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        ) else {
             XCTFail("置換後のセルを取得できませんでした")
             return
         }
         XCTAssertFalse(cellAfterUpdate === cellBeforeUpdate)
         XCTAssertNotEqual(cellAfterUpdate.reuseIdentifier, cellBeforeUpdate.reuseIdentifier)
-        XCTAssertEqual(controller.collectionView.numberOfItems(inSection: 0), 6)
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 6)
     }
 
     func test非Identifiable型のidキーパスで描画し差分更新のidentityにする() async {
@@ -194,7 +206,9 @@ final class KsCollectionScenarioTests: XCTestCase {
             controller.appliedItemIdentifiers,
             [AnyHashable("a"), AnyHashable("bb"), AnyHashable("ccc")]
         )
-        let cellBeforeUpdate = controller.collectionView.cellForItem(at: IndexPath(item: 1, section: 0))
+        let cellBeforeUpdate = controller.collectionView.cellForItem(
+            at: ksIndexPath(forItemOffset: 1, in: controller.collectionView)
+        )
         XCTAssertNotNil(cellBeforeUpdate)
 
         await waitUntil("更新操作の登録", value: { updateItems != nil }) { $0 }
@@ -210,7 +224,9 @@ final class KsCollectionScenarioTests: XCTestCase {
             [AnyHashable("a"), AnyHashable("bb"), AnyHashable("ccc")]
         )
         XCTAssertTrue(
-            controller.collectionView.cellForItem(at: IndexPath(item: 1, section: 0)) === cellBeforeUpdate
+            controller.collectionView.cellForItem(
+                at: ksIndexPath(forItemOffset: 1, in: controller.collectionView)
+            ) === cellBeforeUpdate
         )
     }
 
@@ -237,7 +253,9 @@ final class KsCollectionScenarioTests: XCTestCase {
         XCTAssertGreaterThan(heights[1], heights[0] * 2)
         XCTAssertEqual(heights[0], heights[2], accuracy: 0.5)
         for index in 0..<3 {
-            guard let cell = controller.collectionView.cellForItem(at: IndexPath(item: index, section: 0)) else {
+            guard let cell = controller.collectionView.cellForItem(
+                at: ksIndexPath(forItemOffset: index, in: controller.collectionView)
+            ) else {
                 XCTFail("項目 \(index) のセルを取得できませんでした")
                 continue
             }
@@ -263,7 +281,7 @@ final class KsCollectionScenarioTests: XCTestCase {
         defer { window.isHidden = true }
         await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == 300 }
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: 100, section: 0),
+            at: ksIndexPath(forItemOffset: 100, in: controller.collectionView),
             at: .top,
             animated: false
         )
@@ -300,7 +318,7 @@ final class KsCollectionScenarioTests: XCTestCase {
         let window = show(controller: controller, size: CGSize(width: 390, height: 844))
         defer { window.isHidden = true }
         await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) { $0 == 300 }
-        let target = IndexPath(item: 150, section: 0)
+        let target = ksIndexPath(forItemOffset: 150, in: controller.collectionView)
         XCTAssertFalse(controller.collectionView.indexPathsForVisibleItems.contains(target))
 
         scrollController.scrollTo(id: 150, position: .center, animated: false)
@@ -400,10 +418,14 @@ final class KsCollectionScenarioTests: XCTestCase {
     }
 
     private func rowHeights(in controller: KsCollectionViewController<KeyedItem>) -> [CGFloat] {
-        (0..<3).compactMap {
-            controller.collectionView.collectionViewLayout.layoutAttributesForItem(
-                at: IndexPath(item: $0, section: 0)
-            )?.frame.height
+        (0..<3).compactMap { offset in
+            guard
+                let indexPath = ksIndexPathIfPresent(forItemOffset: offset, in: controller.collectionView)
+            else {
+                return nil
+            }
+            return controller.collectionView.collectionViewLayout
+                .layoutAttributesForItem(at: indexPath)?.frame.height
         }
     }
 
@@ -418,7 +440,7 @@ final class KsCollectionScenarioTests: XCTestCase {
 
     private func scroll(_ controller: KsCollectionViewController<KeyedItem>, to item: Int) {
         controller.collectionView.scrollToItem(
-            at: IndexPath(item: item, section: 0),
+            at: ksIndexPath(forItemOffset: item, in: controller.collectionView),
             at: .top,
             animated: false
         )

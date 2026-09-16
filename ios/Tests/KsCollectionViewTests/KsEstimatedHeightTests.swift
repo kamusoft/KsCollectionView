@@ -173,17 +173,48 @@ final class KsEstimatedHeightTests: XCTestCase {
         var estimate = KsEstimatedHeight()
         [120, 120].forEach { estimate.record(height: $0, width: 402, scale: 2) }
 
+        // 幅が変わると再レイアウトが走るが、その時点では新しい幅の実測がまだ 1 件も無い。
+        // 捨てるのを次の実測まで遅らせているため、ここで読める値は既定値ではなく前の推定値になる。
+        XCTAssertEqual(estimate.value, 120)
+
+        // 新しい幅の実測が 1 件入った時点で、前の幅の標本を捨てる。
         estimate.record(height: 60, width: 197, scale: 2)
 
         XCTAssertEqual(estimate.value, 60)
     }
 
-    func test幅が変わっても新しい幅の実測が入るまでは前の幅の推定値を使う() {
+    func test倍率が変わると前の倍率の実測値を捨てる() {
         var estimate = KsEstimatedHeight()
         [120, 120].forEach { estimate.record(height: $0, width: 402, scale: 2) }
 
-        // 幅の変化で走る再レイアウトに既定値を読ませないための遅延破棄。
+        // 幅のときと同じ遅延破棄。倍率の変化で走る再レイアウトに既定値を読ませない。
         XCTAssertEqual(estimate.value, 120)
+
+        // 倍率が変われば格子の刻みも変わる。前の格子で数えた標本を残すと、同じ見た目の高さが
+        // 別の値に散って最頻値が成立しなくなる。
+        estimate.record(height: 60, width: 402, scale: 3)
+
+        XCTAssertEqual(estimate.value, 60)
+    }
+
+    func test同じ倍率で測り続ける限り実測値は捨てられない() {
+        var estimate = KsEstimatedHeight()
+
+        [120, 120, 120].forEach { estimate.record(height: $0, width: 402, scale: 3) }
+
+        XCTAssertEqual(estimate.value, 120)
+    }
+
+    func test有効でない倍率どうしは同じ倍率として扱い実測値を捨てない() {
+        var estimate = KsEstimatedHeight()
+
+        // 有効でない倍率はいずれも 1 pt 刻みに落ちるため、格子は混ざらない。
+        // 正規化前の値で比べると、この並びで標本が毎回捨てられてしまう。
+        estimate.record(height: 44, width: 402, scale: 0)
+        estimate.record(height: 44, width: 402, scale: .nan)
+        estimate.record(height: 140, width: 402, scale: -1)
+
+        XCTAssertEqual(estimate.value, 44)
     }
 
     func test幅が有限でない計測は採用しない() {

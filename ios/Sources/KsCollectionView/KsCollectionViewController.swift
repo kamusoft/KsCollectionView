@@ -33,11 +33,32 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         offsetFromTop: CGFloat,
         previousOrder: [AnyHashable]
     )?
+    // 控えた位置の世代。位置を控え直すたびに増える。遅らせた復元にはこの番号を持たせ、
+    // 番号が変わっていたら (別の経路が控え直したか、控えが捨てられたら) その復元は捨てる。
+    // 番号を持たないと、重なって届いた適用の最後の完了で最初の控えまで戻してしまう。
+    private var anchorGeneration = 0
     private(set) var longPressRecognizer: UILongPressGestureRecognizer?
     private var applyingSnapshotCount = 0
     private var hasAppliedSnapshot = false
     private var isCommandFlushScheduled = false
     private var lastContainerSize: CGSize = .zero
+    // 直近のレイアウトパスで解決した列数。列数が表示領域の幅で決まる layout では、塊の件数を
+    // この値の倍数に合わせる。レイアウトを 1 度も解いていない間は未解決 (nil) とする。
+    private var resolvedColumnCount: Int?
+    // 表示領域の大きさが変わる直前に控えた列数と、そのとき控えた位置の世代。変化の後に解けた
+    // 列数と突き合わせて、列数が変わったときだけ控えた位置を戻す。世代を併せて持つのは、
+    // 控えた位置が別の経路のものへ差し替わっていないことを確かめてから捨てるためである。
+    private var containerTransitionAnchor: (columnCount: Int, generation: Int)?
+    // 適用済みの snapshot を組んだときの塊の件数。列数の変化で件数が変われば組み直す必要がある。
+    private var appliedChunkSize = 0
+    // 適用済みの snapshot に載っている塊の数。塊の位置 (先頭・末尾) でレイアウトを切り替えるために読む。
+    private var appliedChunkCount = 0
+    // 塊の組み直しを次の実行機会へ予約したかどうか。レイアウトの途中で snapshot を適用しないため、
+    // 発火は同じ実行を抜けてから行う。
+    private var isChunkRebuildScheduled = false
+    // 塊の件数が変わる適用が復元を要求した、控えた位置の世代。適用の後の実行機会まで待ってから
+    // 戻すが、その間に控えが差し替われば番号が合わなくなり、その復元は行わない。
+    private var anchorGenerationAwaitingApply: Int?
     // プリフェッチ宣言がある間だけ持つ URL 解決層。台帳を持つため、構成の差し替えでは作り直さない。
     private var imagePrefetcher: KsImagePrefetcher<Item>?
     // 推定高さは固定値ではなく実測から決める。固定値だと推定と実測の差がそのまま
@@ -45,6 +66,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var estimatedHeight = KsEstimatedHeight()
     private(set) var lastScrollTargetIdentifier: AnyHashable?
     private(set) var processedCommandCount = 0
+    // 塊を組み直した回数。列数が変わっても現在の塊の件数が割り切れるうちは組み直さないことを、
+    // この値が動かないことで観測できる。計数そのものは構成を問わず持つ (`processedCommandCount`
+    // と同じく、値の更新に費用が掛からず計測対象の挙動を変えないため)。
+    private(set) var chunkRebuildCount = 0
+    // 表示の変化に備えて控えた位置を持っているかどうか。控えが捨てられる契機を観測するために読む。
+    var hasPendingAnchor: Bool { pendingAnchor != nil }
     #if DEBUG
     // 仮想化・再利用が効いていることを観測するための計数。生存中のセルだけを弱参照で保持し、
     // 再利用プールから外れて破棄されたセルは数から外れる。計測のための仕組みが計測対象に混ざらないよう、
@@ -148,10 +175,44 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
+    // 表示領域の大きさが変わる直前。ここでは contentOffset もレイアウト属性もまだ変化前の値で
+    // 揃っているため、変化前の並びでの「表示範囲の先頭にある項目」を正しく控えられる。
+    // 自身の view が collectionView そのものであるため、`viewWillLayoutSubviews` まで待つと
+    // bounds だけが新しい値に差し替わり、古い contentOffset と新しい属性という食い違った対になる。
+    override func viewWillTransition(
+        to size: CGSize,
+        with coordinator: UIViewControllerTransitionCoordinator
+    ) {
+        super.viewWillTransition(to: size, with: coordinator)
+        // 向き別列数では、回転で列数が変わっても塊の件数は列数の最小公倍数のまま変わらない
+        // (ios/ADR-0009)。塊を組み直さないぶん組み直しの経路では位置を控えられないため、
+        // 列数の変化で行の並びが変わる分をここで控えて、新しい列数が解けた後に戻す。
+        // 既に他の経路が位置を控えているときは、そちらの控えた位置の方が先に取られたもの
+        // なので上書きしない。
+        guard pendingAnchor == nil, let previousColumnCount = resolvedColumnCount else { return }
+        captureAnchor()
+        // 可視セルが無いなどで控えられなかったときは、戻す対象も無い。
+        guard pendingAnchor != nil else { return }
+        containerTransitionAnchor = (previousColumnCount, anchorGeneration)
+    }
+
+    // 利用者が自分で動かし始めたら、控えた位置は捨てる。控えは変化の前後で表示を保つためのもので、
+    // 利用者が動かした後にその位置へ引き戻す理由は無い。
+    // これは UIScrollViewDelegate の任意メソッドで、UICollectionViewController 自身は実装を
+    // 持たないため super へは委ねない (実体の無い呼び出しになる)。
+    override func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        discardPendingAnchor()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 位置依存の表示 (先頭行の Top 区切り線) を、差分適用後のレイアウト確定に合わせて揃える。
         updateVisibleCellSeparators()
+        // 列数はレイアウトを解いて初めて決まる。解けた列数で塊の件数が割り切れなくなっていたら
+        // 組み直す。未解決から確定した最初のレイアウトもこの判定に入るため、表示領域の大きさが
+        // 一度も変わらない画面でも不完全な行が残らない。
+        scheduleChunkRebuildIfNeeded()
+        restoreAnchorAfterColumnCountChangeIfNeeded()
         let containerSize = collectionView.bounds.size
         guard containerSize != lastContainerSize else { return }
         lastContainerSize = containerSize
@@ -355,7 +416,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         let showsSeparators = isList && configuration.showsSeparators
         cell.configureSeparators(
-            showsTop: showsSeparators && indexPath.item == 0,
+            // 上端の線は配列全体の先頭の項目にだけ出す。塊の境界では item が 0 に戻るため、
+            // 塊の順番も合わせて見ないと境界ごとに線が増える。
+            showsTop: showsSeparators && indexPath.item == 0 && indexPath.section == 0,
             showsBottom: showsSeparators,
             color: configuration.separatorColor ?? KsHostingCell.defaultSeparatorColor
         )
@@ -425,10 +488,21 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         rebuildingVisibleCellContentOnEqualItems: Bool = true,
         rebuildingSurvivingVisibleCellContent: Bool = false
     ) {
-        // 項目もレイアウト種別も変わらない更新では、差分計算も snapshot 適用も行わない。
-        // ただしテンプレートのクロージャは呼び出し側の状態を捕捉しうるため、可視セルは作り直す。
-        if !reconfiguringAllItems, hasAppliedSnapshot, items == appliedItems {
+        // 塊の件数は現在の layout と解決済みの列数から決まる (ios/ADR-0009)。件数が変われば
+        // 塊の切れ目が列の途中に落ちるため、配列が同値でも組み直す。
+        let chunkSize = currentChunkSize()
+        let chunkSizeChanged = hasAppliedSnapshot && chunkSize != appliedChunkSize
+
+        // 項目もレイアウト種別も変わらない更新でも、テンプレートのクロージャは呼び出し側の状態を
+        // 捕捉しうるため可視セルは作り直す (ios/ADR-0006)。塊の件数が変わって組み直しへ進む場合も
+        // この作り直しは要る。後段の再構成は差分 (位置の変化・残存する可視セル) からしか作られず、
+        // 同値配列ではどちらも空になるため、ここを通さないと作り直しが一度も起きない。
+        let itemsAreEqual = !reconfiguringAllItems && hasAppliedSnapshot && items == appliedItems
+        if itemsAreEqual {
             reconfigureVisibleCells(rebuildingContent: rebuildingVisibleCellContentOnEqualItems)
+        }
+        // 差分計算も snapshot 適用も要らない更新はここで終わる。
+        if itemsAreEqual, !chunkSizeChanged {
             settleAnchorIfNeeded()
             if !isApplyingSnapshot {
                 flushPendingCommands()
@@ -481,6 +555,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         // 初回は section を載せるために必ず適用する (項目が空でも header / footer を表示するため)。
         let hasSnapshotChanges = !hasAppliedSnapshot
+            || chunkSizeChanged
             || positionsChanged
             || !plan.reconfigure.isEmpty
             || !plan.reload.isEmpty
@@ -494,9 +569,26 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             return
         }
 
+        // 配列を先頭から塊の件数ずつ区切って、塊ごとのセクションへ載せる (ios/ADR-0009)。
+        // 件数は列数の倍数なので、塊の境界は必ず行の切れ目に落ちる。項目が空でも塊を 1 つ
+        // 載せて、ヘッダー / フッターを表示できるようにする。
         var snapshot = NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>()
-        snapshot.appendSections([.main])
-        snapshot.appendItems(identifiers, toSection: .main)
+        let chunkCount = KsSectionChunking.chunkCount(
+            itemCount: identifiers.count,
+            chunkSize: chunkSize
+        )
+        snapshot.appendSections((0..<chunkCount).map(KsSectionID.init(chunkIndex:)))
+        for chunkIndex in 0..<chunkCount {
+            let start = chunkIndex * chunkSize
+            let end = min(start + chunkSize, identifiers.count)
+            guard start < end else { continue }
+            snapshot.appendItems(
+                Array(identifiers[start..<end]),
+                toSection: KsSectionID(chunkIndex: chunkIndex)
+            )
+        }
+        appliedChunkSize = chunkSize
+        appliedChunkCount = chunkCount
         let existingIdentifiers = Set(currentIdentifiers)
         let reloadIdentifiers = plan.reload.map(KsItemIdentifier.init).filter(existingIdentifiers.contains)
         let reloadedIdentifiers = Set(reloadIdentifiers)
@@ -518,7 +610,18 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         appliedIdentifiers = identifiers
         hasAppliedSnapshot = true
         applyingSnapshotCount += 1
-        dataSource.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
+        // 塊の件数が変わる再適用は、それ自体は動かして見せる変化ではない。塊の件数が 1 件でも
+        // 動けば先頭の塊を除くほぼ全項目が隣の塊へ移る差分になり、アニメーションを付けると
+        // 位置の復元と重なって表示が乱れる。配列の増減が同時に届いていても、その増減だけを
+        // 動かして見せる手立ては差分の側に無いため、塊の件数の変化を契機に一律で抑止する。
+        let animates = animatingDifferences && !chunkSizeChanged
+        // 塊の件数が変わる適用では、適用の直後に UIKit が表示位置を自分で動かす。その動きの
+        // 後に戻さないと、控えた位置が上書きされて表示範囲が 1 画面ぶんずれる。控えた位置が
+        // 無ければ復元は空振りするだけなので、契機は塊の件数の変化だけで判定する。
+        if chunkSizeChanged {
+            anchorGenerationAwaitingApply = anchorGeneration
+        }
+        dataSource.apply(snapshot, animatingDifferences: animates) { [weak self] in
             guard let self else { return }
             applyingSnapshotCount = max(0, applyingSnapshotCount - 1)
             updateVisibleCellSeparators()
@@ -526,14 +629,69 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             // 保留中の命令は、重ねて適用された snapshot がすべて反映されてから実行する。
             guard applyingSnapshotCount == 0 else { return }
             collectionView.layoutIfNeeded()
-            restorePendingAnchor()
+            if let requestedGeneration = anchorGenerationAwaitingApply {
+                anchorGenerationAwaitingApply = nil
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    // 控えが差し替わっていたら、この適用が要求した復元ではない。遅らせている間に
+                    // 利用者がスクロールを始めていた場合も、控えが捨てられて番号が合わなくなる。
+                    guard anchorGeneration == requestedGeneration else { return }
+                    collectionView.layoutIfNeeded()
+                    restorePendingAnchor()
+                }
+            } else {
+                restorePendingAnchor()
+            }
             flushPendingCommands()
+            scheduleChunkRebuildIfNeeded()
         }
     }
 
+    // 塊の件数が現在の列数と合わなくなっていたら、次の実行機会に組み直しを予約する。
+    private func scheduleChunkRebuildIfNeeded() {
+        guard hasAppliedSnapshot, !isChunkRebuildScheduled else { return }
+        guard currentChunkSize() != appliedChunkSize else { return }
+        isChunkRebuildScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            isChunkRebuildScheduled = false
+            rebuildChunksIfNeeded()
+        }
+    }
+
+    // 塊だけを組み直す。配列は変わらないためテンプレートは呼び直さず、表示範囲の先頭にある
+    // 項目を控えて組み直しの後に同じ位置へ戻す。
+    private func rebuildChunksIfNeeded() {
+        guard hasAppliedSnapshot, !isApplyingSnapshot else { return }
+        guard currentChunkSize() != appliedChunkSize else { return }
+        chunkRebuildCount += 1
+        captureAnchor()
+        apply(
+            items: configuration.items,
+            animatingDifferences: false,
+            rebuildingVisibleCellContentOnEqualItems: false
+        )
+    }
+
+    // 現在の layout と解決済みの列数から決まる、1 つの塊に載せる件数。
+    private func currentChunkSize() -> Int {
+        KsSectionChunking.chunkSize(
+            columnMultiple: KsSectionChunking.columnMultiple(
+                layout: configuration.layout,
+                resolvedColumnCount: resolvedColumnCount
+            )
+        )
+    }
+
     private func makeLayout() -> UICollectionViewCompositionalLayout {
-        UICollectionViewCompositionalLayout { [weak self] _, environment in
+        UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
             guard let self else { return nil }
+            // 配列は内部の塊へ分かれて載る。塊の境界が見た目に出ないよう、内側余白・行間・
+            // ヘッダー / フッターを塊の位置で切り替える (ios/ADR-0009)。
+            // 塊の数は snapshot を組んだ時点で決まる。まだ組んでいない間や記録より後ろの塊を
+            // 解いているときは、その塊を末尾として扱う。
+            let isFirstChunk = sectionIndex == 0
+            let isLastChunk = sectionIndex == max(appliedChunkCount, sectionIndex + 1) - 1
             let padding = configuration.contentPadding
             let horizontalPadding = padding.leading + padding.trailing
             let columnCount: Int
@@ -549,6 +707,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                     columnSpacing: configuration.layout.columnSpacing
                 )
             }
+            resolvedColumnCount = columnCount
 
             let itemSize = NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1 / CGFloat(columnCount)),
@@ -569,17 +728,20 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             let section = NSCollectionLayoutSection(group: group)
             section.interGroupSpacing = configuration.layout.rowSpacing
             section.contentInsets = NSDirectionalEdgeInsets(
-                top: padding.top,
+                // 内側余白は配列全体の上下にだけ付ける。塊と塊の間には行間を入れて、境界の
+                // 間隔を他の行間と同じにする (セクションの間には行間が入らないため)。
+                top: isFirstChunk ? padding.top : configuration.layout.rowSpacing,
                 leading: padding.leading,
-                bottom: padding.bottom,
+                bottom: isLastChunk ? padding.bottom : 0,
                 trailing: padding.trailing
             )
 
             var supplementaryItems: [NSCollectionLayoutBoundarySupplementaryItem] = []
-            if configuration.header != nil {
+            // ヘッダーは配列全体の先頭に、フッターは末尾に 1 つずつだけ付ける。
+            if configuration.header != nil, isFirstChunk {
                 supplementaryItems.append(makeBoundaryItem(kind: UICollectionView.elementKindSectionHeader, alignment: .top))
             }
-            if configuration.footer != nil {
+            if configuration.footer != nil, isLastChunk {
                 supplementaryItems.append(makeBoundaryItem(kind: UICollectionView.elementKindSectionFooter, alignment: .bottom))
             }
             section.boundarySupplementaryItems = supplementaryItems
@@ -601,8 +763,25 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
+    // 表示範囲と実際に重なっている項目のうち、全体の順番が最も先頭のものを返す。
+    // 可視セルの一覧には、遠くへ送った直後に送る前のセルがまだ残っていることがあるため、
+    // 一覧の先頭をそのまま採ると画面外の項目をアンカーにしてしまい、復元で先頭へ飛ぶ。
     private func leadingVisibleID() -> AnyHashable? {
-        guard let indexPath = collectionView.indexPathsForVisibleItems.min() else { return nil }
+        let bounds = collectionView.bounds
+        // 表示範囲は、内容の原点 (contentOffset) から見た bounds をバー等の余白で狭めた矩形。
+        // 余白で潰れる構成では狭める前の bounds を使う。`configureCollectionView()` が
+        // `contentInsetAdjustmentBehavior = .never` を立てているためバー由来の値は入らず、
+        // ここで狭まるのは `contentInset` を自ら持つ構成だけである。
+        let insetBounds = bounds.inset(by: collectionView.adjustedContentInset)
+        let visibleRect = insetBounds.isEmpty ? bounds : insetBounds
+        let indexPath = collectionView.indexPathsForVisibleItems.filter { indexPath in
+            guard let attributes = collectionView.collectionViewLayout
+                .layoutAttributesForItem(at: indexPath) else {
+                return false
+            }
+            return attributes.frame.intersects(visibleRect)
+        }.min()
+        guard let indexPath else { return nil }
         return dataSource.itemIdentifier(for: indexPath)?.value
     }
 
@@ -622,6 +801,45 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             attributes.frame.minY - collectionView.bounds.minY,
             appliedIdentifiers.map(\.value)
         )
+        anchorGeneration &+= 1
+    }
+
+    // 控えた位置を捨てる。世代を進めることで、遅らせてある復元もこの控えを戻さなくなる。
+    private func discardPendingAnchor() {
+        guard pendingAnchor != nil else { return }
+        pendingAnchor = nil
+        anchorGeneration &+= 1
+    }
+
+    // 表示領域の変化の直前に控えた位置を、新しい列数が解けた後に戻す。
+    // 列数が変わらなかった変化では行の並びも変わらないため、控えた位置は使わずに捨てる。
+    private func restoreAnchorAfterColumnCountChangeIfNeeded() {
+        guard
+            let transition = containerTransitionAnchor,
+            let currentColumnCount = resolvedColumnCount
+        else {
+            return
+        }
+        containerTransitionAnchor = nil
+        guard transition.columnCount != currentColumnCount else {
+            // 控えた位置がここで控えたものである (世代が一致する) ときだけ捨てる。別の経路が
+            // 後から控え直していれば、その経路が待っている復元まで落としてしまう。
+            if anchorGeneration == transition.generation {
+                discardPendingAnchor()
+            }
+            return
+        }
+        // 塊の件数まで変わる変化では、組み直しの経路が同じ控えた位置を適用の後に戻す。
+        guard !isChunkRebuildScheduled, currentChunkSize() == appliedChunkSize else { return }
+        // 復元は塊の組み直しと同じく、レイアウトが確定した後の実行機会まで遅らせる。
+        // 同じ実行の中で戻すと、この後に UIKit 自身が行う表示位置の調整に上書きされる。
+        let requestedGeneration = anchorGeneration
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            guard anchorGeneration == requestedGeneration else { return }
+            collectionView.layoutIfNeeded()
+            restorePendingAnchor()
+        }
     }
 
     // 差分適用を伴わない更新でも位置を保つため、レイアウトを確定させてから復元する。
@@ -633,7 +851,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
 
     private func restorePendingAnchor() {
         guard let anchor = pendingAnchor else { return }
-        pendingAnchor = nil
+        // 控えは 1 度だけ使う。使った時点で世代を進め、遅らせてある別の復元が同じ控えを
+        // もう一度戻そうとしないようにする。
+        discardPendingAnchor()
         guard
             let target = survivingAnchor(
                 for: anchor.identifier,
