@@ -146,7 +146,15 @@ Android のライブラリは `InitializationProvider` に相乗りしてアプ�
 
 ## 性能
 
-Sample「画像グリッド」(10,000 件・3 列・正方形 `KsImage`、公開のプレースホルダー画像サービス) を固定 fixture として両プラットフォームの基準機で計測した。メモリの定常化は両プラットフォームとも合格。スクロールの絶対基準 (iOS の hitch time ratio、Android の frameOverrun P99) は両プラットフォームとも基準値を超過して不合格だが、iOS では画像ロードの実装が hitch の原因ではないこと、画像を使わない対照の Sample「大量件数」画面が同じ手順で桁違いに超過することが判明したため、性能の合否は規約 (窓・閾値・fixture の件数) の見直し (変更 `kasane/changes/performance-criteria-review`) を待つ状態にある。手順と基準は [iOS](../../../handbook/ios/performance-verification.md) / [Android](../../../handbook/android/performance-verification.md) の性能検証規約。
+スクロール性能の合否は、基準機でのオーナーの体感で下し、計測器の数値は証跡として残す (cross/ADR-0006。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md))。画像の先読みや `KsImage` に触れる変更の fixture は Sample「画像グリッド」(10,000 件・3 列・正方形 `KsImage`、公開のプレースホルダー画像サービス) である。
+
+| 観点 | iOS (基準機 iPhone 11) | Android (基準機 Pixel 4a) |
+|---|---|---|
+| スクロールの滑らかさ (体感) | 合格 (2026-09-17 が最新)。全セルが同じ高さで、推定高さの解き直しが起きない | 合格 (2026-09-08)。ただし描画フレーム時間に 20 ms の山があり、文字だけのグリッドより重い。画像 1 枚ごとに subcomposition が 1 段増える費用と整合する |
+| 画像の表示待ち (止めてから画像が揃うまで) | 特記なし | iOS より数テンポ遅れ、体感がよくない。元寸を CPU から読めず、表示時に縮小デコードを待つため (上記)。見直しは変更 `kasane/changes/prefetch-display-size` |
+| メモリ | 往復で定常化する | 往復で定常化し、配列の置換と画面離脱で項目のコンポジションが解放される (先読みなし / `memory` / `disk` の 3 通り) |
+
+画像の表示待ちは滑らかさとは別の観測点で、体感の合否に混ぜない。手順は [iOS](../../../handbook/ios/performance-verification.md) / [Android](../../../handbook/android/performance-verification.md) の性能検証規約。
 
 ## 用語
 

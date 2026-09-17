@@ -5,7 +5,7 @@ applies-when:
   tasks: [環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
 title: ローカル開発環境と Sample の実行
 description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。両プラットフォームとも実際に確認した手順を記す
-timestamp: 2026-09-07
+timestamp: 2026-09-17
 ---
 
 # ローカル開発環境と Sample の実行
@@ -86,6 +86,8 @@ CLI のビルドは `samples/ios/` で `xcodebuild build -project KsCollectionVi
 
 iOS の実機で実行・計測するときは、機体を UDID で指名する (`-destination 'platform=iOS,id=<UDID>'`)。
 接続中の機体は `xcrun xctrace list devices` の Devices 節に出る。
+
+実機へ入れるビルドの署名は、`xcodebuild` に `DEVELOPMENT_TEAM=<チーム ID> CODE_SIGN_STYLE=Automatic -allowProvisioningUpdates` を渡して行い、Xcode の画面では設定しない。画面で設定するとチーム ID が `samples/ios/` のプロジェクトファイルへ書き戻され、commit 前の識別子の検査で止まる。チーム ID は、以前に実機へ入れたビルドの `embedded.mobileprovision` を `security cms -D -i <ファイル>` で開いた `TeamIdentifier` で確かめられる。
 
 **実機が一覧に出るのに使えないときは、端末側ではなく Mac 側のペアリングが確立していないことがある。**
 `xcrun devicectl list devices -v` で該当機体の `developerModeStatus` が `nil`、`ddiServicesAvailable` が

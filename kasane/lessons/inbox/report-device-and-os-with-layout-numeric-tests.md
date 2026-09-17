@@ -4,9 +4,10 @@ kind: pain
 severity: normal
 count: 1
 first-seen: 2026-09-15
-last-seen: 2026-09-15
+last-seen: 2026-09-16
 evidence:
   - performance-criteria-review (tasks 2.4 のエンジンテスト「行高が一様な配列で初回表示の合計高さの見積もりを損ねない」が、実装者の iPhone 17 Pro Max Simulator では 1.01% / 2 回で緑だったが、レビュアーが試した 5 つの Simulator のうち 3 つで決定的に失敗 (誤差 8.69〜9.98% / 変化 124〜188 回)。実装報告・deviation の数値に機種・OS が無く、1 環境でしか成立しない値だと 2 周目のレビューまで気付けなかった)
+  - performance-criteria-review / 同一 change 内の再発 (deviation の「確定した事実」2 点が 1 機種・2 点の観測からの外挿で、review-004 のプローブで誤りと判明。倍率に依存するテストの決定的な失敗も、レビュアーが別の機種で 3 回見つけた (review-002 / 005 / 010)。同一作業単位のため count は増やさない)
 ---
 
 ## ルール文

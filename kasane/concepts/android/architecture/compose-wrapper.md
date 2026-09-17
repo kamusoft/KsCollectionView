@@ -103,7 +103,11 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 
 ### 仮想化と再利用が成立している
 
-10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。スクロール性能は、ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面 (比較対象) との相対と、フレーム超過時間の絶対上限で判定する。合格基準と手順は [Android 性能検証](../../../handbook/android/performance-verification.md)。画像グリッド (10,000 件・3 列、宣言あり) の絶対基準 (frameOverrun P99 が 0.0 ms 以下) は両到達点とも届かず (ディスク 6 ms 台、メモリ 4 ms 台。cold の取得が原因ではなく warm でも縮まらない)、合否は規約の見直し (change `performance-criteria-review`) を待つ。到達点 `memory` の方式の見直しは change `prefetch-display-size`。
+10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。配列を別の内容へ置換すると同時生存は可視範囲 + 先読み分に戻り、画面を離れると 0 になる (計測モジュールの自動走査で、先読みなし / `memory` / `disk` の 3 通りとも確認)。
+
+スクロール性能の合否は、基準機でのオーナーの体感で下す (cross/ADR-0006。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md))。文字だけの「大量件数」は体感合格で、iOS で問題になった推定高さの解き直しに相当する費用は無い (Lazy 系は表示中の項目だけを測るため)。この合格は固定の操作列を定める前の記録 (2026-09-08) で、固定の操作列での採り直しは Android 本体に触れる次の変更で行う。画像グリッドの体感と表示待ちは [image-loading](../../core/core-model/image-loading.md) の性能節にある。
+
+体感とは別の系統で、比較対象 (ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面) に対する上乗せを Macrobenchmark で測る。事後検証スクリプトが、各試行の描画フレーム数が 90 以上であることと、`frameDurationCpuMs` の P90 / P99 の劣化が 10% 以内であることを判定する。2026-09-15 の基準機では、2 列グリッド・1 列リストともライブラリ側が比較対象より 6〜9% 速かった。ただし比較対象だけが `animateContentSize` の合成レイヤを負う条件なので、この結果はラッパーの薄さそのものの証明にはならない。手順は [Android 性能検証の手順](../../../handbook/android/performance-verification.md)。
 
 ## してはいけないこと
 
@@ -131,7 +135,7 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - [collection-interaction](../../core/core-model/collection-interaction.md) — 実現している契約 (タップ・スクロール命令)
 - [image-loading](../../core/core-model/image-loading.md) — 実現している契約 (先読み・到達点・KsImage・キャッシュ操作)
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
-- [Android 性能検証の手順と合格基準](../../../handbook/android/performance-verification.md)
+- [Android 性能検証の手順](../../../handbook/android/performance-verification.md)、[スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md) — 性能の手順と合否の判定規則 (cross/ADR-0006)
 - android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針。Coil は利用者の compileSdk 要求を上げない 3.5.0 に固定)、android/ADR-0003 (material3 と ripple)、android/ADR-0004 (行の高さ変化の補間)
 - android/ADR-0005 (アプリケーションコンテキストの捕捉)、core/ADR-0012 (Coil への直接依存と共有インスタンス)
 - core/ADR-0007、core/ADR-0011、ios/ADR-0007

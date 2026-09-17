@@ -10,6 +10,6 @@
 | [0006](0006-reconfigure-visible-cells-on-equal-array-update.md) | 同値配列の更新でも可視セルを再構成し、ID・テンプレートキーの宣言と登録集合は表示中不変とする | accepted | 親の状態を捕捉するテンプレートを成立させる。前提「親の更新が届く」はテンプレート内でしか読まれない `@State` では成り立たず、観測する値を渡した場合の再構成条件は 0008 が置き換えた。一部改訂: 0008 |
 | [0007](0007-cell-content-placement.md) | セル content は行の上端に固定・水平は中央に置き、content へ行の高さを提案しない | accepted | UIHostingConfiguration の中央配置はみ出し対策 (KsRowContentPlacement)。帰結: grid で背の低いセルは行高いっぱいに広がらない。Android も同じ規則で一致を確認して accepted (2026-09-05)。配置規則は両プラットフォーム共通の契約 (concepts/core/styling/collection-layout.md)。 |
 | [0008](0008-observed-parent-state-modifier.md) | テンプレートの中で読む親の状態は、観測する値として DSL に明示的に渡す (iOS 固有の modifier) | accepted | `observedValue(_:)` (amends 0006)。引数式が body で評価されるため依存が張られ、値が変わったときだけ可視セルを再構成する。未指定時は 0006 のまま。Android は Compose の自動観測で不要。トランザクション引き渡しによる中身のアニメーションは効果なしと確認。 |
-| [0009](0009-internal-section-chunking.md) | 配列を内部で固定件数の塊 (内部セクション) に分けて配置し、レイアウトの再解決の費用を配列の件数から切り離す | proposed | 塊の件数は 500 を列数候補の lcm の倍数に切り上げ。境界は見た目に出さず、利用者の語彙に現れない。phase-4 の論理セクションは 2 段 (論理 × 塊) を前提にする。前提 (解き直しはセクション単位) は試作の実機計測で確認済みで、実装後の補足を追記 (2026-09-17)。出典 change: performance-criteria-review |
+| [0009](0009-internal-section-chunking.md) | 配列を内部で固定件数の塊 (内部セクション) に分けて配置し、レイアウトの再解決の費用を配列の件数から切り離す | accepted | 塊の件数は 500 を列数候補の最小公倍数の倍数に切り上げ。境界は見た目に出さず、利用者の語彙に現れない。セクション / グループ化機能の論理セクションは 2 段 (論理 × 塊) を前提にする。前提 (解き直しの費用はセクション単位) は基準機の件数比 1.04 倍で確認。 |
 
 採番規則は [../index.md](../index.md) を参照。

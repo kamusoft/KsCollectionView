@@ -15,3 +15,6 @@
 
 ## 2026-09-08
 - distilled: image-loading (ADR android/0005 を起票して accepted、core/0012 は実装後の視点で本文を書き直し proposed のまま確定待ち / handbook: ios/performance-verification.md のスクロール計測の接続手順を立て直し、android/performance-verification.md に実行後の後始末を追記、cross/runtime-behavior-verification.md に「実行環境で実体が変わる資源を扱う分岐」を lessons critical から昇格 / concepts: core/core-model/image-loading.md を新設 (初見可読性レビュー 1 周反映)、ios/architecture/collection-engine.md に先読み接続・表示要求の鍵・世代付き識別子と基準機の性能実測を追記、android/architecture/compose-wrapper.md に先読み窓・表示要求の鍵・リソース描画・KsAppContext を追記 / lessons inbox: reviewer-reproduces を count 4 に、exercise-device-only-branches を details へ移して昇格、severity 表記 1 件を正規化 / archive は core/0012 の確定待ちで保留)
+
+## 2026-09-17
+- distilled: performance-criteria-review (ADR cross/0006・ios/0009 を実装後の視点で本文を書き直して accepted、ios/0003 に関連行を追記 / handbook: cross/scroll-performance-gate.md の非接続の対照の条件をオーナー判断で「迷い・不合格のとき」に改訂、ios/performance-verification.md に件数を変えた比較の手順と実機の端末指名・接続タイムアウトの対処を追記、cross/local-development-setup.md に実機ビルドの署名を追記 / concepts: ios/architecture/collection-engine.md を大規模改訂 (推定高さの最頻値・内部の塊・表示位置の控えと復元・分かっている限界・体感ゲートでの性能。初見可読性レビュー 1 周反映)、core/core-model/image-loading.md と android/architecture/compose-wrapper.md の性能節を体感ゲートに追随 / deviation 補完 1 件 / lessons: inbox 新規 3 件・根拠追加 1 件、reviewer-reproduces-evidence-numbers-by-probe を code-review.md L-001 に昇格)

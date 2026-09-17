@@ -1,0 +1,16 @@
+---
+scope: spec-review
+kind: pain
+severity: normal
+count: 1
+first-seen: 2026-09-08
+last-seen: 2026-09-16
+evidence:
+  - performance-criteria-review (提案のホスト側自己レビューが相方の spec レビューの指摘をほぼ拾えなかった。初版 (second-opinion-spec-001、2026-09-08) は自己レビュー 2 周で指摘 0 件、相方の 8 件はすべて採用。改訂 (second-opinion-spec-002、2026-09-16) は自己レビュー 2 周で相方の Major 5 件をすべて見逃した — 件数を変えた比較が同じ仕事量を比べていない、adaptive の塊の契約が spec / design / ADR で食い違い同値配列の早期 return を考慮していない、塊分割でメモリ往復ドライバの通過件数 (`indexPath.item`) が数えられなくなる、項目だけの挿入では位置が控えられない、handbook の「ドライバはメモリ往復だけ」が改訂 spec と矛盾する)
+---
+
+## ルール文
+提案を作成・改訂したときの自己レビューでは、新設・変更した契約 (Requirement・Scenario・design の Decision) ごとに、同じ契約を書いている他の成果物 (design・ADR・handbook) と、その契約で前提が変わる既存コードの経路 (早期 return の条件・状態を控える契機・件数や順番の数え方) を開いて突き合わせ、突き合わせた箇所と結果を記録に書く。件数や条件を変えて比べる Scenario では、比べる 2 つの走行が同じ仕事量になる条件が書かれているかも確かめる。
+
+## 経緯
+- 2026-09-16 performance-criteria-review: 改訂の自己レビュー 2 周で、相方が見つけた成果物間の矛盾と既存経路への影響 (Major 5 件) をどれも検出できなかった。すべて採用され、spec・design・ADR・tasks を直してから実装に進んだ
