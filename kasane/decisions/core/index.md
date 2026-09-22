@@ -14,5 +14,6 @@
 | [0010](0010-list-separator-default-appearance.md) | list の区切り線の既定外観 — 先頭行の上端・行間・最終行の下端に全幅 1pt の固定色で描く | accepted | hairline・行間のみ・インセット・semantic color・背面描画を却下。両プラットフォーム同じ実値、線は content の前面。色は `listSeparatorColor` で変更可。Android 実装と突き合わせて accepted (2026-09-05)。 |
 | [0011](0011-invalid-input-release-behavior.md) | 不正入力 (重複 ID・未登録テンプレートキー) は debug では assertion、release では表示を継続して警告ログを出す | accepted | 落とさず・消さず・黙らず。重複 ID と重複登録は後勝ち。Android のみ 4 つ目 (Bundle に載らない `key`)。debug の主語は利用者アプリのビルド種別。Android 実装と突き合わせて accepted (2026-09-05)。 |
 | [0012](0012-image-loader-direct-dependency.md) | 画像ローダー — 本体が iOS は Nuke・Android は Coil 3 に直接依存し `KsImage` とプリフェッチ接続を内蔵 | proposed | 別 product 同梱・ローダー抽象 + アダプタ・Kingfisher・iOS のディスクキャッシュ自動有効化を却下。ローダーの共有インスタンスをそのまま共有キャッシュとし、iOS のディスクキャッシュは `KsImagePipeline.enableSharedDiskCache()` の明示呼び出し。実装後の視点で本文を書き直し済み、確定はオーナー待ち (2026-09-08)。 |
+| [0013](0013-prefetch-display-size-hint.md) | 先読みの表示幅の宣言 — 要素 `KsResource` に URL ごとの概算の幅 (列幅 / 固定値) を持たせ、表示は実物の寸法を許容範囲で引き当てる | proposed | `prefetchResources` の要素を `KsResource` (幅省略 = 原寸) にし `[URL]` は廃止 (配布前)。表示は鍵の完全一致をやめ許容範囲 (下限・上限) で引き当て、CPU の同期縮小を廃止。学習 (A-2)・バケット化・別名の入口・オーバーロード・ハードウェア支援オフを却下。amends 0008 (2026-09-22)。 |
 
 採番規則は [../index.md](../index.md) を参照。
