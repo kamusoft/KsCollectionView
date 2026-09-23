@@ -15,5 +15,6 @@
 | [0011](0011-invalid-input-release-behavior.md) | 不正入力 (重複 ID・未登録テンプレートキー) は debug では assertion、release では表示を継続して警告ログを出す | accepted | 落とさず・消さず・黙らず。重複 ID と重複登録は後勝ち。Android のみ 4 つ目 (Bundle に載らない `key`)。debug の主語は利用者アプリのビルド種別。Android 実装と突き合わせて accepted (2026-09-05)。 |
 | [0012](0012-image-loader-direct-dependency.md) | 画像ローダー — 本体が iOS は Nuke・Android は Coil 3 に直接依存し `KsImage` とプリフェッチ接続を内蔵 | proposed | 別 product 同梱・ローダー抽象 + アダプタ・Kingfisher・iOS のディスクキャッシュ自動有効化を却下。ローダーの共有インスタンスをそのまま共有キャッシュとし、iOS のディスクキャッシュは `KsImagePipeline.enableSharedDiskCache()` の明示呼び出し。実装後の視点で本文を書き直し済み、確定はオーナー待ち (2026-09-08)。 |
 | [0013](0013-prefetch-display-size-hint.md) | 先読みの表示幅の宣言 — 要素 `KsResource` に URL ごとの概算の幅 (列幅 / 固定値) を持たせ、表示は実物の寸法を許容範囲で引き当てる | proposed | `prefetchResources` の要素を `KsResource` (幅省略 = 原寸) にし `[URL]` は廃止 (配布前)。表示は鍵の完全一致をやめ許容範囲 (下限・上限) で引き当て、CPU の同期縮小を廃止。学習 (A-2)・バケット化・別名の入口・オーバーロード・ハードウェア支援オフを却下。amends 0008 (2026-09-22)。 |
+| [0014](0014-image-cache-key-override.md) | 画像の任意キー — 先読みの要素 `KsResource` と `KsImage` の画像ソースの両方に同じ任意キーを持たせ、キーがあれば URL の代わりに鍵の基準にする | proposed | 署名付き URL など URL が変わる画像のため。引数名は `key`、省略は従来どおり URL。指定時は取得以外 (メモリ・ディスク・世代・索引・先読みの取得単位・消去) をすべてキー基準にする。`KsResource` だけに持たせる案・URL → キー変換の登録・先読み宣言から対応を覚える案 (D / D') を却下 (2026-09-23)。 |
 
 採番規則は [../index.md](../index.md) を参照。

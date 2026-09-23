@@ -51,11 +51,15 @@ cross/ADR-0006 (proposed) の手順で Pixel 4a の「画像グリッド」を c
   - **素の配列 (URL だけ) は残し、到達点 memory では原寸を載せる**。表示は同じ許容範囲の引き当てで原寸を使う。CPU の同期縮小 (`Unreadable` 分岐) は不要になり、Android 実機でも成立する
   - 外形 (propose で確定 2026-09-22): 入口は `prefetchResources` 1 本のまま、要素を `KsResource(url, width:)` に。幅は `KsWidth` (`.column` / `.fixed(40)`、Kotlin は `KsWidth.Column` / `Fixed(40.dp)`)、省略で元寸。`[URL]` / `List<String>` は廃止 (配布前)。別名の入口 (`prefetchImages`: 区別がつかない)・オーバーロード (Kotlin で Composable の複製)・ファクトリ混在・`Dp` 番兵はオーナー判断で却下
   - 却下: バケット化 (刻みをまたぐと外れる)、下限なし (ぼやけ事故)、下限 1.0 (大きめを強いる)、上限なし (巨大原寸)、幅+高さ+当てはめ方の宣言
+- 追加探索 (2026-09-23) 論点 1「任意キーを指定する場所」: **A = 先読みの要素 `KsResource` と `KsImage` の画像ソース (`KsImageSource.remote` / `Remote`) の両方に同じ任意キーを持たせる**。動機はオーナーの追加要望「署名付き URL のように毎回変わる URL は鍵に使えないので、`KsResource` で任意のキーを指定し、キーがあればキー文字列を基に鍵を作る」。`KsResource` だけ (B) では表示側が URL で鍵を作るため先読みが当たらない。引数名は `cacheKey` ではなく **`key`** (オーナー判断)。書き口: `KsResource(url, width: .column, key: photo.id)` / `.remote(url, key: photo.id)`、Kotlin `KsResource(url, width = KsWidth.Column, key = photo.id)` / `KsImageSource.Remote(url, key = photo.id)`。既定値は省略 (nil / null) で、既存の `.remote(url)` / `Remote(url)` はそのまま通る
+  - 却下: C「URL → キー変換をアプリ全体で 1 つ登録」(URL から作れないキーを書けない・大域状態。署名がクエリだけの場面の手軽さは Revisit When で A に足す余地)、D「`KsResource` にだけ書き、先読み宣言から URL → キーの対応を覚える」(先読みは画面内のアイテムを宣言対象にしない — Android の窓は可視範囲の先だけで起動直後のセルは窓の更新より先に作られる、iOS の `prefetchItemsAt` は初期表示のセルに来ない — ため起動直後の 1 画面が URL の鍵になる)、D'「D + セル表示時にも宣言を評価して登録」(コレクション外・先読み未宣言の `KsImage` で黙って URL の鍵へ戻る見えない結合、実装も重い)
+- 追加探索 (2026-09-23) 論点 2「キーが効く範囲」: **取得 (ネットワーク) 以外のすべてでキーを URL の代わりに使う** — メモリの鍵 (幅・枠サイズの付け足しはそのまま)、ディスクの鍵 (iOS は `imageID`: Nuke の `makeDataCacheKey` とメモリ鍵の両方に効くことを checkout で確認、Android は `diskCacheKey`)、削除の世代、鍵の索引、先読みの取得単位と `fence`、`KsImageCache.remove(source)` (画像ソースにキーがあればキーで消す)。ローダー付属ビューを URL で直接使う場合とは項目を共有しない (壊れない)。キーは画像の中身を一意に特定する文字列であることを利用者向けの注意書きに含める
 - 前提の更新: 起票の直接の動機だった到達点 `memory` の frameOverrun P99 18〜21 ms は、オーナー判断 C (`allowHardware(false)` の撤去) 後に 4.4〜4.6 ms (`disk` の 6.2〜6.4 ms より軽い) まで下がっている。滑らかさは動機から外れ、残るのは「実機で `memory` が `disk` に対して費用だけ余分に払う (spec 違反・iOS との非対称)」と表示待ちの体感
 
 ## ADR 候補 (作成済み: ADR-NNNN / 未起票: ...)
 
 - 作成済み: **core/ADR-0013** (proposed, 2026-09-22) — 先読みの表示幅の宣言と許容範囲の引き当て。amends core/ADR-0008。phase-8 agenda の「サイズヒント付き宣言は却下」と image-loading design Decision 5 の却下案 A / C を改訂する (蒸留時に agenda / Decision 5 側へ参照を残す)
+- 作成済み: **core/ADR-0014** (proposed, 2026-09-23) — 画像の任意キー (`KsResource` と `KsImage` の画像ソースの両方に `key`、指定時は取得以外をキー基準)。追加探索 2026-09-23 の論点 1〜2
 - core/ADR-0012 (proposed) は本 change の対象外 (ローダー依存の持ち方で、鍵の方式には触れていない)
 
 ## 未決の論点
@@ -67,6 +71,13 @@ cross/ADR-0006 (proposed) の手順で Pixel 4a の「画像グリッド」を c
 - iOS の引き当ての実現: Nuke に近似の引き当てが無いため、URL ごとに載っている寸法の索引をライブラリが持つ設計 (寿命・消去との同期)
 - 列幅の解決の置き場: iOS は `KsLayoutMetrics` + bounds、Android は `resolveGridCells` + 可視情報。回転・列数変更後の先読みは新しい幅で出す
 - 詳細形の名前 (Swift の引数ラベル / Kotlin の引数名) と型名 (`KsPrefetchResource` / 幅の enum)
+
+追加探索 (2026-09-23、任意キー) の残り — propose の改訂 (2026-09-23) で解決し design Decision 9 に反映:
+
+- `key` を持てる画像ソース → リモートだけ (ファイル・アセットには持たせない)
+- 空文字の `key` → 不正入力 (core/ADR-0011。release は警告して `key` なし)
+- 同じ `key` で URL が違う同時取得 → 統合しない (Nuke はネットワーク取得を `originalImageID` = 元の URL で統合するため別取得になり、同じ鍵へ保存される)
+- 便宜形 `KsImage(url, key:)` も足す。先読みの宣言の突き合わせは当初「識別子で行い取り直さない」としたが、相方 spec レビュー 002 #3 (失効した URL の先読みが回復しない) を受けてオーナー判断で「URL も含め、URL が変われば新しい URL で出し直す (取得済みならキャッシュに当たる)」に改めた
 
 起票時からの残り:
 
@@ -83,3 +94,5 @@ cross/ADR-0006 (proposed) の手順で Pixel 4a の「画像グリッド」を c
 ## 変更級の推奨
 
 **L** (オーナー確定 2026-09-22)。材料: 公開 API の追加 (先読み宣言の詳細形、core/ADR-0008 の amends)・先読み台帳の要求単位化・`KsImage` の引き当てを鍵の完全一致から許容範囲へ・列幅の解決・spec の Requirement 3 本の改訂・両プラットフォームで引き当ての実現手段が違う (Coil `INEXACT` の裏取り / Nuke は自前の索引)・実機計測 (先頭に到達点 memory の手動計測、最後に合否)・実機テスト 4 本の前提書き換え。UI 変更なし。M と迷う材料が 2 つあるため「迷ったら 1 段上」で L。
+
+追加探索 (2026-09-23、任意キー) を同梱しても **L のまま** (公開型 `KsResource` / `KsImageSource.remote` の形がさらに変わり、鍵の基準の切り替えが両プラットフォームのメモリ・ディスク・世代・索引・台帳・消去にまたがる。級を上げる要素はあっても下げる要素はない)。
