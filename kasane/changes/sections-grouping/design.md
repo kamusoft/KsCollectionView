@@ -25,26 +25,82 @@ phase-4 の議論で、セクションの宣言 (core/ADR-0015)、list の区切
 
 **採用案:** グループの値・見出し・固定の有無を 1 つの宣言にまとめる。Swift は modifier、Kotlin は引数 1 つに値を渡す (記法は各流儀、語彙は 1 対 1。core/ADR-0002)。間隔は layout 値の引数に足す (core/ADR-0006)。
 
+以下の例の項目型は `Product` (`id` と、グループの値に使う `category: String` を持つ) とする。
+
+**基本形** — `category` が同じ項目が続く範囲を 1 つのセクションにし、見出しに「カテゴリ名 (件数)」を出す。見出しは既定で上端に固定される。
+
 ```swift
-KsCollectionView(items, layout: .grid(columns: .fixed(portrait: 2, landscape: 4),
-                                      rowSpacing: 8, sectionSpacing: 24, sectionHeaderSpacing: 8)) { item in Cell(item) }
-    .sections(by: \.category) { category, itemsInSection in
-        Header(category, count: itemsInSection.count)
+KsCollectionView(products) { product in ProductRow(product) }
+    .sections(by: \.category) { category, productsInSection in
+        Text("\(category) (\(productsInSection.count))")
     }
-    .sections(by: \.category, pinnedHeaders: false) { … }   // 固定を外す
-    .sections(by: \.category)                               // 見出しなしでセクションだけ
 ```
 
 ```kotlin
 KsCollectionView(
-    items = items, key = { it.id },
-    layout = KsLayout.Grid(KsColumns.Fixed(portrait = 2, landscape = 4),
-                           rowSpacing = 8.dp, sectionSpacing = 24.dp, sectionHeaderSpacing = 8.dp),
-    sections = KsSections(by = { it.category }) { category, itemsInSection ->
-        Header(category, count = itemsInSection.size)
+    items = products,
+    key = { it.id },
+    sections = KsSections(by = { it.category }) { category, productsInSection ->
+        Text("$category (${productsInSection.size})")
     },
-    // KsSections(by = { it.category }, pinnedHeaders = false) { … } / KsSections(by = { it.category })
-) { template { item -> Cell(item) } }
+) { template { product -> ProductRow(product) } }
+```
+
+**見出しの固定を外す** — 基本形に `pinnedHeaders: false` を足すだけ。
+
+```swift
+KsCollectionView(products) { product in ProductRow(product) }
+    .sections(by: \.category, pinnedHeaders: false) { category, _ in
+        Text(category)
+    }
+```
+
+```kotlin
+KsCollectionView(
+    items = products,
+    key = { it.id },
+    sections = KsSections(by = { it.category }, pinnedHeaders = false) { category, _ ->
+        Text(category)
+    },
+) { template { product -> ProductRow(product) } }
+```
+
+**見出しなし** — セクションに分けるだけ (セクション間の間隔や区切り線の単位として使う)。
+
+```swift
+KsCollectionView(products) { product in ProductRow(product) }
+    .sections(by: \.category)
+```
+
+```kotlin
+KsCollectionView(
+    items = products,
+    key = { it.id },
+    sections = KsSections(by = { it.category }),
+) { template { product -> ProductRow(product) } }
+```
+
+**間隔** — セクションの間隔と見出しの下の間隔は、行間と同じく layout 値の引数で指定する (いずれも既定 0)。
+
+```swift
+KsCollectionView(
+    products,
+    layout: .grid(columns: .fixed(portrait: 2, landscape: 4),
+                  rowSpacing: 8, sectionSpacing: 24, sectionHeaderSpacing: 8)
+) { product in ProductCell(product) }
+    .sections(by: \.category) { category, _ in Text(category) }
+```
+
+```kotlin
+KsCollectionView(
+    items = products,
+    key = { it.id },
+    layout = KsLayout.Grid(
+        KsColumns.Fixed(portrait = 2, landscape = 4),
+        rowSpacing = 8.dp, sectionSpacing = 24.dp, sectionHeaderSpacing = 8.dp,
+    ),
+    sections = KsSections(by = { it.category }) { category, _ -> Text(category) },
+) { template { product -> ProductCell(product) } }
 ```
 
 グループの値の型は Swift が `Hashable`、Kotlin が型引数で、見出しのクロージャは型を保ったまま値を受け取る。`KsSections` は Kotlin だけの公開型で、Swift の modifier に当たる (Kotlin の `template(key)` に Swift の `KsTemplate` が当たるのと同じ非対称)。

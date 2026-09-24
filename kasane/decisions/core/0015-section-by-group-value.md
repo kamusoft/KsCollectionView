@@ -27,15 +27,23 @@ API 設計の判断軸として、項目のモデルに手を入れないこと�
 
 セクションとセクションの間の間隔は、行間と同じく layout 値の引数 1 つで宣言する (既定 0。core/ADR-0006 の「間隔は layout 値で宣言する」)。間隔は前のセクションの最終行の後、次のセクションの見出しの前に入り、リストの先頭と末尾には入らない (端は `contentPadding` が受け持つ)。見出しとそのセクションの先頭行の間の間隔も、専用の引数 1 つで宣言する (既定 0。旧 `GroupFirstSpacing` 相当)。行間は行と行の間にだけ入り、見出しの上下には入らない。
 
+項目型 `Product` の `category` をグループの値にし、見出しに「カテゴリ名 (件数)」を出す例:
+
 ```swift
-KsCollectionView(items) { item in Row(item) }
-    .sections(by: \.category) { category, itemsInSection in Header(category, count: itemsInSection.count) }
+KsCollectionView(products) { product in ProductRow(product) }
+    .sections(by: \.category) { category, productsInSection in
+        Text("\(category) (\(productsInSection.count))")
+    }
 ```
 
 ```kotlin
-KsCollectionView(items = items, key = { it.id },
-    sections = KsSections(by = { it.category }) { category, itemsInSection -> Header(category, itemsInSection.size) },
-) { template { item -> Row(item) } }
+KsCollectionView(
+    items = products,
+    key = { it.id },
+    sections = KsSections(by = { it.category }) { category, productsInSection ->
+        Text("$category (${productsInSection.size})")
+    },
+) { template { product -> ProductRow(product) } }
 ```
 
 グループの値・見出し・固定の有無は 1 つの宣言 (Swift は modifier、Kotlin は `KsSections` 型の引数) にまとめ、グループの値の型を保ったまま見出しに渡す。見出しと固定の設定は省略できる。
