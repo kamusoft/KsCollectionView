@@ -7,5 +7,6 @@
 | [0003](0003-material3-dependency-for-ripple.md) | ライブラリは material3 に依存し、タップのフィードバックは標準 ripple を既定にする | accepted | Foundation の `LocalIndication` だけでは `MaterialTheme` 無しのアプリで既定がデバッグ塗りになる。帰結: `touchFeedbackColor` の意味論が iOS と非対称 (統一は後続)。 |
 | [0004](0004-animate-row-height-change-by-default.md) | 行の高さ変化を既定でアニメーションさせ、補間中は content を行の高さで測り直して切り取る | accepted | 自前 modifier `ksAnimatedHeight`。`animateContentSize` (縮む向きで帯) と `animateItem` 併用 (P90 +19%) を却下。利用契約: テンプレートの根に高さの制約を渡す。 |
 | [0005](0005-app-context-via-androidx-startup.md) | 公開 API は `Context` を引数に取らず androidx.startup の Initializer でアプリケーションコンテキストを捕捉する | accepted | core/ADR-0002 の引数 1 対 1 を守るため `KsAppContext` を起動時に埋める。既存の `InitializationProvider` に相乗りし ContentProvider は増えない。未初期化時は警告 no-op (debug assertion は掛けない)。image-loading の実装と突き合わせて accepted (2026-09-08)。 |
+| [0006](0006-animate-item-placement-on-diff.md) | 配列の差し替えによる項目と見出しの移動・挿入・削除を、Android でも `animateItem` でアニメーションさせる | proposed | amends 0004 (「`animateItem` は重ねない」だけを置き換え)。付け方・フェード・高さ補間との重なりは試作の目視で決め、性能は相対基準で確認。D&D まで先送りする案を却下。 |
 
 採番規則は [../index.md](../index.md) を参照。

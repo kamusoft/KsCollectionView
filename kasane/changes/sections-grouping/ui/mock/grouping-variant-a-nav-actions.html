@@ -1,0 +1,29 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>グループ化 — 案 A: 操作をナビゲーションバーに置く</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d9de;font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;display:flex;gap:32px;justify-content:center;padding:24px}
+.phone{width:402px;height:874px;background:#F2F2F7;border-radius:44px;overflow:hidden;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.status{height:54px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 32px 8px;font-weight:600;font-size:16px;color:#111214}
+.nav{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#F2F2F7;border-bottom:1px solid #D9D9DE}
+.nav .back{color:#2F6FED;font-size:17px;width:96px}
+.nav .title{font-weight:600;font-size:17px;color:#111214}
+.nav .actions{width:96px;display:flex;gap:14px;justify-content:flex-end;color:#2F6FED;font-size:15px}
+.list{flex:1;overflow:hidden;position:relative;background:#F2F2F7}
+.header{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#F2F2F7;font-size:15px}
+.header .name{font-weight:600;color:#111214}
+.header .count{color:#6E7076;font-size:13px}
+.pinned{position:absolute;top:0;left:0;right:0;z-index:2;border-bottom:1px solid #D9D9DE}
+.rows{display:grid;grid-template-columns:1fr 1fr;column-gap:1px;row-gap:1px}
+.cell{background:#FFFFFF;padding:12px 16px;min-height:48px}
+.cell .t{font-size:17px;color:#111214}
+.cell .d{font-size:15px;color:#6E7076;margin-top:2px}
+.gap-section{height:16px}
+.gap-header{height:1px}
+.bottombar{flex:none;background:#FFFFFF;border-top:1px solid #D9D9DE;padding:10px 16px 28px}
+.bottombar .btns{display:flex;gap:12px}
+.bottombar .btn{flex:1;text-align:center;padding:10px 0;border-radius:10px;background:#F2F2F7;color:#2F6FED;font-size:15px;font-weight:600}
+.bottombar .note{font-size:12px;color:#6E7076;margin-top:8px}
+.caption{position:absolute;bottom:-28px;left:0;right:0;text-align:center;font-size:12px;color:#6E7076}
+.wrap{position:relative}
+.home{height:34px;flex:none;background:#F2F2F7}
+</style></head>
+<body><div class="wrap"><div class="phone"><div class="status"><span>9:41</span><span>●●●</span></div><div class="nav"><span class="back">‹ 戻る</span><span class="title">グループ化</span><span class="actions"><span>反転</span><span>移す</span></span></div><div class="list"><div class="header pinned"><span class="name">グループ 1</span><span class="count">1,200 件</span></div><div style="height:40px"></div><div class="rows"><div class="cell"><div class="t">Item 1195</div></div><div class="cell"><div class="t">Item 1196</div></div><div class="cell"><div class="t">Item 1197</div><div class="d">長い説明の文言がここに入り、行の高さが変わります。</div></div><div class="cell"><div class="t">Item 1198</div></div><div class="cell"><div class="t">Item 1199</div></div><div class="cell"><div class="t">Item 1200</div></div></div><div class="gap-section"></div><div class="header"><span class="name">グループ 2</span><span class="count">12 件</span></div><div class="gap-header"></div><div class="rows"><div class="cell"><div class="t">Item 1201</div></div><div class="cell"><div class="t">Item 1202</div></div><div class="cell"><div class="t">Item 1203</div></div><div class="cell"><div class="t">Item 1204</div><div class="d">長い説明の文言がここに入り、行の高さが変わります。</div></div><div class="cell"><div class="t">Item 1205</div></div><div class="cell"><div class="t">Item 1206</div></div><div class="cell"><div class="t">Item 1207</div></div><div class="cell"><div class="t">Item 1208</div></div><div class="cell"><div class="t">Item 1209</div></div><div class="cell"><div class="t">Item 1210</div></div><div class="cell"><div class="t">Item 1211</div><div class="d">長い説明の文言がここに入り、行の高さが変わります。</div></div><div class="cell"><div class="t">Item 1212</div></div></div><div class="gap-section"></div><div class="header"><span class="name">グループ 3</span><span class="count">27 件</span></div><div class="gap-header"></div><div class="rows"><div class="cell"><div class="t">Item 1213</div></div><div class="cell"><div class="t">Item 1214</div></div><div class="cell"><div class="t">Item 1215</div></div><div class="cell"><div class="t">Item 1216</div></div><div class="cell"><div class="t">Item 1217</div></div><div class="cell"><div class="t">Item 1218</div><div class="d">長い説明の文言がここに入り、行の高さが変わります。</div></div><div class="cell"><div class="t">Item 1219</div></div><div class="cell"><div class="t">Item 1220</div></div><div class="cell"><div class="t">Item 1221</div></div><div class="cell"><div class="t">Item 1222</div></div></div></div><div class="home"></div></div><div class="caption">案 A: 操作をナビゲーションバーに置く (グループ 1 の末尾を表示中。グループ 1 の見出しは上端に固定)</div></div></body></html>

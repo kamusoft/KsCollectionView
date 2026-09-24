@@ -1,0 +1,34 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><title>差分更新 — 案 B: 操作を下部バーに置く</title><style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#d9d9de;font-family:-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;display:flex;justify-content:center;padding:24px}
+.phone{width:402px;height:874px;background:#F2F2F7;border-radius:44px;overflow:hidden;position:relative;box-shadow:0 8px 32px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.status{height:54px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 32px 8px;font-weight:600;font-size:16px;color:#111214}
+.nav{height:52px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#F2F2F7;border-bottom:1px solid #D9D9DE;position:relative}
+.nav .back{color:#2F6FED;font-size:17px;width:96px}
+.nav .title{font-weight:600;font-size:17px;color:#111214}
+.nav .actions{width:96px;text-align:right;color:#2F6FED;font-size:15px}
+.controls{flex:none;background:#FFFFFF;border-bottom:1px solid #D9D9DE;padding:10px 16px;display:flex;align-items:center;gap:12px}
+.seg{display:flex;background:#F2F2F7;border-radius:8px;padding:2px;flex:1}
+.seg span{flex:1;text-align:center;font-size:13px;padding:6px 0;border-radius:6px;color:#111214}
+.seg .on{background:#FFFFFF;box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}
+.toggle{display:flex;align-items:center;gap:8px;font-size:13px;color:#111214}
+.sw{width:44px;height:26px;border-radius:13px;background:#2F6FED;position:relative}
+.sw::after{content:"";position:absolute;right:2px;top:2px;width:22px;height:22px;border-radius:11px;background:#fff}
+.list{flex:1;overflow:hidden;position:relative;background:#F2F2F7}
+.header{height:40px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#F2F2F7;font-size:15px}
+.header .name{font-weight:600;color:#111214}
+.header .count{color:#6E7076;font-size:13px}
+.pinned{position:absolute;top:0;left:0;right:0;z-index:2}
+.row{background:#FFFFFF;padding:12px 16px;border-bottom:1px solid #D9D9DE;font-size:17px;color:#111214}
+.row.first{border-top:1px solid #D9D9DE}
+.row .d{font-size:15px;color:#6E7076;margin-top:2px}
+.gap-section{height:16px}
+.bottombar{flex:none;background:#FFFFFF;border-top:1px solid #D9D9DE;padding:10px 16px 28px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.btn{text-align:center;padding:9px 0;border-radius:10px;background:#F2F2F7;color:#2F6FED;font-size:15px;font-weight:600}
+.menu{position:absolute;right:12px;top:48px;width:190px;background:#FFFFFF;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);z-index:5;overflow:hidden}
+.menu div{padding:11px 16px;font-size:15px;color:#111214;border-bottom:1px solid #D9D9DE}
+.menu div:last-child{border-bottom:none}
+.home{height:34px;flex:none;background:#F2F2F7}
+.caption{text-align:center;font-size:12px;color:#6E7076;margin-top:8px}
+</style></head><body><div><div class="phone"><div class="status"><span>9:41</span><span>●●●</span></div><div class="nav"><span class="back">‹ 戻る</span><span class="title">差分更新</span><span class="actions"></span></div><div class="controls"><div class="seg"><span class="on">リスト</span><span>グリッド</span></div><div class="toggle">セクション<div class="sw"></div></div></div><div class="list"><div class="header"><span class="name">グループ A</span><span class="count">5 件</span></div><div class="row first">Item 1</div><div class="row">Item 2</div><div class="row">Item 3 ★</div><div class="row">Item 4</div><div class="row">Item 5</div><div class="gap-section"></div><div class="header"><span class="name">グループ B</span><span class="count">5 件</span></div><div class="row first">Item 6</div><div class="row">Item 7</div><div class="row">Item 8</div><div class="row">Item 9</div><div class="row">Item 10</div><div class="gap-section"></div><div class="header"><span class="name">グループ C</span><span class="count">5 件</span></div><div class="row first">Item 11</div><div class="row">Item 12</div><div class="row">Item 13</div><div class="row">Item 14</div><div class="row">Item 15</div></div><div class="bottombar"><div class="seg" style="margin-bottom:8px"><span class="on">先頭</span><span>中ほど</span><span>末尾</span></div><div class="grid3" style="grid-template-columns:repeat(4,1fr)"><span class="btn">挿入</span><span class="btn">削除</span><span class="btn">更新</span><span class="btn">移動</span></div><div class="grid3" style="grid-template-columns:1fr 1fr 1fr;margin-top:8px"><span class="btn">反転</span><span class="btn">シャッフル</span><span class="btn">元に戻す</span></div></div></div><div class="caption">案 B: 操作を下部バーに置く — 20 件・リスト・セクションあり (5 件ずつ 4 グループ)。Item 3 は「更新」を 1 回行った後</div></div></body></html>
