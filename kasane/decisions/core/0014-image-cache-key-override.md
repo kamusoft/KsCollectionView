@@ -1,29 +1,36 @@
 ---
 id: 0014
 title: 画像の任意キー — 先読みの要素 KsResource と KsImage の画像ソースの両方に同じ任意キーを持たせ、キーがあれば URL の代わりに鍵の基準にする
-status: proposed
+status: accepted
 date: 2026-09-23
 ---
 
 ## Context
 
-画像の鍵は URL から作られている。先読み (`prefetchResources` の要素 `KsResource`。core/ADR-0013) は URL、表示 (`KsImage(source: .remote(URL))`) は iOS が `url.absoluteString` から世代と `imageID` を決め、Android は `KsImageSource.Remote.url` をそのまま `cacheKey` にする。消去 (`KsImageCache.remove(source)`) と先読みの停止 (`fence`) も同じ URL 文字列で項目を指す。
+画像の鍵は URL から作られている。先読み (`prefetchResources` の要素 `KsResource`。core/ADR-0013) は URL、表示 (`KsImage(.remote(URL))`) は iOS が `url.absoluteString` から世代と `imageID` を決め、Android は `KsImageSource.Remote.url` をそのまま `cacheKey` にする。消去 (`KsImageCache.remove(source)`) と先読みの停止 (`fence`) も同じ URL 文字列で項目を指す。
 
 署名付き URL のように取得のたびに URL が変わる画像では、同じ画像でも鍵が毎回違うため、先読みした項目も保存済みのディスク項目も当たらない。オーナーは `KsResource` で任意のキーを指定し、キーがある要素は URL ではなくそのキー文字列を基に鍵を作ることを求めた (探索 2026-09-23)。
 
-前提: 先読みの宣言は画面内に見えているアイテムを対象にしない (Android は窓が「可視範囲の先」だけで、起動直後のセルは窓の更新より先に作られる。iOS の `prefetchItemsAt` は最初から見えているセルに来ない)。Nuke の `ImageRequest.imageID` はメモリとディスクの両方の鍵に効き、Coil は `memoryCacheKey` / `diskCacheKey` で鍵を指定できる。
+前提:
+
+- 先読みの宣言は画面内に見えているアイテムを対象にしない。Android は窓が「可視範囲の先」だけで、起動直後のセルは窓の更新より先に作られる。iOS の `prefetchItemsAt` は最初から見えているセルに来ない
+- Nuke の `ImageRequest.imageID` はメモリとディスクの両方の鍵に効き、ネットワーク取得の統合は設定値ではなく元の URL で行う。Coil 3 は `memoryCacheKey` / `diskCacheKey` で鍵を指定できる
 
 ## Decision
 
-**先読みの要素 `KsResource` と `KsImage` の画像ソース (`KsImageSource.remote` / `Remote`) の両方に、同じ任意キーを持たせる。キーを指定した画像は、URL の代わりにそのキー文字列を基に鍵を作る。** キーは省略でき、省略した画像は従来どおり URL から鍵を作る。取得そのものには常に URL を使う。
+**先読みの要素 `KsResource` と `KsImage` のリモートの画像ソース (`KsImageSource.remote` / `Remote`) の両方に、同じ任意キーを持たせる。キーを指定した画像は、URL の代わりにそのキー文字列を基に鍵を作る。** キーは省略でき、省略した画像は従来どおり URL から鍵を作る。取得そのものには常に URL を使う。
 
-書き口 (引数名は `key`。オーナー判断 2026-09-23): Swift `KsResource(url, width: .column, key: photo.id)` / `KsImage(source: .remote(url, key: photo.id))`、Kotlin `KsResource(url, width = KsWidth.Column, key = photo.id)` / `KsImageSource.Remote(url, key = photo.id)`。キーの既定値を省略 (nil / null) にするため、既存の `.remote(url)` / `Remote(url)` の書き方はそのまま通る。
+書き口 (引数名は `key`。オーナー判断) は Swift `KsResource(url, width: .column, key: photo.id)` / `KsImage(.remote(url, key: photo.id))` / 便宜形 `KsImage(url, key: photo.id)`、Kotlin `KsResource(url, width = KsWidth.Column, key = photo.id)` / `KsImageSource.Remote(url, key = photo.id)`。キーの既定値を省略 (nil / null) にするため、既存の `.remote(url)` / `Remote(url)` / `KsImage(url)` の書き方はそのまま通る。
 
-先読みと表示で同じキーを書くのは利用者の責任とし、2 か所の記述はアプリ側でモデルから `KsResource` / 画像ソースを作る関数を 1 つ用意すればまとめられる (モデル自体には手を入れない)。
+先読みと表示で同じキーを書くのは利用者の責任とする。2 か所の記述は、アプリ側でモデルから `KsResource` / 画像ソースを作る関数を 1 つ用意すればまとめられる (モデル自体には手を入れない)。キーが画像の中身を一意に特定する文字列であることも利用者の責任とし、利用者向けの注意書きに含める。
 
-**キーを指定した画像は、取得 (ネットワーク) 以外のすべてでキーを URL の代わりに使う** (探索 2026-09-23 論点 2): メモリの鍵 (幅・枠サイズなど従来付け足す部分はそのまま付く)、ディスクの鍵 (iOS は `imageID`、Android は `diskCacheKey`)、削除後に古い項目へ当たらないための世代、URL ごとの鍵の索引 (core/ADR-0013)、先読みの取得単位と `fence`、`KsImageCache.remove(source)` (画像ソースにキーがあればキーで消す)。1 か所でも URL が残ると、URL が変わる画像ではそこだけ毎回食い違うため。ディスクの鍵をキーにすることで、起動をまたいでも取得し直さない。
+**キーを指定した画像は、取得 (ネットワーク) 以外のすべてでキーを URL の代わりに使う。** 対象は、メモリの鍵 (幅・枠サイズなど従来付け足す部分はそのまま付く)、ディスクの鍵 (iOS は `imageID`、Android は `diskCacheKey`)、削除後に古い項目へ当たらないための世代、URL ごとの鍵の索引 (core/ADR-0013)、先読みの取得単位と `fence`、`KsImageCache.remove(source)` である。1 か所でも URL が残ると、URL が変わる画像ではそこだけ毎回食い違うため、ライブラリ内部は識別子 (キーがあればキー、無ければ URL) を 1 か所で求め、鍵を作るすべての箇所がそれを使う。ディスクの鍵をキーにすることで、起動をまたいでも取得し直さない。`remove` はソースの識別子で消すので、キー付きで保存した画像を消すには同じキーを付けたソースを渡す。
 
-キーは画像の中身を一意に特定する文字列であることを利用者の責任とし、利用者向けの注意書きに含める。
+**キーの識別子は URL と別の名前空間に置く。** キーの文字列がたまたま別の画像の URL と同じでも、同じ項目・同じ削除対象にならない。削除の世代を識別子に付ける形も、他のキーが作れない形にする。具体的な文字列の形は実装に任せ、衝突しないことを契約テストで固定する。
+
+**キーを持てるのはリモートの画像だけにする。** 端末内のファイルとアセット / リソースには持たせない。空文字のキーは不正入力 (core/ADR-0011) とし、debug は assertion、release は警告ログを出してキーなし (URL が識別子) として扱う。先読みの要素と画像ソースの両方で同じ扱いにする。
+
+**先読みの宣言の突き合わせには URL も含める。** キーを指定した要素でも、URL だけが変わった宣言に差し替わったら、旧 URL の取得を取り消して新しい URL で出し直す。失効した署名付き URL の取得が失敗したまま窓に残らないためで、取得済みなら新しい要求はキーでキャッシュに当たりネットワークを使わない。
 
 ## Alternatives Considered
 
@@ -33,19 +40,27 @@ date: 2026-09-23
 | C: アプリ全体でひとつの「URL → キー」変換を登録する (`KsImageCache` に変換関数を登録する形) | URL から作れないキー (画像 ID など) を書けない。アプリ全体で共有する状態が増え、登録の順番やテスト間の持ち越しが論点になる。署名がクエリに付くだけの場面なら手軽なので、後から A に足す余地は残す |
 | D: キーは `KsResource` にだけ書き、ライブラリが先読みの宣言から「URL → キー」の対応を覚えて `KsImage` が URL から引く | 先読みの宣言は画面内に見えているアイテムを対象にしないため、起動直後の 1 画面ぶんがキーの分からないまま URL の鍵で表示され、署名付き URL では起動のたびにそこだけ取得し直す |
 | D': D に加え、コレクションがセルを表示するときにも宣言を評価して対応を登録する | 書く場所は 1 か所で済むが、コレクションの外の画面や先読みを宣言していない `KsImage` ではキーが効かず、何も起きずに URL の鍵へ戻る (取得し直しが起きても気づけない)。`KsImage` の動きが周りのコレクションの宣言に左右される見えないつながりができ、表示のたびの宣言評価と対応表の寿命管理で実装も重い |
+| キーの文字列をそのまま識別子にする (名前空間を分けない) | キーが別の画像の URL と同じ文字列だと同じ項目・同じ削除対象になり、「キーなしのソースではキー付きの画像は消えない」が成り立たない |
+| ファイル・アセットにもキーを持たせる | 取得のたびに URL が変わる問題が無く、使い道が無いまま公開面だけが増える。使い道が出たら足す |
+| 空文字のキーを省略と同じに黙って扱う | 書き誤り (モデルの ID が空のまま等) に気づけず、すべての画像が URL の鍵に落ちる |
+| キーを指定した要素は識別子と幅の種類だけで宣言を突き合わせ、URL の変更では出し直さない | 旧 URL が失効して取得が失敗すると、窓に残る間は新しい URL で出し直されず先読みの効果が消える |
+| 先読みの失敗を検知して新しい URL で再試行する | Nuke の `ImagePrefetcher` は要求ごとの完了を通知しないため、先読みの経路を作り直すことになる |
 
 ## Consequences
 
-- 正: 署名付き URL のように URL が変わる画像でも、同じキーなら先読みした項目と保存済みの項目を使える
+- 正: 署名付き URL のように URL が変わる画像でも、同じキーなら先読みした項目と保存済みの項目を起動をまたいで使える
 - 正: URL から作れないキー (画像 ID など) を使える。アプリ全体で共有する状態を持たず、書いたとおりに動く
 - 正: 両プラットフォームで同じ形にでき、キーの既定値を省略にすることで既存の画像ソースの書き方は変わらない
-- 負: 利用者は先読みの要素とセルの `KsImage` の 2 か所に同じキーを書く。食い違うと、先読みした項目が表示で使われない
+- 負: 利用者は先読みの要素とセルの `KsImage` の 2 か所に同じキーを書く。食い違うと、先読みした項目が表示で使われない (壊れず、通常の縮小要求に落ちる)
 - 負: 違う画像に同じキーを付けると取り違える (キーの一意性は利用者の責任)
 - 負: ローダーに付属するビュー (`LazyImage` / `AsyncImage`) を URL で直接使う場合とは、キーを指定した項目を共有しない (キャッシュが別になるだけで壊れない)
-- 負: 公開型の形が変わる: `KsResource` (core/ADR-0013 で新設) にキーの引数が、`KsImageSource.remote` / `Remote` にキーの値が加わる
+- 負: キー付きの画像を `KsImageCache.remove` で消すには同じキーを付けたソースを渡す必要があり、URL だけのソースでは消えない
+- 負: 署名だけが変わった宣言に差し替えると、先読みの要求を出し直す (取得済みならキャッシュに当たるが、要求の往復は増える)
+- 負: 公開型の形が変わる。`KsResource` (core/ADR-0013 で新設) にキーの引数が、`KsImageSource.remote` / `Remote` にキーの値が加わり、Swift で `KsImageSource` の case をパターンマッチしている利用者コードは関連値の形が変わる (配布前)
 
 ## Revisit When
 
 - 署名がクエリに付くだけの画像で、2 か所に同じキーを書く手間が実利用で重いと分かったとき (案 C の「URL → キー」変換の登録を A に足す)
 
-出典: kasane/changes/prefetch-display-size/exploration.md (追加探索 2026-09-23 論点 1) / core/ADR-0008 / core/ADR-0013
+出典: kasane/changes/archive/2026-09-24-prefetch-display-size/exploration.md (追加探索 2026-09-23 論点 1〜2) / kasane/changes/archive/2026-09-24-prefetch-display-size/design.md (Decision 6・9) / core/ADR-0008 / core/ADR-0013
+関連: core/ADR-0012 (ローダーの共有インスタンスをそのまま共有キャッシュにする。キーを指定した項目はローダー付属ビューと共有しない例外になる)

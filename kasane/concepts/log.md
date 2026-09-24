@@ -18,3 +18,6 @@
 
 ## 2026-09-17
 - distilled: performance-criteria-review (ADR cross/0006・ios/0009 を実装後の視点で本文を書き直して accepted、ios/0003 に関連行を追記 / handbook: cross/scroll-performance-gate.md の非接続の対照の条件をオーナー判断で「迷い・不合格のとき」に改訂、ios/performance-verification.md に件数を変えた比較の手順と実機の端末指名・接続タイムアウトの対処を追記、cross/local-development-setup.md に実機ビルドの署名を追記 / concepts: ios/architecture/collection-engine.md を大規模改訂 (推定高さの最頻値・内部の塊・表示位置の控えと復元・分かっている限界・体感ゲートでの性能。初見可読性レビュー 1 周反映)、core/core-model/image-loading.md と android/architecture/compose-wrapper.md の性能節を体感ゲートに追随 / deviation 補完 1 件 / lessons: inbox 新規 3 件・根拠追加 1 件、reviewer-reproduces-evidence-numbers-by-probe を code-review.md L-001 に昇格)
+
+## 2026-09-24
+- distilled: prefetch-display-size (ADR core/0013・core/0014 を実装後の視点で本文を書き直して accepted、core/0013 は amends 0008 で core/0008 に amended-by を追記。core/0013 の見直し条件「表示待ちが改善しないとき」は計測で別要因 (取得の同時数) と分かったためオーナー判断で外した / handbook の変更なし / concepts: core/core-model/image-loading.md を大規模改訂 (KsResource・先読みの幅・許容範囲の引き当て・任意キー・性能。初見可読性レビュー 1 周 10 件反映)、ios/architecture/collection-engine.md と android/architecture/compose-wrapper.md の画像の節を追随 (索引・画面に出る時点の引き当てのやり直し・識別子の形・鍵の付随情報)。collection-engine.md は散文 10315 字で分割検討の目安を超過 / deviation 補完なし / lessons: inbox の cross-check-changed-contracts-in-spec-self-review を count 2 に、昇格なし)

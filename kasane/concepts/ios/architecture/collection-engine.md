@@ -3,7 +3,7 @@ type: concept
 title: iOS コレクションエンジン
 description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・レイアウト・操作契約の実現方法と、その中で守っている仕組み
 tags: [ios, engine, uicollectionview, hosting]
-timestamp: 2026-09-17
+timestamp: 2026-09-24
 ---
 
 # iOS コレクションエンジン
@@ -23,9 +23,10 @@ KsCollectionView (SwiftUI, 値型 + modifier で KsCollectionConfiguration を�
            ├ KsTemplateRegistry       … テンプレートキー → CellRegistration (遅延登録、snapshot 適用前に全キー準備)
            ├ UICollectionViewCompositionalLayout (sectionProvider が configuration と塊の位置を実行時参照)
            ├ KsEstimatedHeight        … 自己サイズの実測から推定高さを決める
-           ├ KsImagePrefetcher        … prefetchResources の URL 解決層 (台帳) → KsNukeImageLoading (Nuke ImagePrefetcher)
+           ├ KsImagePrefetcher        … prefetchResources の宣言 (KsResource) を取得単位へ解く台帳 → KsNukeImageLoading (Nuke ImagePrefetcher)
            └ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
-KsImage (SwiftUI)  … KsImageRequestFactory が表示要求を組み立て、NukeUI LazyImage が共有パイプラインへ出す
+KsImage (SwiftUI)  … KsImageRequestFactory が索引 (KsImageMemoryIndex) から引き当て、外れたときだけ
+                     NukeUI LazyImage (先読みが取得中なら KsImageDeferredLoad) が共有パイプラインへ要求を出す
 ```
 
 Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)。差分計算は diffable に任せ、内容変更の検知だけを旧新突き合わせで行う。
@@ -43,8 +44,10 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 | `KsEstimatedHeight` | 自己サイズの実測から推定高さを決める値型 (後述) |
 | `KsScrollController` | 命令を受け取り VC へ転送する。未接続のときは何もしない。複数のコレクションに接続されたときは、最後に接続したコレクションだけへ転送する |
 | `KsLayoutDiagnostics` / `KsItemOffsetLookup` | 計測のための入口 (`@_spi(KsMeasurement)` を付けて読み込んだときだけ見える。利用者向け API ではない)。前者は Debug 構成だけに載る「自己サイズを返したセル数と、推定と不一致だった回数」の計数、後者は Release にも載る「画面の indexPath を配列全体の通し番号へ変換する」入口 |
-| `KsImagePrefetcher` / `KsNukeImageLoading` | システムの先読み通知 (`KsPrefetching`、アイテム単位) を URL 単位へ翻訳し、「アイテム ID → URL」「URL → 参照数」の台帳で寿命を管理する。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は到達点ごとの `ImagePrefetcher` へ写像、テストは記録用の fake を注入する |
-| `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の表示要求の組み立て (枠の実サイズからのデコード時縮小)、ソースごとの世代付き識別子、キャッシュ消去の通知 (`ObservableObject`。下限 iOS 16 のため `@Observable` は使わない) |
+| `KsImagePrefetcher` / `KsNukeImageLoading` | システムの先読み通知 (`KsPrefetching`、アイテム単位) を取得単位へ翻訳し、「アイテム ID → 宣言 (識別子・URL・幅の種類)」「取得単位 → 参照数と開始時の `ImageRequest`」の 2 層の台帳で寿命を管理する。列幅は controller が先読み通知の時点で `KsLayoutMetrics` の列数と bounds・余白・列間隔から解き、px で渡す。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は到達点ごとの `ImagePrefetcher` へ写像、テストは記録用の fake を注入する |
+| `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の引き当てと表示要求の組み立て (外れたときの枠の実サイズからのデコード時縮小)、識別子 (キーまたは URL) と世代付き識別子の算出、キャッシュ消去の通知 (`ObservableObject`。下限 iOS 16 のため `@Observable` は使わない) |
+| `KsImageMemoryIndex` / `KsImageMatching` | 引き当ての候補になる「メモリへ載せるよう要求した鍵」の索引 (主スレッドに閉じた LRU、上限 20,000 件) と、許容範囲の判定 (定数 0.5 / 4 はここに 1 か所) |
+| `KsImageRetainedMatch` / `KsImageDeferredLoad` | 引き当てた画像と表示経路の選択を条件ごとに持ち続ける値と、画面に出る時点で引き当てを照会し直してから要求を出す包み (後述) |
 | `KsImagePipeline` | `enableSharedDiskCache()` の実装。`dataCache` が未設定なら `configuration` を引き継いで差し替える (core/ADR-0012) |
 
 ## 保証すること (実測で確かめた罠対策)
@@ -133,13 +136,15 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 
 `KsCollectionViewController` は生成時に `ImagePipeline.shared` を読んで `KsNukeImageLoading` を作る。`KsImagePipeline.enableSharedDiskCache()` を後から呼んでも既存のコレクションの先読みは差し替え前のパイプラインを使い続けるため、利用者契約は「起動時に一度呼ぶ」になる ([画像の先読みと KsImage](../../core/core-model/image-loading.md))。取り消し通知には到達点が付かないため、`KsNukeImageLoading` は作成済みの全到達点の `ImagePrefetcher` へ停止を伝える。`ImagePrefetcher` は解放時に未完了の取得を止めるので、controller の解放で先読みは全停止する。
 
-### 表示要求は 1 本の鍵で出し、元寸がメモリにあればその場で縮小して初回描画に使う
+### 範囲内のメモリ項目は要求を出さずに描き、外れたときだけ 1 本の鍵で要求する
 
-`KsImage` の表示要求は常にデコード時縮小の指定 (`ImageRequest.ThumbnailOptions` の `.aspectFit` / `.aspectFill`) を持つ 1 本の形にする。ローダーは要求そのものの鍵でメモリを引き、結果も同じ鍵へ書くため、経路ごとに鍵を変えると自分で書いた項目に次の表示が当たらず、戻ったときに読み込み中を経由する。到達点 `memory` の先読みは寸法なしの鍵で元寸を載せるので表示の鍵と一致しない。`KsImageRequestFactory` は組み立ての時点で元寸をメモリから同期で引き当て、その場で枠の大きさへ縮小して初回描画に使い、縮小結果を表示の鍵で共有キャッシュへ書く。元寸が無ければ読み込み中から始める。この準備は SwiftUI の body 評価の中で共有キャッシュへ書き込むが、同じ入力には同じ結果なので再評価で項目は増えない。`ThumbnailOptions` 付きの要求は元寸のメモリ項目を再利用せず再デコードする、という Nuke の挙動がこの引き当てを要する理由 (相方レビューで再現)。
+Nuke には近い大きさの項目を引き当てる手段も鍵の列挙も無く、`ThumbnailOptions` 付きの要求は寸法の違うメモリ項目を再利用せず再デコードする。そのため `KsImageMemoryIndex` が識別子ごとに `ImageRequest` を覚え、`KsImageRequestFactory` が組み立ての時点で候補をパイプラインのメモリキャッシュへ問い合わせて `KsImageMatching` で判定する (契約は [画像の先読みと KsImage](../../core/core-model/image-loading.md)、core/ADR-0013)。外れたときの表示要求は、常にデコード時縮小の指定 (`ThumbnailOptions` の `.aspectFit` / `.aspectFill`) を持つ 1 本の形にする。ローダーは要求そのものの鍵でメモリを引き、結果も同じ鍵へ書くため、経路ごとに鍵を変えると自分で書いた項目に次の表示が当たらない。
+
+UIKit はセルの中身を先読みの開始と同じ頃に組み立てるので、組み立てで一度だけ引き当てると、先読みの完了後に画面に出たセルもディスクから再デコードする (実機で 147 件中 136 件)。そこで、先読みが取得中の可能性 (`mayBeLoadingPrefetch`) があるときだけ `KsImageDeferredLoad` で包み、画面に出る時点 (`onAppear`) で照会し直してから要求を出す。それ以外は組み立て時に `LazyImage` を置く (`LazyImage` も要求の開始は画面に出る時点)。`KsImageRetainedMatch` は、引き当てた画像と包みを選んだことを条件 (識別子と世代・`reloadToken`・枠・表示倍率・当てはめ方) ごとに覚える。`clear(.memory)` は索引と取得中の記録を消すが世代を進めないため、覚えていないと直後の組み立て直しで `LazyImage` に切り替わり、表示中の画像をディスクから再デコードする。
 
 ### ソース単位の削除は世代付き識別子で旧項目を避ける
 
-Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどのサイズで要求したかを後から列挙できない。`KsImageCache.remove(source)` はそのソースの世代を `KsImageIdentity` で進め、以後の `KsImage` と先読みの要求は `ImageRequest.imageID` に「URL + 世代」を入れて発行する。世代 0 (一度も消していないソース) は識別子を付けず、NukeUI の `LazyImage` を直接使った表示と同じ項目を指し続ける。`clear` は識別子を変えず、`KsImageInvalidation` の世代だけを進めて表示中の `KsImage` を組み立て直す。`clear` / `remove` は、生存している先読み層の一覧 (`KsImagePrefetchRegistry`) を通じて進行中の取得を止めてから消す。表示側の進行中の取得は止めない (Android に公開の取り消し口が無く、両プラットフォームで揃えるため)。
+Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどのサイズで要求したかを後から列挙できない。`KsImageIdentity` は識別子を 1 か所で求める。キーなしは URL の文字列、キーありは `"ks-key " + key`、削除後は `"ks-gen N " + 識別子` で、キーと URL・世代付きの形と別のキーが衝突しない (core/ADR-0014)。`KsImageCache.remove(source)` は世代 0 の要求と現在の世代の要求の両方で消し、そのソースの世代を進める。以後の `KsImage` と先読みの要求は `ImageRequest.imageID` に世代付きの識別子を入れて発行する。世代 0 でキーなしのソースは識別子を付けず、NukeUI の `LazyImage` を直接使った表示と同じ項目を指し続ける。キーありのソースは世代 0 でも `imageID` を付け、メモリとディスクの両方の鍵がキーになる。`clear` は識別子を変えず、`KsImageInvalidation` の世代だけを進めて表示中の `KsImage` を組み立て直す。`clear` / `remove` は、生存している先読み層の一覧 (`KsImagePrefetchRegistry`) を通じて進行中の取得を止めてから消す。表示側の進行中の取得は止めない (Android に公開の取り消し口が無く、両プラットフォームで揃えるため)。
 
 ### レイアウト切替・入力・命令
 
@@ -210,11 +215,12 @@ Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどの
 | hitch | 描画が表示の期限に間に合わず、フレームが遅れて出た事象 (Instruments の指標。High は遅れの大きいもの) |
 | 到達点 | 先読みが画像をどこまで持ってくるか。`disk` (元データをディスクまで) と `memory` (デコード済みをメモリまで) |
 | 受け口 (`KsImageLoading`) | ローダーへの操作を集めた internal な境界。本番は Nuke の adapter、テストは記録用の fake が入る |
+| 識別子 / 索引 / 引き当て | 画像の鍵の基準 (キーまたは URL)、引き当ての候補の一覧、許容範囲に入る項目を探して使うこと。意味は [画像の先読みと KsImage](../../core/core-model/image-loading.md) の用語節 |
 
 ## 関連
 
 - [項目モデルと差分更新](../../core/core-model/collection-items.md)、[レイアウト語彙](../../core/styling/collection-layout.md)、[操作とスクロール制御](../../core/core-model/collection-interaction.md)
 - [画像の先読みと KsImage](../../core/core-model/image-loading.md) — 先読み・到達点・キャッシュ操作の契約 (この文書はその iOS 側の実現)
-- ios/ADR-0001〜0009 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0012 (Nuke への直接依存と共有パイプライン)、cross/ADR-0006 (性能の完了判定)
+- ios/ADR-0001〜0009 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0012 (Nuke への直接依存と共有パイプライン)、core/ADR-0013・0014 (許容範囲の引き当て・任意キー)、cross/ADR-0006 (性能の完了判定)
 - handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
 - 翻案元: `../KsSettingsView/ios/Sources/KsSettingsViewUI/` (`FullSnapshotContentTargets` / `KsCellRegistry` / `CustomCellRowPlacement` / `SectionBoxLayout`)

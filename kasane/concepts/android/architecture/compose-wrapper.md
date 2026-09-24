@@ -3,7 +3,7 @@ type: concept
 title: Android Compose ラッパー
 description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策
 tags: [architecture, compose, lazy-grid]
-timestamp: 2026-09-08
+timestamp: 2026-09-24
 ---
 
 # Android Compose ラッパー
@@ -31,7 +31,7 @@ flowchart TD
     TAP["combinedClickable + ripple<br/>ハンドラ宣言時のみ"]
     BOX["Box(propagateMinConstraints = true) + ksAnimatedHeight<br/>行の高さを補間し、補間中の高さを根まで制約として届ける"]
     TPL["テンプレート (利用者の Composable)"]
-    PREFETCH["KsImagePrefetchWindow<br/>prefetchResources 宣言時のみ layoutInfo を観測し<br/>進行方向へ可視件数分の窓を作って差分を enqueue / dispose"]
+    PREFETCH["KsImagePrefetchWindow<br/>prefetchResources 宣言時のみ layoutInfo を観測し<br/>進行方向へ可視件数分の窓を作って取得単位の差分を enqueue / dispose"]
     COIL["KsCoilImageLoading<br/>SingletonImageLoader への写像 (到達点 → 取得方針)"]
 
     KCV --> SCOPE
@@ -59,8 +59,9 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003) |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
 | `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID → index (ヘッダー分 +1 込み) を解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
-| `KsImagePrefetchWindow` / `KsCoilImageLoading` | `LazyGridState.layoutInfo` を `snapshotFlow` で観測し、先頭可視 index の変化から進行方向を判定して「可視範囲の外側・進行方向・可視件数と同数」の窓を作る。「アイテム ID → URL」「URL → 参照数」の台帳の差分だけをローダーへ伝える。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は Coil の adapter、テストは記録用の fake を注入する |
-| `KsImageRequestFactory` / `KsImageInvalidation` | `KsImage` の表示要求の組み立て (表示サイズ付きの鍵) と、キャッシュ消去の世代 (Compose の状態として持ち、読んでいる `KsImage` だけが組み立て直される) |
+| `KsImagePrefetchWindow` / `KsCoilImageLoading` | `LazyGridState.layoutInfo` を `snapshotFlow` で観測し、先頭可視 index の変化から進行方向を判定して「可視範囲の外側・進行方向・可視件数と同数」の窓を作る。「アイテム ID → 宣言 (識別子・URL・幅の種類) と取得単位」「取得単位 → 参照数と開始時の取っ手」の 2 層の台帳の差分だけをローダーへ伝える。列幅は `update` のたびに layout・contentPadding・コンテナ幅から解く (`Adaptive` は `LazyVerticalGrid` の規則を再現)。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は Coil の adapter、テストは記録用の fake を注入する |
+| `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の引き当てと表示要求の組み立て (表示サイズと当てはめ方付きの鍵)、識別子 (キーまたは URL) と鍵の算出、キャッシュ消去の世代 (Compose の状態として持ち、読んでいる `KsImage` だけが組み立て直される) |
+| `KsImageMemoryIndex` / `KsImageMatching` | 引き当ての候補になる `MemoryCache.Key` の索引 (1 つの錠で直列化した LRU、上限 20,000 件。取得中の先読みも取得 1 件ごとに数える) と、許容範囲の判定 (定数 0.5 / 4 はここに 1 か所) |
 | `KsAppContext` / `KsAppContextInitializer` | androidx.startup の Initializer でアプリケーションのコンテキストを起動時に捕捉する。公開 API が `Context` を引数に取らないための経路 (android/ADR-0005)。未初期化なら `KsImageCache` は警告ログで no-op |
 
 ## 保証すること (実測で確かめた罠対策)
@@ -95,7 +96,21 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 
 ### 表示要求の鍵に表示サイズと当てはめ方を載せる
 
-`KsImage` の表示要求は表示枠の実サイズを鍵に含め、同じ取得元でも表示サイズごとに別のキャッシュ項目になる。鍵に表示サイズを載せる付随情報の名前はローダー内部と同じ `coil#size` でなければならない — ローダーは鍵の表示サイズと要求の表示サイズが食い違う項目を捨てるため (逆アセンブルで確認。ローダーの版が上がると壊れうるが、壊れ方は「再デコードが増える」方向で表示は正しいまま)。当てはめ方の区別には自前の `ks#scale` を併用する (無いと fit の縮小結果が fill でも使われる)。表示枠は `BoxWithConstraints` で最初の構成で同期に読む (画像 1 枚あたり subcomposition が 1 段増える)。到達点 `memory` の先読みが載せた元寸は、画素を読み出せる場合だけその場で縮小して初回描画に使い (`KsDownscaleResult`)、読み出せない (ハードウェア支援ビットマップ) 場合は読み込み中からローダーの縮小デコードを待つ。ハードウェア支援を切って読めるようにする指定は採らない (載る画像も縮小結果もソフトウェアビットマップになり、描画のたびにテクスチャアップロードが乗る。実測でフレーム超過が 3 倍・メモリ定常値 +40 MB)。
+`KsImage` の表示要求は `size` + `Precision.EXACT` と、表示枠の実サイズと当てはめ方を載せたメモリの鍵で出し、同じ取得元でも表示サイズごとに別のキャッシュ項目になる。鍵に表示サイズを載せる付随情報の名前はローダー内部と同じ `coil#size` でなければならない — ローダーは鍵の表示サイズと要求の表示サイズが食い違う項目を捨てるため (逆アセンブルで確認。ローダーの版が上がると壊れうるが、壊れ方は「再デコードが増える」方向で表示は正しいまま)。
+
+当てはめ方 (fit / fill) は自前の `ks#scale` で表示要求の鍵にだけ載せる。無いと、引き当てで範囲外と退けた先読みの項目や別の当てはめ方で載った項目が、ローダーのメモリで表示要求と同じ鍵に当たる。幅つきの先読みは `coil#size` だけの鍵 (`Scale.FILL` + `Precision.INEXACT`) で載せ、幅なしの先読みは鍵に付随情報を付けない。キーを指定した画像は鍵の本体と `diskCacheKey` が識別子 (`"ks-key " + key`) になり、世代は鍵に入れない (core/ADR-0014)。表示枠は `BoxWithConstraints` で最初の構成で同期に読む (画像 1 枚あたり subcomposition が 1 段増える)。
+
+### 範囲内のメモリ項目は要求を出さずに描く
+
+Coil の `Precision.INEXACT` は下限 1.0・上限なしで許容範囲と合わず、`memoryCache.keys` の走査は件数に比例するため、引き当てはライブラリが行う (core/ADR-0013)。`KsImageMemoryIndex` が識別子ごとに `MemoryCache.Key` を覚え、`KsImageRequestFactory` が候補をローダーのメモリキャッシュへ問い合わせて `KsImageMatching` で判定する。範囲内なら `rememberAsyncImagePainter` を作らず、その項目を `Image` で描く。
+
+先読みが載せた元寸はハードウェア支援ビットマップのまま使え、CPU で画素を読む縮小はしない。ハードウェア支援を切って読めるようにする指定は採らない (載る画像も縮小結果もソフトウェアビットマップになり、描画のたびにテクスチャアップロードが乗る。実測でフレーム超過が 3 倍・メモリ定常値 +40 MB)。
+
+### 先読みが取得中なら、画面に出る時点で照会し直してから要求する
+
+フリング中の Compose は画面外の項目を先に合成するため、合成の時点では先読みが未完了で、画面に出る頃には完了していることがある。合成の時点で要求を出すと、その項目は読み込み中を経由してディスクから再デコードする。そこで、合成で引き当てに外れ、同じ識別子の到達点 `memory` の先読みが取得中 (`hasFetchInFlight`) のときだけ、部品 `KsDeferredNode` が最初に配置された時点で照会し直す。当たればその項目を、外れればその場で出した要求の結果を部品の中で描き、再合成はせず描画の無効化だけで済ませる (状態を書いて再合成する形では、表示中のフレームの再合成が増えて janky が悪化した)。
+
+取得中は取得 1 件ごとの目印で数え、完了・失敗・取り消しのリスナーと取り消しの取っ手で外れる。そのため、完了・失敗・取り消し済みの先読みの画像は遅らせず、合成の時点ですぐに要求を出す。
 
 ### リソースはローダーを通さず同期で描く
 
@@ -116,7 +131,7 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - スクロール命令の消費を配列をキーにした `LaunchedEffect` にしない (上記)。
 - 項目に `animateItem` を重ねない (上記)。
 - 計測用画面・テンプレート計数を release のソースセットに置かない。Sample の `measurement` / `counterEnabled` ソースセットの差し替えで release には空実装だけが入る。
-- 画像の要求にハードウェア支援ビットマップを使わない指定 (`allowHardware(false)`) を付けない。クラッシュ対策であっても、描画資源を切る回避策は実装側で選ばずオーナーに諮る (上記「表示要求の鍵」)。
+- 画像の要求にハードウェア支援ビットマップを使わない指定 (`allowHardware(false)`) を付けない。クラッシュ対策であっても、描画資源を切る回避策は実装側で選ばずオーナーに諮る (上記「範囲内のメモリ項目は要求を出さずに描く」)。
 - 公開 API に `Context` を引数で足さない。`KsAppContext` から読む (android/ADR-0005)。
 
 ## 用語
@@ -137,5 +152,5 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
 - [Android 性能検証の手順](../../../handbook/android/performance-verification.md)、[スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md) — 性能の手順と合否の判定規則 (cross/ADR-0006)
 - android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針。Coil は利用者の compileSdk 要求を上げない 3.5.0 に固定)、android/ADR-0003 (material3 と ripple)、android/ADR-0004 (行の高さ変化の補間)
-- android/ADR-0005 (アプリケーションコンテキストの捕捉)、core/ADR-0012 (Coil への直接依存と共有インスタンス)
+- android/ADR-0005 (アプリケーションコンテキストの捕捉)、core/ADR-0012 (Coil への直接依存と共有インスタンス)、core/ADR-0013・0014 (許容範囲の引き当て・任意キー)
 - core/ADR-0007、core/ADR-0011、ios/ADR-0007
