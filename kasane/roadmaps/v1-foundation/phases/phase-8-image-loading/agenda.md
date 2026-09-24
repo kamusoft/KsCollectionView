@@ -108,8 +108,8 @@ change `prefetch-display-size` (L 級) で、先読みの要素を `KsResource` 
 |---|---|
 | 画像の表示待ちの主因 (取得の同時数・先読みと表示要求の優先度・Android の二重取得) | 独立変更 `kasane/changes/image-fetch-concurrency-priority` (簡易起票済み) |
 | 利用者ドキュメント (先読みの幅・任意キーの運用) | phase-7 の agenda「phase-8 からの申し送り (2026-09-24、prefetch-display-size)」に追記 |
-| Android `KsImageTest.urlConvenienceFormBehavesLikeRemoteSource` の揺れ (取得の回数を待たずに読む書き方。verify-003) | 本フェーズの TODO |
-| 表示要求を画面に出る時点まで遅らせた `KsImage` が、画面外に出たときに要求を取り消すことを数えたテストが無い (verify-003) | 本フェーズの TODO |
+| Android `KsImageTest.urlConvenienceFormBehavesLikeRemoteSource` の揺れ (取得の回数を待たずに読む書き方。verify-003) | 独立変更 `kasane/changes/image-fetch-concurrency-priority` (exploration.md の未決の論点に追記。2026-09-24 に本フェーズの TODO から移管) |
+| 表示要求を画面に出る時点まで遅らせた `KsImage` が、画面外に出たときに要求を取り消すことを数えたテストが無い (verify-003) | 独立変更 `kasane/changes/image-fetch-concurrency-priority` (exploration.md の未決の論点に追記。2026-09-24 に本フェーズの TODO から移管) |
 | 性能改善後のビルドでの体感ゲートの取り直し (手動の最終走行は改善前のビルドで、改善は自動駆動の A/B で確認。verify-003) | 見送り。改善は遅らせる対象を絞って再合成を減らす向きで、A/B で Android の「メモリまで」の janky・P99 が比較用ビルドより良く、iOS の「ディスクまで」の悪化も消えたことを確かめている。体感を悪くする向きの変更ではない |
 | iOS の性能検証手順のメモリ判定 (`phys_footprint`) が、展開済みの画像の記憶域を数えていない可能性 (`evidence/memory-steady-ios.md`) | 見送り。本 change の「元寸を載せない」はキャッシュの大きさと項目の寸法で示せた。画像キャッシュのメモリ量を合否に使う変更が出たときに手順を見直す |
 
@@ -117,7 +117,7 @@ change `prefetch-display-size` (L 級) で、先読みの要素を `KsResource` 
 
 core/ADR-0012 の確定と image-loading の archive は、簡易起票済みの 3 change (`prefetch-display-size` / `performance-criteria-review` / `ios-separator-update-guard`) で到達点・性能基準まわりの内容が動きうるためオーナー判断で保留している (2026-09-08)。実装フェーズで解ききれず別 change に逃がした部分があり、そこが落ち着くまで決定を固めない。それらの決着後に image-loading と併せて再蒸留し、確定と archive を行う。
 
-決着 (2026-09-24): `performance-criteria-review` は 2026-09-17、`prefetch-display-size` と `ios-separator-update-guard` は 2026-09-24 に archive した。いずれも core/ADR-0012 の決定を動かさなかった (core/ADR-0013・0014 は ADR-0012 を前提にした例外で、footer の関連行で繋いだ)。同日に再蒸留し、core/ADR-0012 を accepted にして image-loading を archive した。
+決着 (2026-09-24): `performance-criteria-review` は 2026-09-17、`prefetch-display-size` と `ios-separator-update-guard` は 2026-09-24 に archive した。いずれも core/ADR-0012 の決定を動かさなかった (core/ADR-0013・0014 は ADR-0012 を前提にした例外で、footer の関連行で繋いだ)。同日に再蒸留し、core/ADR-0012 を accepted にして image-loading を archive した。残っていたテストの TODO 2 件を独立変更 `image-fetch-concurrency-priority` へ移し、本フェーズを completed にした。
 
 - [x] 論点の解消 (2026-09-05)
 - [x] core/ADR-0012 (proposed) のオーナー確認 → accepted へ昇格 (2026-09-24)
@@ -125,5 +125,5 @@ core/ADR-0012 の確定と image-loading の archive は、簡易起票済みの
 - [x] iOS: Nuke の共有パイプラインでディスクキャッシュ (DataCache) を有効化する設計 (既定無効。共有インスタンスをそのまま使う ADR-0012 との両立方法) (2026-09-07: 明示 API `enableSharedDiskCache()`。実装結果を参照)
 - [x] 利用者ドキュメント: グリッドにはサムネイル用途の URL を申告する運用を書く (2026-09-08: 原料を concepts へ蒸留、実制作は phase-7 へ申し送り)
 - [x] ksn-propose で変更提案を起こす (2026-09-05: image-loading)
-- [ ] Android `KsImageTest.urlConvenienceFormBehavesLikeRemoteSource` を、取得の回数を待ってから読む形に直す (負荷が高いと揺れる。prefetch-display-size の verify-003 の申し送り)
-- [ ] 表示要求を画面に出る時点まで遅らせた `KsImage` が、画面外に出たときに要求を取り消すことを両プラットフォームの単体テストで固定する (prefetch-display-size の verify-003 の申し送り)
+- [x] Android `KsImageTest.urlConvenienceFormBehavesLikeRemoteSource` を、取得の回数を待ってから読む形に直す (負荷が高いと揺れる。prefetch-display-size の verify-003 の申し送り) (2026-09-24: 独立変更 image-fetch-concurrency-priority へ移管)
+- [x] 表示要求を画面に出る時点まで遅らせた `KsImage` が、画面外に出たときに要求を取り消すことを両プラットフォームの単体テストで固定する (prefetch-display-size の verify-003 の申し送り) (2026-09-24: 独立変更 image-fetch-concurrency-priority へ移管)
