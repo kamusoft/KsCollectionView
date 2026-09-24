@@ -2176,6 +2176,202 @@ final class KsCollectionEngineTests: XCTestCase {
         XCTAssertEqual(tryUnwrapCell(controller, item: 0).touchFeedbackColor, .systemRed)
     }
 
+    func testグリッドで配列の変更とタッチ色の差し替えが同時に届いても残った可視セルに新しい色が届く() async {
+        var configuration = makeConfiguration(items: (0..<6).map { Item(id: $0, title: "項目 \($0)") })
+        configuration.layout = .grid(columns: .fixed(2), rowSpacing: 8, columnSpacing: 8)
+        configuration.onItemTap = { _ in }
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(6, in: controller)
+        let survivingCells = (0..<6).map { tryUnwrapCell(controller, item: $0) }
+        XCTAssertTrue(survivingCells.allSatisfy { $0.touchFeedbackColor == KsHostingCell.defaultTouchFeedbackColor })
+
+        // 配列の変更 (末尾への追加) と色の差し替えが 1 回の更新で届く。残った可視セルは作り直されないため、
+        // 新しい色は差分の適用完了からの揃え直しで届く。
+        configuration.items.append(Item(id: 6, title: "追加"))
+        configuration.touchFeedbackColor = .systemRed
+        controller.update(configuration: configuration)
+
+        await waitUntil("残った可視セルのタッチ色", value: {
+            survivingCells.map(\.touchFeedbackColor)
+        }) { $0.allSatisfy { $0 == .systemRed } }
+        XCTAssertEqual(ksTotalItemCount(in: controller.collectionView), 7)
+
+        // 配列が同値のまま色だけが差し替わる更新も、グリッドの可視セルへ届く。
+        configuration.touchFeedbackColor = .systemBlue
+        controller.update(configuration: configuration)
+
+        await waitUntil("同値配列の更新後のタッチ色", value: {
+            survivingCells.map(\.touchFeedbackColor)
+        }) { $0.allSatisfy { $0 == .systemBlue } }
+    }
+
+    func test表示前に古い色のまま残ったセルは表示に入る時点で現在の構成に揃う() async {
+        var configuration = makeConfiguration(items: (0..<6).map { Item(id: $0, title: "項目 \($0)") })
+        configuration.layout = .grid(columns: .fixed(2), rowSpacing: 8, columnSpacing: 8)
+        configuration.onItemTap = { _ in }
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(6, in: controller)
+
+        // 同値配列のまま色だけを差し替える。この更新は可視セルにしか届かない。
+        configuration.touchFeedbackColor = .systemRed
+        controller.update(configuration: configuration)
+
+        // 先行して組み立てられ、差し替えの間は画面外にあったセルの代わり。ユニットテストのホストでは
+        // 先行組み立てが起きないため、差し替え前の構成で組み立てたセルを用意し、表示に入る時点の
+        // デリゲート呼び出しを直接行う。
+        let staleCell = KsHostingCell(frame: CGRect(x: 0, y: 0, width: 180, height: 44))
+        staleCell.configureTouchFeedback(color: KsHostingCell.defaultTouchFeedbackColor)
+        XCTAssertEqual(staleCell.touchFeedbackColor, KsHostingCell.defaultTouchFeedbackColor)
+
+        controller.collectionView(
+            controller.collectionView,
+            willDisplay: staleCell,
+            forItemAt: ksIndexPath(forItemOffset: 4, in: controller.collectionView)
+        )
+
+        XCTAssertEqual(staleCell.touchFeedbackColor, .systemRed)
+    }
+
+    func test表示前に古い区切り線のまま残ったセルは表示に入る時点で位置と色が揃う() async {
+        var configuration = makeConfiguration(items: (0..<3).map { Item(id: $0, title: "項目 \($0)") })
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+
+        configuration.separatorColor = .systemPink
+        controller.update(configuration: configuration)
+
+        // 差し替え前の構成で、先頭以外の位置として組み立てられたセルの代わり (上のテストと同じ理由で
+        // 表示に入る時点のデリゲート呼び出しを直接行う)。
+        let staleCell = KsHostingCell(frame: CGRect(x: 0, y: 0, width: 390, height: 44))
+        staleCell.configureSeparators(showsTop: false, showsBottom: true, color: KsHostingCell.defaultSeparatorColor)
+
+        controller.collectionView(
+            controller.collectionView,
+            willDisplay: staleCell,
+            forItemAt: ksIndexPath(forItemOffset: 0, in: controller.collectionView)
+        )
+
+        XCTAssertTrue(staleCell.isTopSeparatorVisible)
+        XCTAssertTrue(staleCell.isBottomSeparatorVisible)
+        XCTAssertEqual(staleCell.topSeparatorColor, UIColor.systemPink)
+        XCTAssertEqual(staleCell.bottomSeparatorColor, UIColor.systemPink)
+    }
+
+    #if DEBUG
+    // 色の書き込み回数と揃え直しの回数は debug ビルドにだけ載るため、これらのテストも debug 構成でだけ実行する。
+    func test同じ構成で揃え直しても既定のタッチ色と区切り線の色を書き直さない() async {
+        await assertRealigningKeepsColorsUnwritten(
+            configuration: makeConfiguration(items: (0..<3).map { Item(id: $0, title: "項目 \($0)") })
+        )
+    }
+
+    func test同じ構成で揃え直しても指定したタッチ色と区切り線の色を書き直さない() async {
+        var configuration = makeConfiguration(items: (0..<3).map { Item(id: $0, title: "項目 \($0)") })
+        configuration.touchFeedbackColor = .systemRed
+        configuration.separatorColor = .systemPink
+        await assertRealigningKeepsColorsUnwritten(configuration: configuration)
+    }
+
+    func testグリッドではレイアウト確定で可視セルを揃え直さない() async {
+        var configuration = makeConfiguration(items: (0..<60).map { Item(id: $0, title: "項目 \($0)") })
+        configuration.layout = .grid(columns: .fixed(2), rowSpacing: 8, columnSpacing: 8)
+        // 区切り線の表示を宣言していても、グリッドは区切り線を出さない。
+        configuration.showsSeparators = true
+        let updates = await visibleCellSeparatorUpdatesDuringLayout(configuration: configuration)
+        XCTAssertEqual(updates, 0)
+    }
+
+    func test区切り線なしのリストではレイアウト確定で可視セルを揃え直さない() async {
+        var configuration = makeConfiguration(items: (0..<60).map { Item(id: $0, title: "項目 \($0)") })
+        configuration.showsSeparators = false
+        let updates = await visibleCellSeparatorUpdatesDuringLayout(configuration: configuration)
+        XCTAssertEqual(updates, 0)
+    }
+
+    func test区切り線ありのリストではレイアウト確定で可視セルを揃え直す() async {
+        // 上の 2 つのテストの対照。同じ手順で揃え直しが数えられることを確かめ、0 件が空振りでないことを示す。
+        let configuration = makeConfiguration(items: (0..<60).map { Item(id: $0, title: "項目 \($0)") })
+        let updates = await visibleCellSeparatorUpdatesDuringLayout(configuration: configuration)
+        XCTAssertGreaterThan(updates, 0)
+    }
+
+    // 初回表示が落ち着いた後に、構成の差し替え (同じ構成) とレイアウト確定の 2 経路で可視セルを揃え直し、
+    // 色の書き込みが増えないことを確かめる。
+    private func assertRealigningKeepsColorsUnwritten(
+        configuration: KsCollectionConfiguration<Item>,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) async {
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitForVisibleItemCount(3, in: controller)
+        await waitUntil("初回適用の完了後の揃え直し", value: {
+            controller.visibleCellSeparatorUpdateCount
+        }) { $0 >= 1 }
+        let cells = (0..<3).map { tryUnwrapCell(controller, item: $0) }
+        let touchWrites = cells.map(\.touchFeedbackColorWriteCount)
+        let separatorWrites = cells.map(\.separatorColorWriteCount)
+        let updatesBefore = controller.visibleCellSeparatorUpdateCount
+
+        controller.update(configuration: configuration)
+        for _ in 0..<3 {
+            controller.collectionView.setNeedsLayout()
+            controller.collectionView.layoutIfNeeded()
+        }
+
+        // 揃え直しは実際に走っている (書き込みが増えないのは揃え直しが起きなかったからではない)。
+        XCTAssertGreaterThan(controller.visibleCellSeparatorUpdateCount, updatesBefore, file: file, line: line)
+        XCTAssertEqual(cells.map(\.touchFeedbackColorWriteCount), touchWrites, file: file, line: line)
+        XCTAssertEqual(cells.map(\.separatorColorWriteCount), separatorWrites, file: file, line: line)
+        let expectedTouchColor = configuration.touchFeedbackColor ?? KsHostingCell.defaultTouchFeedbackColor
+        let expectedSeparatorColor = configuration.separatorColor ?? KsHostingCell.defaultSeparatorColor
+        // 控えは構成が渡したオブジェクトそのもの。色を指定しないときは固定した既定色が渡っており、
+        // 参照のたびに別のオブジェクトになりうる色では書き込みの省略が効かなくなる。
+        XCTAssertTrue(
+            cells.allSatisfy { $0.lastWrittenTouchFeedbackColor === expectedTouchColor },
+            file: file,
+            line: line
+        )
+        // ビューから読み戻した色は書いたオブジェクトそのものとは限らない (動的色は別のオブジェクトで返る) ため、値で比べる。
+        XCTAssertTrue(cells.allSatisfy { $0.touchFeedbackColor == expectedTouchColor }, file: file, line: line)
+        XCTAssertTrue(cells.allSatisfy { $0.bottomSeparatorColor == expectedSeparatorColor }, file: file, line: line)
+    }
+
+    // 初回表示が落ち着いた後に、レイアウトの確定だけを繰り返し (その場での再レイアウトとスクロール) 起こし、
+    // その間に可視セルを揃え直した回数を返す。
+    private func visibleCellSeparatorUpdatesDuringLayout(
+        configuration: KsCollectionConfiguration<Item>
+    ) async -> Int {
+        let controller = KsCollectionViewController(configuration: configuration)
+        let window = show(controller: controller, size: CGSize(width: 390, height: 844))
+        defer { window.isHidden = true }
+        await waitUntil("初期 snapshot", value: { controller.appliedItemIdentifiers.count }) {
+            $0 == configuration.items.count
+        }
+        // 初回の適用完了からの揃え直しを済ませてから数え始める。
+        await waitUntil("初回適用の完了後の揃え直し", value: {
+            controller.visibleCellSeparatorUpdateCount
+        }) { $0 >= 1 }
+        let updatesBefore = controller.visibleCellSeparatorUpdateCount
+
+        for step in 1...5 {
+            controller.collectionView.setNeedsLayout()
+            controller.collectionView.layoutIfNeeded()
+            controller.collectionView.setContentOffset(CGPoint(x: 0, y: CGFloat(step) * 120), animated: false)
+            controller.collectionView.layoutIfNeeded()
+        }
+        XCTAssertGreaterThan(controller.collectionView.contentOffset.y, 0, "スクロールが起きていません")
+        return controller.visibleCellSeparatorUpdateCount - updatesBefore
+    }
+    #endif
+
     func test空の項目でも先頭へのスクロール命令でheaderの先頭へ戻す() async {
         let scrollController = KsScrollController()
         var configuration = makeConfiguration(items: [])

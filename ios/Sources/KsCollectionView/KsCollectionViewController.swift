@@ -85,6 +85,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         return liveCells.count
     }
 
+    // 可視セルの位置依存の表示を揃え直した回数。区切り線を出さない構成でレイアウト確定のたびに
+    // 可視セルを走査しないことを、この値が動かないことで観測する。
+    private(set) var visibleCellSeparatorUpdateCount = 0
+
     // 現在の推定高さ。推定が多数派の高さに達したかを観測するために読む。
     // 自己サイズの計数は `KsLayoutDiagnostics` が 1 か所で持つ。
     var currentEstimatedHeight: CGFloat {
@@ -207,7 +211,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // 位置依存の表示 (先頭行の Top 区切り線) を、差分適用後のレイアウト確定に合わせて揃える。
-        updateVisibleCellSeparators()
+        // スクロール中は毎フレーム通るため、揃える対象 (区切り線) を持たない構成では走査しない。
+        // グリッドは区切り線を出さず、ヘッダー・フッターは補助ビューの経路で揃える。タッチ時の背景色の
+        // 変更は、差分の適用完了からの揃え直し (配列が変わる更新)、同値配列の更新での可視セルの再構成
+        // (`reconfigureVisibleCells`)、セルが表示に入る時点 (`willDisplay`) の揃え直しで届き、
+        // いずれも構成を問わず行う。
+        if showsListSeparators {
+            updateVisibleCellSeparators()
+        }
         // 列数はレイアウトを解いて初めて決まる。解けた列数で塊の件数が割り切れなくなっていたら
         // 組み直す。未解決から確定した最初のレイアウトもこの判定に入るため、表示領域の大きさが
         // 一度も変わらない画面でも不完全な行が残らない。
@@ -431,15 +442,18 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         estimatedHeight.record(height: size.height, width: size.width, scale: scale)
     }
 
-    private func configure(cell: KsHostingCell, at indexPath: IndexPath) {
-        let isList: Bool
+    // 区切り線を出す構成か。区切り線はリストでだけ描く。
+    private var showsListSeparators: Bool {
         switch configuration.layout.kind {
         case .list:
-            isList = true
+            configuration.showsSeparators
         case .grid:
-            isList = false
+            false
         }
-        let showsSeparators = isList && configuration.showsSeparators
+    }
+
+    private func configure(cell: KsHostingCell, at indexPath: IndexPath) {
+        let showsSeparators = showsListSeparators
         cell.configureSeparators(
             // 上端の線は配列全体の先頭の項目にだけ出す。塊の境界では item が 0 に戻るため、
             // 塊の順番も合わせて見ないと境界ごとに線が増える。
@@ -448,7 +462,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             color: configuration.separatorColor ?? KsHostingCell.defaultSeparatorColor
         )
         // 既定はプラットフォーム標準のハイライト相当の半透明色。不透明色にするとセル内容を覆い隠す。
-        cell.configureTouchFeedback(color: configuration.touchFeedbackColor ?? .systemFill)
+        cell.configureTouchFeedback(
+            color: configuration.touchFeedbackColor ?? KsHostingCell.defaultTouchFeedbackColor
+        )
     }
 
     private func configureHeader(_ view: KsHostingSupplementaryView) {
@@ -477,6 +493,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     private func updateVisibleCellSeparators() {
+        #if DEBUG
+        visibleCellSeparatorUpdateCount += 1
+        #endif
         for indexPath in collectionView.indexPathsForVisibleItems {
             guard let cell = collectionView.cellForItem(at: indexPath) as? KsHostingCell else {
                 continue
@@ -1050,6 +1069,19 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         return !cell.lastHitWasInteractive
             && (configuration.onItemTap != nil || configuration.onItemLongTap != nil)
+    }
+
+    // セルが表示に入る時点で、位置依存の表示とタッチ時の背景色を現在の構成に揃える。
+    // 先行して組み立てられたセルは、表示に入るときにセルの生成を通らず、画面外にある間の構成の差し替えは
+    // 可視セルだけを対象にする揃え直しでは届かない。レイアウト確定の揃え直しは区切り線を出す構成に
+    // 限っているため、構成を問わずここで揃える。色が変わっていなければセル側で書き込みを省く。
+    override func collectionView(
+        _ collectionView: UICollectionView,
+        willDisplay cell: UICollectionViewCell,
+        forItemAt indexPath: IndexPath
+    ) {
+        guard let cell = cell as? KsHostingCell else { return }
+        configure(cell: cell, at: indexPath)
     }
 
     override func collectionView(_ collectionView: UICollectionView, didHighlightItemAt indexPath: IndexPath) {

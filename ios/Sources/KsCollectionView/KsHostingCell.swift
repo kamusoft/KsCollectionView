@@ -9,10 +9,32 @@ internal final class KsHostingCell: UICollectionViewCell {
         alpha: 1
     )
 
+    /// タッチ時の背景色を指定しなかったときに使う色。プラットフォーム標準のハイライト相当の半透明色。
+    /// `.systemFill` は参照のたびに同じオブジェクトを返す保証が無いため、1 つに固定して
+    /// 書き込みの省略 (同じオブジェクトなら書かない) が既定色でも効くようにする。
+    static let defaultTouchFeedbackColor: UIColor = .systemFill
+
     private let touchFeedbackView = UIView()
     private let topSeparatorView = UIView()
     private let bottomSeparatorView = UIView()
     private(set) var lastHitWasInteractive = false
+    // 最後に書いた色。可視セルの揃え直しはスクロール中に毎フレーム走ることがあり、
+    // 色の代入は同じ値でも比較・動的色の解決・レイヤの更新を伴うため、同じオブジェクトなら書かない。
+    // UIColor は不変なので、同じオブジェクトであれば書かれている色も同じである。
+    // 色はセルの再利用をまたいで残るため、控えも再利用で捨てない。
+    private var writtenTouchFeedbackColor: UIColor?
+    private var writtenSeparatorColor: UIColor = KsHostingCell.defaultSeparatorColor
+    #if DEBUG
+    // 色を実際に書き込んだ回数。同じ構成での揃え直しが書き込みを起こさないことを観測するために読む。
+    // 計測のための仕組みが計測対象に混ざらないよう、debug ビルドにだけ載せる。
+    private(set) var touchFeedbackColorWriteCount = 0
+    private(set) var separatorColorWriteCount = 0
+
+    // 最後に書いたタッチ時の背景色そのもの。既定色が固定したオブジェクトで渡っていることを観測するために読む。
+    var lastWrittenTouchFeedbackColor: UIColor? {
+        writtenTouchFeedbackColor
+    }
+    #endif
 
     /// 自己サイズの計測結果を受け取るハンドラ。推定高さを実測へ寄せるために使う。
     /// 高さは測ったときの行の幅と対で意味を持つため、サイズごと渡す。
@@ -132,7 +154,12 @@ internal final class KsHostingCell: UICollectionViewCell {
     }
 
     func configureTouchFeedback(color: UIColor) {
+        guard writtenTouchFeedbackColor !== color else { return }
+        writtenTouchFeedbackColor = color
         touchFeedbackView.backgroundColor = color
+        #if DEBUG
+        touchFeedbackColorWriteCount += 1
+        #endif
     }
 
     func setTouchFeedbackVisible(_ isVisible: Bool) {
@@ -156,15 +183,19 @@ internal final class KsHostingCell: UICollectionViewCell {
     }
 
     func configureSeparators(showsTop: Bool, showsBottom: Bool, color: UIColor) {
-        let colorChanged = topSeparatorView.backgroundColor != color
+        let colorChanged = writtenSeparatorColor !== color
         guard colorChanged
             || topSeparatorView.isHidden != !showsTop
             || bottomSeparatorView.isHidden != !showsBottom else {
             return
         }
         if colorChanged {
+            writtenSeparatorColor = color
             topSeparatorView.backgroundColor = color
             bottomSeparatorView.backgroundColor = color
+            #if DEBUG
+            separatorColorWriteCount += 1
+            #endif
         }
         topSeparatorView.isHidden = !showsTop
         bottomSeparatorView.isHidden = !showsBottom
