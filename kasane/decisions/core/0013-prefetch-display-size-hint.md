@@ -74,5 +74,5 @@ core/ADR-0008 は先読み宣言を「アイテム → URL 配列」のクロー
 - 宣言で書けないケース (テンプレートやレイアウトが実行時にしか決まらない等) が実例として出たとき (A-2 の追加を検討)
 - 許容範囲の引き当てが Coil / Nuke の版更新で成立しなくなったとき
 
-出典: kasane/changes/archive/2026-09-24-prefetch-display-size/exploration.md (探索 2026-09-22 論点 1〜2、相談役助言 2026-09-08) / kasane/changes/archive/2026-09-24-prefetch-display-size/design.md (Decision 1〜4・7) / kasane/changes/image-loading/design.md (Decision 5) / kasane/changes/image-loading/deviation.md (2026-09-07 継ぎ目、2026-09-08 判断 C) / kasane/roadmaps/v1-foundation/phases/phase-8-image-loading/agenda.md (先読み宣言の決定 2026-09-05) / core/ADR-0008
+出典: kasane/changes/archive/2026-09-24-prefetch-display-size/exploration.md (探索 2026-09-22 論点 1〜2、相談役助言 2026-09-08) / kasane/changes/archive/2026-09-24-prefetch-display-size/design.md (Decision 1〜4・7) / kasane/changes/archive/2026-09-24-image-loading/design.md (Decision 5) / kasane/changes/archive/2026-09-24-image-loading/deviation.md (2026-09-07 継ぎ目、2026-09-08 判断 C) / kasane/roadmaps/v1-foundation/phases/phase-8-image-loading/agenda.md (先読み宣言の決定 2026-09-05) / core/ADR-0008
 関連: core/ADR-0014 (先読みの要素と画像ソースの任意キー。本決定の「同じ URL」は、キーを指定した画像ではキーを指す)

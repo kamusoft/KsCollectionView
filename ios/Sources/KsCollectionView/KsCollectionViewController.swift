@@ -251,6 +251,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             prefetcher.resources = resources
             prefetcher.destination = configuration.prefetchDestination
         } else {
+            // 先読みは Nuke の共有パイプラインへそのまま流し、ライブラリ独自のキャッシュ層を挟まない。
+            // ローダー付属のビューを直接使う利用者とも同じキャッシュを見る (core/ADR-0012)。
             prefetcher = KsImagePrefetcher(
                 loading: configuration.imageLoading ?? KsNukeImageLoading(pipeline: .shared),
                 id: configuration.id,

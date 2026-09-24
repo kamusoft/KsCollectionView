@@ -58,7 +58,7 @@ iOS は Nuke (13 系、`Nuke` + `NukeUI`)、Android は Coil 3 (`coil-compose` �
 
 ## 実装結果 (2026-09-08 反映)
 
-change `image-loading` (L 級) で両プラットフォームに `prefetchResources` (+ 到達点)・`KsImage`・`KsImageSource`・`KsImageContentMode`・`KsImageCache`・`KsPrefetchDestination` を新設した。iOS は Nuke 13.2 系、Android は Coil 3.5.0 (3.6 系は Compose 1.12 の推移で利用者に compileSdk 37 を強いるため固定) に本体が直接依存する。Android はキャッシュ操作の引数を iOS と揃えるため androidx.startup でアプリケーションコンテキストを捕捉する (android/ADR-0005)。契約の全体は concepts `core/core-model/image-loading.md`、実装の実際は `kasane/changes/archive/*-image-loading/deviation.md`。
+change `image-loading` (L 級) で両プラットフォームに `prefetchResources` (+ 到達点)・`KsImage`・`KsImageSource`・`KsImageContentMode`・`KsImageCache`・`KsPrefetchDestination` を新設した。iOS は Nuke 13.2 系、Android は Coil 3.5.0 (3.6 系は Compose 1.12 の推移で利用者に compileSdk 37 を強いるため固定) に本体が直接依存する。Android はキャッシュ操作の引数を iOS と揃えるため androidx.startup でアプリケーションコンテキストを捕捉する (android/ADR-0005)。契約の全体は concepts `core/core-model/image-loading.md`、実装の実際は `kasane/changes/archive/2026-09-24-image-loading/deviation.md`。
 
 決定事項から変わった点:
 
@@ -83,7 +83,7 @@ change `image-loading` (L 級) で両プラットフォームに `prefetchResour
 | iOS の区切り線更新の無駄 (毎レイアウトで全可視セルの背景色を代入) | 独立変更 `kasane/changes/ios-separator-update-guard` (簡易起票済み) |
 | 利用者ドキュメント (サムネイル URL の宣言、`enableSharedDiskCache()` の運用と delegate、iOS `remove` の共有喪失、Android の startup 前提) | phase-7 の agenda に追記 (原料は concepts `core/core-model/image-loading.md`) |
 | 実機でしか走らないテスト (`android/kscollectionview/src/androidTest/`) の CI の受け皿、iOS Sample にユニットテストターゲットが無いこと | phase-7 の agenda「検証 CI の構成」に追記 |
-| core/ADR-0012 の確定 | オーナー判断待ち (TODO のまま残す。確定まで change は archive しない) |
+| core/ADR-0012 の確定 | 後続 3 change の決着後、2026-09-24 の再蒸留でオーナー確認を経て accepted。image-loading を `kasane/changes/archive/2026-09-24-image-loading/` へ archive |
 | Android `KsImageSource.File` の `Uri` (content://) 対応 | 見送り。需要が出たら追加する (design の Open Question) |
 | 7.3 Android の実機再確認 | 見送り (受容済み。spec の「再ダウンロードなし」はディスクでも満たす) |
 
@@ -117,10 +117,10 @@ change `prefetch-display-size` (L 級) で、先読みの要素を `KsResource` 
 
 core/ADR-0012 の確定と image-loading の archive は、簡易起票済みの 3 change (`prefetch-display-size` / `performance-criteria-review` / `ios-separator-update-guard`) で到達点・性能基準まわりの内容が動きうるためオーナー判断で保留している (2026-09-08)。実装フェーズで解ききれず別 change に逃がした部分があり、そこが落ち着くまで決定を固めない。それらの決着後に image-loading と併せて再蒸留し、確定と archive を行う。
 
-決着の状況 (2026-09-24): `performance-criteria-review` は 2026-09-17、`prefetch-display-size` は 2026-09-24 に archive した。残りは `ios-separator-update-guard` (簡易起票のまま)。
+決着 (2026-09-24): `performance-criteria-review` は 2026-09-17、`prefetch-display-size` と `ios-separator-update-guard` は 2026-09-24 に archive した。いずれも core/ADR-0012 の決定を動かさなかった (core/ADR-0013・0014 は ADR-0012 を前提にした例外で、footer の関連行で繋いだ)。同日に再蒸留し、core/ADR-0012 を accepted にして image-loading を archive した。
 
 - [x] 論点の解消 (2026-09-05)
-- [ ] core/ADR-0012 (proposed) のオーナー確認 → accepted へ昇格。本文は 2026-09-08 の蒸留で書き直し済み。確定は簡易起票済みの 3 change の決着後 (下記)
+- [x] core/ADR-0012 (proposed) のオーナー確認 → accepted へ昇格 (2026-09-24)
 - [x] Sample のデモ画像に使う公開プレースホルダー画像サービスの選定 (identity lint の許可設定を含む) (2026-09-06: Lorem Picsum)
 - [x] iOS: Nuke の共有パイプラインでディスクキャッシュ (DataCache) を有効化する設計 (既定無効。共有インスタンスをそのまま使う ADR-0012 との両立方法) (2026-09-07: 明示 API `enableSharedDiskCache()`。実装結果を参照)
 - [x] 利用者ドキュメント: グリッドにはサムネイル用途の URL を申告する運用を書く (2026-09-08: 原料を concepts へ蒸留、実制作は phase-7 へ申し送り)

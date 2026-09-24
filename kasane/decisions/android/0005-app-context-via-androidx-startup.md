@@ -39,4 +39,4 @@ Android の公開 API は `Context` を引数に取らない。iOS と同じ引�
 - Compose を使うアプリが `InitializationProvider` を持たなくなったとき (相乗りの前提が崩れる)
 - 利用者アプリで初期化を無効にする構成が実際に現れ、警告 no-op では足りないと分かったとき
 
-出典: kasane/changes/archive/2026-09-08-image-loading/deviation.md (Android の `KsImageCache` のシグネチャと本体の依存、2026-09-07 / Android のキャッシュ操作の未初期化時、2026-09-07) / core/ADR-0002 / core/ADR-0011
+出典: kasane/changes/archive/2026-09-24-image-loading/deviation.md (Android の `KsImageCache` のシグネチャと本体の依存、2026-09-07 / Android のキャッシュ操作の未初期化時、2026-09-07) / core/ADR-0002 / core/ADR-0011

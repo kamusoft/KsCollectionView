@@ -52,7 +52,8 @@ public enum KsImagePipeline {
         var configuration = current.configuration
         configuration.dataCache = dataCache
         // Nuke 13 は共有パイプラインの delegate を外から読めない (宣言が internal) ため、
-        // 引き継げるのは configuration だけになる。
+        // 引き継げるのは configuration だけになる。自動で差し替えず明示の呼び出しにしている
+        // 理由もこれ (core/ADR-0012)。
         ImagePipeline.shared = ImagePipeline(configuration: configuration)
     }
 

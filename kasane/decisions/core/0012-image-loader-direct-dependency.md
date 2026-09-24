@@ -1,7 +1,7 @@
 ---
 id: 0012
 title: 画像ローダー — 本体が iOS は Nuke・Android は Coil 3 に直接依存し KsImage とプリフェッチ接続を内蔵する
-status: proposed
+status: accepted
 date: 2026-09-07
 ---
 
@@ -51,4 +51,6 @@ core/ADR-0008 は `prefetchResources` クロージャと専用画像コンポー
 - OSS 公開が主目的に変わり、画像を使わない利用者の依存の重さが問題になったとき
 - Nuke が共有パイプラインの `delegate` を公開で読めるようにしたとき (ディスクキャッシュの自動有効化を再検討できる)
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-8-image-loading/history.md (2026-09-05: ローダー依存の持ち方 / ローダーの選定) / kasane/changes/archive/2026-09-08-image-loading/design.md (Decision 1・2) / kasane/changes/archive/2026-09-08-image-loading/deviation.md (Requirement「共有キャッシュ」の項、2026-09-07) / core/ADR-0008 / cross/ADR-0001
+出典: kasane/roadmaps/v1-foundation/phases/phase-8-image-loading/history.md (2026-09-05: ローダー依存の持ち方 / ローダーの選定) / kasane/changes/archive/2026-09-24-image-loading/design.md (Decision 1・2) / kasane/changes/archive/2026-09-24-image-loading/deviation.md (Requirement「共有キャッシュ」の項、2026-09-07) / core/ADR-0008 / cross/ADR-0001
+
+関連: core/ADR-0013 (先読みで縮小した項目を `KsImage` が許容範囲で引き当てる。独自のキャッシュ領域は持たず鍵の索引だけを持ち、ローダー付属ビューは縮小済みの項目に当たらない) / core/ADR-0014 (任意キーを指定した項目はローダー付属ビューと共有しない例外になる)
