@@ -138,3 +138,9 @@ ksn-propose で L 級の提案一式 (proposal / design の Decision 15 件 / �
 
 Android の試作 (エミュレータ) と iOS の試作 (Simulator) を同じ操作で作り、オーナーが見比べた。Android はいちばん上で先頭に挿入すると挿入した項目が表示範囲の上に外れて見えない (NG) → 先頭を表示中なら先頭に留める契約を両プラットフォームに足した (design Decision 16)。末尾・中間の挿入と削除も無いと網羅できない → 「差分更新」画面の操作を 位置 (先頭 / 中ほど / 末尾) × 挿入 / 削除 / 更新 / 移動 に広げ、件数は 60 件では多すぎるため 20 件にした。グリッドで列をまたぐ移動は iOS も斜めにまっすぐ動くと分かり、オーナーは両プラットフォームとも標準のままを選択。オーナーから「試作は propose でやることではない」と指摘があり、以後は提案の仕上げに戻した。`animateItem` を付ける位置・フェードの有無・高さの補間との重なりは実装のタスク (3.8) で決める。
 
+## 2026-09-24: 公開の語彙を group に揃える (提案作成後)
+
+オーナーが design Decision 1 の `section` という名前は用途と一致しないと指摘した。選択肢: A 公開の語彙を Group に揃える / B Section のまま。判断の軸は利用者と議論の言葉 (「グループ化」「グループの値」)、旧 AiForms の語彙 (`GroupHeaderTemplate` 等) との連続、iOS エンジン内部の「セクション」(内部の塊) との取り違え、SwiftUI の `Section` との近さ、`groupBy` から「離れた同じ値も集める」と誤解されるおそれ。採用: A (オーナー決定)。`.groups(by:)` / `KsGroups` / `groupSpacing` とし、`groupBy` の名は避けて続いた範囲だけがグループになることをドキュメントと assertion で示す。
+
+見出しの下の間隔の名前は `groupHeaderSpacing` ではどこの間隔か分からないとの指摘で、短い候補 (`headerItemSpacing` / `headerToItemsSpacing` / `belowHeaderSpacing` / `headerSpacing`) から `headerItemSpacing` を採用 (オーナー決定)。layout 値で間隔を持つ見出しはグループの見出しだけなので `group` を外した。提案一式・ADR 4 件の本文で利用者の語彙の意味の「セクション」を「グループ」に揃え、iOS 内部の意味 (内部セクション・compositional layout のセクション) は残した。
+

@@ -12,7 +12,7 @@ core/ADR-0003 は、差分計算とアニメーションの適用をライブラ
 
 ADR-0004 が `animateItem` を退けた理由は、高さ変化の補間に重ねても押し出される行の動きは良くならず、性能の上乗せ (2 列グリッドのフレーム CPU 時間 P90 +19.4%、`animateContentSize` との組み合わせで計測) だけが残ったことだった。項目の移動・挿入・削除を見せる目的では検討していない。
 
-セクション / グループ化機能 (change `sections-grouping`) で、グループをまたぐ項目の移動とグループの並べ替えを見せる必要が出た。後続の D&D 並べ替え機能でも、ドラッグ中に項目がどいて動く見え方に同じ手段が要る。
+グループ化機能 (change `sections-grouping`) で、グループをまたぐ項目の移動とグループの並べ替えを見せる必要が出た。後続の D&D 並べ替え機能でも、ドラッグ中に項目がどいて動く見え方に同じ手段が要る。
 
 前提: `ksAnimatedHeight` と `animateItem` を同じ項目に付けたときの性能と見え方は、決定の時点で測っていない。
 
@@ -20,7 +20,7 @@ ADR-0004 が `animateItem` を退けた理由は、高さ変化の補間に重�
 
 android/ADR-0004 の決定のうち「`animateItem` は重ねない」を本決定で置き換える。高さ変化の補間 (`ksAnimatedHeight`) とその利用契約は維持する。
 
-配列の差し替えによる項目とセクションの見出しの移動・挿入・削除を、Android でも `animateItem` でアニメーションさせる。付ける位置 (既存の modifier との順序)、出入りの見せ方 (フェードの有無)、高さ変化の補間と重なったときの扱いは、使い捨ての試作をオーナーが目視して決める。性能は、handbook/android/performance-verification に従って比較対象にも `animateItem` を付けて相対基準を測り、`animateItem` 自体の費用は「なし / あり」の比較を証跡に残して体感のゲート (cross/ADR-0006) で判断する。
+配列の差し替えによる項目とグループの見出しの移動・挿入・削除を、Android でも `animateItem` でアニメーションさせる。付ける位置 (既存の modifier との順序)、出入りの見せ方 (フェードの有無)、高さ変化の補間と重なったときの扱いは、使い捨ての試作をオーナーが目視して決める。性能は、handbook/android/performance-verification に従って比較対象にも `animateItem` を付けて相対基準を測り、`animateItem` 自体の費用は「なし / あり」の比較を証跡に残して体感のゲート (cross/ADR-0006) で判断する。
 
 ## Alternatives Considered
 
