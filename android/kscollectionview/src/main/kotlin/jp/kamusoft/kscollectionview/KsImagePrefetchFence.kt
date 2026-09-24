@@ -7,8 +7,8 @@ internal interface KsImagePrefetchFencing {
     /** 台帳に残っている取得をすべて止め、台帳も空にする。 */
     fun fenceAll()
 
-    /** 指定した URL の取得だけを止め、台帳から外す。 */
-    fun fence(url: String)
+    /** 指定した識別子の画像の取得だけを、幅に関わらずすべて止め、台帳から外す。 */
+    fun fence(identifier: String)
 }
 
 /**
@@ -34,10 +34,10 @@ internal object KsImagePrefetchRegistry {
         }
     }
 
-    /** 指定した URL の取得だけを止める。ソース単位の削除で使う。 */
-    fun fence(url: String) {
+    /** 指定した識別子の画像の取得だけを止める。ソース単位の削除で使う。 */
+    fun fence(identifier: String) {
         for (target in liveTargets()) {
-            target.fence(url)
+            target.fence(identifier)
         }
     }
 

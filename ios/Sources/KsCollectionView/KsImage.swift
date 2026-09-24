@@ -15,12 +15,14 @@ import SwiftUI
 ///     Text("表示できません")
 /// }
 /// KsImage(.remote(url), failure: { Text("表示できません") })
+/// KsImage(url, key: photo.id)   // 取得のたびに URL が変わる画像はキーで見分ける
 /// ```
 ///
 /// 読み込み中と失敗の表示は片方だけを指定でき、指定しなかった側は既定の表示になります。
 ///
-/// 画像は表示枠の大きさに縮小してデコードするため、元の大きさの画像をメモリに置きません。
-/// 表示枠の大きさが決まるまでは読み込みを始めません。
+/// メモリに表示枠と大きく違わない大きさの同じ画像があれば、デコードし直さずにそれで表示します
+/// (読み込み中の表示を経由しません)。無ければ表示枠の大きさに縮小してデコードするため、表示のために
+/// 元の大きさの画像をメモリへ展開しません。表示枠の大きさが決まるまでは読み込みを始めません。
 ///
 /// 表示枠の大きさは利用者が与えてください (`.frame(...)` や `.aspectRatio(...)` など)。
 /// 与えない場合は与えられた空間をすべて占めるため、他のビューと横に並べると相手が潰れます。
@@ -41,6 +43,8 @@ public struct KsImage<Loading: View, Failure: View>: View {
 
     @ObservedObject private var invalidation = KsImageInvalidation.shared
     @Environment(\.displayScale) private var displayScale
+    // メモリから引き当てて描いている画像。メモリのみの消去の後に組み立て直されても描き続けるために持つ。
+    @State private var retainedMatch = KsImageRetainedMatch()
 
     /// 読み込み中と失敗の表示を指定して画像を表示します。
     public init(
@@ -56,13 +60,16 @@ public struct KsImage<Loading: View, Failure: View>: View {
     }
 
     /// 読み込み中と失敗の表示を指定して、リモート URL の画像を表示します。
+    ///
+    /// `key` は ``KsImageSource/remote(_:key:)`` と同じ意味です。
     public init(
         _ url: URL,
+        key: String? = nil,
         contentMode: KsImageContentMode = .fill,
         @ViewBuilder loading: @escaping () -> Loading,
         @ViewBuilder failure: @escaping () -> Failure
     ) {
-        self.init(.remote(url), contentMode: contentMode, loading: loading, failure: failure)
+        self.init(.remote(url, key: key), contentMode: contentMode, loading: loading, failure: failure)
     }
 
     fileprivate init(
@@ -89,6 +96,8 @@ public struct KsImage<Loading: View, Failure: View>: View {
     private func content(size: CGSize) -> some View {
         switch KsImageRequestFactory.route(for: source) {
         case .asset(let name):
+            // 引き当てで持っていた別のソースの画像は、このソースの表示に使わないので捨てる。
+            let _ = retainedMatch.discard()
             assetContent(name: name)
         case .loader:
             loaderContent(size: size)
@@ -110,40 +119,111 @@ public struct KsImage<Loading: View, Failure: View>: View {
 
     @ViewBuilder
     private func loaderContent(size: CGSize) -> some View {
-        // 表示の組み立てと同時に、初回の描画に使える画像を同期で用意する。ここで用意しないと
-        // ローダーの状態が決まるまでの間に読み込み中の表示が挟まる。副作用として共有ローダーの
-        // メモリキャッシュへ書くことがあるが、同じ入力には同じ結果を書くため、枠の大きさ・
-        // 表示倍率・世代が変わって組み立て直されても増えない。
+        // 表示の組み立てと同時に、メモリから枠にそのまま使える画像を引き当てる。引き当てられれば
+        // それで表示が完了し、ローダーへ要求を出さないので読み込み中の表示も挟まらない。
+        // 枠の大きさ・表示倍率・世代が変わって組み立て直されたときも引き当てからやり直すため、
+        // 新しい枠に対して許容範囲の内側にある項目なら、デコードし直さずに同じ項目で表示を続ける。
+        // メモリのみの消去で引き当てられなくなっても、ソース・世代・枠・表示倍率・当てはめ方が
+        // 変わらない間は、引き当てて描いていた画像で表示を続ける。
+        // 組み立ての時点で引き当てられず、同じ画像の先読みが取得中の可能性があるときは、要求を画面に出る
+        // 時点まで始めず、画面に出る時点でもう一度引き当てを試す (`KsImageDeferredLoad`)。先読みが取得中で
+        // なければ待っても引き当てられる見込みが無いので、ローダー付属のビューへそのまま任せる (このビューも
+        // 要求を始めるのは画面に出る時点)。画面に出る時点の処理を増やさないためである。いったん待つ表示を
+        // 選んだら、引き当ての条件が変わらない間は選び続ける。メモリのみの消去で取得中の記録が消えた後の
+        // 組み立て直しで選び直すと、待つ表示で読み込んだ画像が捨てられて読み込み中へ戻るためである。
+        let reloadToken = reloadToken
         if let prepared = KsImageRequestFactory.prepare(
             source: source,
             size: size,
             contentMode: contentMode,
             displayScale: displayScale
         ) {
-            LazyImage(request: prepared.request) { state in
-                if let image = state.image {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: contentMode.swiftUIContentMode)
-                } else if state.error != nil {
-                    failureContent
-                } else if let cached = prepared.cachedImage {
-                    // ローダーの状態が決まるのは表示が組み上がった後なので、メモリにある
-                    // 画像はその間だけ自分で描く。読み込み中の表示を挟まないための経路。
-                    Image(uiImage: cached)
-                        .resizable()
-                        .aspectRatio(contentMode: contentMode.swiftUIContentMode)
+            let condition = KsImageRetainedMatch.Condition(
+                reloadToken: reloadToken,
+                size: size,
+                displayScale: displayScale,
+                contentMode: contentMode
+            )
+            let shown = retainedMatch.resolve(matched: prepared.matchedImage, for: condition)
+            Group {
+                if let shown {
+                    matchedContent(shown)
+                } else if retainedMatch.usesDeferredLoad(
+                    mayBeLoadingPrefetch: prepared.mayBeLoadingPrefetch,
+                    for: condition
+                ) {
+                    KsImageDeferredLoad(
+                        request: prepared.request,
+                        rematch: { [source, contentMode, retainedMatch] in
+                            Self.rematch(
+                                source: source,
+                                contentMode: contentMode,
+                                condition: condition,
+                                retainedMatch: retainedMatch
+                            )
+                        },
+                        placeholder: { loadingContent },
+                        matched: { matchedContent($0) },
+                        loaded: { loadedContent($0) },
+                        failure: { failureContent }
+                    )
                 } else {
-                    loadingContent
+                    LazyImage(request: prepared.request) { state in
+                        if let image = state.image {
+                            loadedContent(image)
+                        } else if state.error != nil {
+                            failureContent
+                        } else {
+                            loadingContent
+                        }
+                    }
                 }
             }
+            // 引き当ての条件 (枠の大きさ・表示倍率・当てはめ方・世代) が変わったら表示の状態ごと作り直し、
+            // 新しい条件の要求からやり直す。画面に出る時点で引き当てた画像はその条件でしか使えず、作り直さないと
+            // 新しい枠に対して許容範囲の外にある項目を描き続けて縮小デコードの要求を出さない。ローダー付属の
+            // ビューも、縮小の指定だけが違う要求への差し替えでは読み込みをやり直さない。
+            .id(condition)
             // 識別子が変わると読み込みが最初からやり直しになる。キャッシュを消したときに
             // 表示中の画像を読み込み中へ戻すのはこの経路。
             .id(reloadToken)
         } else {
-            // 表示枠の大きさが決まるまでは読み込みを始めない。
+            // 表示枠の大きさが決まるまでは読み込みを始めない。引き当てもしないので、持っていた画像は捨てる。
+            let _ = retainedMatch.discard()
             loadingContent
         }
+    }
+
+    // 引き当てた画像の表示。
+    private func matchedContent(_ image: UIImage) -> some View {
+        loadedContent(Image(uiImage: image))
+    }
+
+    // 読み込んだ (または引き当てた) 画像の表示。
+    private func loadedContent(_ image: Image) -> some View {
+        image
+            .resizable()
+            .aspectRatio(contentMode: contentMode.swiftUIContentMode)
+    }
+
+    // 画面に出る時点の引き当て。組み立ての時点と同じ枠・表示倍率・当てはめ方で照会し、引き当てた画像は
+    // 組み立ての時点で引き当てたときと同じく持ち続ける (メモリのみの消去の後の組み立て直しでも描き続けるため)。
+    // 組み立ての外で呼ばれるため、環境の値を読まずに組み立ての時点の値だけで照会する。
+    private static func rematch(
+        source: KsImageSource,
+        contentMode: KsImageContentMode,
+        condition: KsImageRetainedMatch.Condition,
+        retainedMatch: KsImageRetainedMatch
+    ) -> UIImage? {
+        guard let matched = KsImageRequestFactory.prepare(
+            source: source,
+            size: condition.size,
+            contentMode: contentMode,
+            displayScale: condition.displayScale
+        )?.matchedImage else {
+            return nil
+        }
+        return retainedMatch.resolve(matched: matched, for: condition)
     }
 
     @ViewBuilder
@@ -167,11 +247,10 @@ public struct KsImage<Loading: View, Failure: View>: View {
     // 読み込みをやり直すかの判定に使う識別子。ソース単位の削除では該当ソースの識別子だけが
     // 変わり、範囲消去ではすべての識別子が変わる。
     private var reloadToken: String {
-        guard case .loader(let url) = KsImageRequestFactory.route(for: source) else {
+        guard let resolved = KsImageIdentity.resolve(source) else {
             return "\(source)"
         }
-        let key = url.absoluteString
-        return "\(KsImageIdentity.imageID(forKey: key) ?? key)@\(invalidation.globalGeneration)"
+        return "\(KsImageIdentity.effectiveID(forIdentifier: resolved.identifier))@\(invalidation.globalGeneration)"
     }
 }
 
@@ -186,12 +265,15 @@ extension KsImage where Failure == EmptyView {
     }
 
     /// 読み込み中の表示だけを指定して、リモート URL の画像を表示します。
+    ///
+    /// `key` は ``KsImageSource/remote(_:key:)`` と同じ意味です。
     public init(
         _ url: URL,
+        key: String? = nil,
         contentMode: KsImageContentMode = .fill,
         @ViewBuilder loading: @escaping () -> Loading
     ) {
-        self.init(source: .remote(url), contentMode: contentMode, loading: loading, failure: nil)
+        self.init(source: .remote(url, key: key), contentMode: contentMode, loading: loading, failure: nil)
     }
 }
 
@@ -206,12 +288,15 @@ extension KsImage where Loading == EmptyView {
     }
 
     /// 失敗したときの表示だけを指定して、リモート URL の画像を表示します。
+    ///
+    /// `key` は ``KsImageSource/remote(_:key:)`` と同じ意味です。
     public init(
         _ url: URL,
+        key: String? = nil,
         contentMode: KsImageContentMode = .fill,
         @ViewBuilder failure: @escaping () -> Failure
     ) {
-        self.init(source: .remote(url), contentMode: contentMode, loading: nil, failure: failure)
+        self.init(source: .remote(url, key: key), contentMode: contentMode, loading: nil, failure: failure)
     }
 }
 
@@ -222,8 +307,10 @@ extension KsImage where Loading == EmptyView, Failure == EmptyView {
     }
 
     /// リモート URL の画像を表示します。読み込み中と失敗のときは既定の表示になります。
-    public init(_ url: URL, contentMode: KsImageContentMode = .fill) {
-        self.init(source: .remote(url), contentMode: contentMode, loading: nil, failure: nil)
+    ///
+    /// `key` は ``KsImageSource/remote(_:key:)`` と同じ意味です。
+    public init(_ url: URL, key: String? = nil, contentMode: KsImageContentMode = .fill) {
+        self.init(source: .remote(url, key: key), contentMode: contentMode, loading: nil, failure: nil)
     }
 }
 

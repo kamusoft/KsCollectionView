@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,15 +25,21 @@ import jp.kamusoft.kscollectionview.KsImageCacheScope
 import jp.kamusoft.kscollectionview.KsPrefetchDestination
 
 /**
- * 「画像グリッド」画面。10,000 件のネットワーク画像を 3 列で並べ、プリフェッチの到達点を
- * 切り替えながらスクロールの見え方を比べる。
+ * 「画像グリッド」画面。10,000 件のネットワーク画像を 3 列で並べ、プリフェッチの形
+ * (到達点と表示幅) を切り替えながらスクロールの見え方を比べる。
  *
- * 件数・列数・間隔・文言・初期選択は iOS Sample の同名画面とそろえる (cross/ADR-0004)。
+ * 件数・列数・間隔・文言・初期選択は iOS Sample の同名画面とそろえる。
+ *
+ * @param initialChoice 最初の選択。起動時の指定 ([SampleRoutes.PrefetchExtra]) があればそれ、
+ *   無ければ画面の初期選択
  */
 @Composable
-fun ImageGridDemoScreen(modifier: Modifier = Modifier) {
+fun ImageGridDemoScreen(
+    modifier: Modifier = Modifier,
+    initialChoice: ImagePrefetchChoice = ImagePrefetchChoice.InitialSelection,
+) {
     // 選択は構成変更 (回転) をまたいで保つ。iOS の @State と同じ振る舞いにそろえる。
-    var choice by rememberSaveable { mutableStateOf(ImagePrefetchChoice.Disk) }
+    var choice by rememberSaveable { mutableStateOf(initialChoice) }
     val items = remember { ImageGridFixture.items() }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -50,7 +55,7 @@ fun ImageGridDemoScreen(modifier: Modifier = Modifier) {
             layout = ImageGridFixture.layout,
             contentPadding = ImageGridFixture.contentPadding,
             // 「なし」は宣言そのものを行わず、プリフェッチが無い状態を見せる。
-            prefetchResources = ImageGridFixture.resources(destination),
+            prefetchResources = ImageGridFixture.resources(choice),
             prefetchDestination = destination ?: KsPrefetchDestination.Disk,
         ) {
             template { item -> ImageGridCell(item) }
@@ -61,8 +66,8 @@ fun ImageGridDemoScreen(modifier: Modifier = Modifier) {
         SampleControlBar(
             verticalArrangement = Arrangement.spacedBy(SampleTheme.controlVerticalPadding),
         ) {
-            SampleSegmentedControl(
-                modifier = Modifier.fillMaxWidth(),
+            // 選択肢の文言が長いため、横に並べず 1 行のメニューにする (iOS Sample と同じ形)。
+            SampleMenuPicker(
                 options = ImagePrefetchChoice.entries.map { it.title },
                 selectedIndex = choice.ordinal,
                 onSelect = { choice = ImagePrefetchChoice.entries[it] },

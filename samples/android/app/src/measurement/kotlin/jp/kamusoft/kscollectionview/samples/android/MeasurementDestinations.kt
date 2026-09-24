@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import jp.kamusoft.kscollectionview.KsCollectionView
 import jp.kamusoft.kscollectionview.KsPrefetchDestination
+import kotlinx.coroutines.delay
 
 /**
  * 計測用の入口の経路。
@@ -71,8 +73,28 @@ object MeasurementRoutes {
     fun imageMemoryRoundTrip(count: Int, maxRoundTrips: Int, destination: String): String =
         "${Prefix}image-memory/$count/$maxRoundTrips/$destination"
 
+    /**
+     * 画像グリッドのメモリの自動往復のうち、1 段階ごとに読み込みが落ち着くのを待ってから進むもの。
+     *
+     * 待たない往復は取得より速く進むため、メモリキャッシュがほとんど埋まらない。メモリキャッシュと
+     * 索引の中身を定常状態で見るときに使う。
+     */
+    fun imageMemoryLoadedRoundTrip(count: Int, maxRoundTrips: Int, destination: String): String =
+        "${Prefix}image-memory-loaded/$count/$maxRoundTrips/$destination"
+
     /** 画像の挙動 (共有・読み込み中・失敗) の検証画面。 */
     fun imageBehavior(): String = "${Prefix}image-behavior"
+
+    /** 同一ホストの同時取得数を渡す引数の名前。0 は既定のまま。 */
+    const val MaxRequestsPerHostArgument = "maxRequestsPerHost"
+
+    /**
+     * 画像グリッドの土俵で、セルの出入り・止まった時点・読み込みの節目をログへ出す観測用の画面。
+     *
+     * @param maxRequestsPerHost 同一ホストの同時取得数。0 なら取得経路の既定のまま
+     */
+    fun imageObserve(count: Int, destination: String, maxRequestsPerHost: Int): String =
+        "${Prefix}image-observe/$count/$destination/$maxRequestsPerHost"
 
     /**
      * 計測用の画面が載り終えたことを外から読むための印。
@@ -187,7 +209,7 @@ fun NavGraphBuilder.measurementDestinations(
         }
     }
 
-    imageMeasurementDestinations(onBack)
+    imageMeasurementDestinations(onBack, onLeaveTo)
 }
 
 /**
@@ -201,6 +223,33 @@ fun NavGraphBuilder.measurementDestinations(
 private fun replacementItems(count: Int): List<DemoItem> =
     DemoData.largeItems(count).map { item -> item.copy(id = item.id + count) }
 
+/** 1 段階ごとに読み込みが落ち着くのを待つ上限 (ミリ秒)。 */
+private const val ImageLoadingSettleDeadlineMillis = 10_000L
+
+/**
+ * 進行中の読み込みが無くなるのを、実時間の上限つきで待つ。
+ *
+ * 位置を送った直後は表示と先読みの要求がまだ出ていないことがあるため、先に少し待ってから数える。
+ * 上限を超えたらそのまま進む (取得の遅れで走査全体が止まらないようにする)。
+ */
+private suspend fun awaitImageLoadingSettled() {
+    delay(100)
+    val deadline = System.currentTimeMillis() + ImageLoadingSettleDeadlineMillis
+    while (ImageLoadingInFlight.current > 0 && System.currentTimeMillis() < deadline) {
+        delay(50)
+    }
+}
+
+/**
+ * 画像グリッドの置換の段階で差し替える、同じ件数で識別子の重ならない配列を作る。
+ *
+ * 識別子を件数分ずらすため、置換後のセルは別の画像 (別の URL) を表示する。
+ *
+ * @param count 作る件数
+ */
+private fun imageReplacementItems(count: Int): List<DemoItem> =
+    ImageGridFixture.items(count).map { item -> item.copy(id = item.id + count) }
+
 /**
  * 画像グリッドの計測用の画面を経路に加える。
  *
@@ -208,12 +257,45 @@ private fun replacementItems(count: Int): List<DemoItem> =
  * プリフェッチの到達点だけを経路で選べるようにする。操作バーは計測に関係しないため持たない。
  *
  * @param onBack 戻る導線の処理
+ * @param onLeaveTo 自動走査が画面を離れて別の経路へ移る処理 (離れた画面は残さない)
  */
-private fun NavGraphBuilder.imageMeasurementDestinations(onBack: () -> Unit) {
+private fun NavGraphBuilder.imageMeasurementDestinations(
+    onBack: () -> Unit,
+    onLeaveTo: (from: String, to: String) -> Unit,
+) {
     composable(route = MeasurementRoutes.imageBehavior()) {
         SampleScaffold(title = "検証: 画像の挙動", onBack = onBack) {
             ImageBehaviorVerificationScreen(
                 modifier = Modifier.markMeasurementScreen(MeasurementRoutes.imageBehavior()),
+            )
+        }
+    }
+
+    composable(
+        route = "${MeasurementRoutes.Prefix}image-observe/{${MeasurementRoutes.CountArgument}}" +
+            "/{${MeasurementRoutes.DestinationArgument}}" +
+            "/{${MeasurementRoutes.MaxRequestsPerHostArgument}}",
+        arguments = listOf(
+            navArgument(MeasurementRoutes.CountArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.DestinationArgument) { type = NavType.StringType },
+            navArgument(MeasurementRoutes.MaxRequestsPerHostArgument) { type = NavType.IntType },
+        ),
+    ) { entry ->
+        val count = entry.arguments.readCount()
+        val choice = entry.arguments.readPrefetchChoice()
+        val maxRequestsPerHost = entry.arguments
+            ?.getInt(MeasurementRoutes.MaxRequestsPerHostArgument)
+            ?: error("経路の引数に同時取得数がありません")
+        // 共有インスタンスは最初の読み込みで作られる。土俵を組む前に指定しておく
+        // (起動時にキャッシュを消す指定があると、その時点で既定の構成で作られてしまうため、
+        // この画面はキャッシュの消去をアプリのデータの消去で行う前提で使う)。
+        if (maxRequestsPerHost > 0) ImageLoadingNetworkOverride.maxRequestsPerHost = maxRequestsPerHost
+        val route = MeasurementRoutes.imageObserve(count, choice.routeSegment, maxRequestsPerHost)
+        SampleScaffold(title = "観測: 画像 $count 件 ${choice.title}", onBack = onBack) {
+            ImageObserveScreen(
+                count = count,
+                choice = choice,
+                modifier = Modifier.markMeasurementScreen(route),
             )
         }
     }
@@ -257,6 +339,9 @@ private fun NavGraphBuilder.imageMeasurementDestinations(onBack: () -> Unit) {
             choice.routeSegment,
         )
         val items = remember(count) { ImageGridFixture.items(count) }
+        val context = LocalContext.current
+        // 往復ごとと離脱後に、メモリキャッシュと索引の中身を記録する。
+        MemoryIndexProbe.enabled = true
         SampleScaffold(
             title = "計測: 画像メモリ $count 件 ${choice.title}",
             onBack = onBack,
@@ -267,8 +352,54 @@ private fun NavGraphBuilder.imageMeasurementDestinations(onBack: () -> Unit) {
                 modifier = Modifier.markMeasurementScreen(route),
                 layout = ImageGridFixture.layout,
                 contentPadding = ImageGridFixture.contentPadding,
-                prefetchResources = ImageGridFixture.resources(choice.destination),
+                prefetchResources = ImageGridFixture.resources(choice),
                 prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
+                replacementItems = { imageReplacementItems(count) },
+                onLeave = { onLeaveTo(route, MeasurementRoutes.memoryResult()) },
+                roundTripProbe = { MemoryIndexProbe.describe(context) },
+                row = { item -> ImageGridCell(item) },
+            )
+        }
+    }
+
+    composable(
+        route = "${MeasurementRoutes.Prefix}image-memory-loaded/{${MeasurementRoutes.CountArgument}}" +
+            "/{${MeasurementRoutes.MaxRoundTripsArgument}}" +
+            "/{${MeasurementRoutes.DestinationArgument}}",
+        arguments = listOf(
+            navArgument(MeasurementRoutes.CountArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.MaxRoundTripsArgument) { type = NavType.IntType },
+            navArgument(MeasurementRoutes.DestinationArgument) { type = NavType.StringType },
+        ),
+    ) { entry ->
+        val count = entry.arguments.readCount()
+        val maxRoundTrips = entry.arguments.readMaxRoundTrips()
+        val choice = entry.arguments.readPrefetchChoice()
+        val route = MeasurementRoutes.imageMemoryLoadedRoundTrip(
+            count,
+            maxRoundTrips,
+            choice.routeSegment,
+        )
+        val items = remember(count) { ImageGridFixture.items(count) }
+        val context = LocalContext.current
+        // 往復ごとと離脱後に、メモリキャッシュと索引の中身を記録する。
+        MemoryIndexProbe.enabled = true
+        SampleScaffold(
+            title = "計測: 画像メモリ (読み込み待ち) $count 件 ${choice.title}",
+            onBack = onBack,
+        ) {
+            MemoryRoundTripScreen(
+                items = items,
+                maxRoundTrips = maxRoundTrips,
+                modifier = Modifier.markMeasurementScreen(route),
+                layout = ImageGridFixture.layout,
+                contentPadding = ImageGridFixture.contentPadding,
+                prefetchResources = ImageGridFixture.resources(choice),
+                prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
+                replacementItems = { imageReplacementItems(count) },
+                onLeave = { onLeaveTo(route, MeasurementRoutes.memoryResult()) },
+                roundTripProbe = { MemoryIndexProbe.describe(context) },
+                afterStep = { awaitImageLoadingSettled() },
                 row = { item -> ImageGridCell(item) },
             )
         }
@@ -302,7 +433,7 @@ fun ImageGridMeasurementScreen(
             modifier = Modifier.weight(1f),
             layout = ImageGridFixture.layout,
             contentPadding = ImageGridFixture.contentPadding,
-            prefetchResources = ImageGridFixture.resources(choice.destination),
+            prefetchResources = ImageGridFixture.resources(choice),
             prefetchDestination = choice.destination ?: KsPrefetchDestination.Disk,
         ) {
             template { item -> ImageGridCell(item) }
@@ -310,9 +441,9 @@ fun ImageGridMeasurementScreen(
     }
 }
 
-/** 経路の文字列に使う到達点の名前。 */
+/** 経路の文字列に使うプリフェッチの形の名前。起動時の指定と同じ綴りにする。 */
 val ImagePrefetchChoice.routeSegment: String
-    get() = name.lowercase()
+    get() = argument
 
 /**
  * 目的の画面が載ったことを外から読めるようにする印を付ける。
@@ -342,7 +473,7 @@ private fun Bundle?.readPrefetchChoice(): ImagePrefetchChoice {
 /**
  * 「大量件数」の土俵を、ライブラリを通さず素の LazyVerticalGrid で描く。
  *
- * ラッパーが薄いこと (android/ADR-0001) を、同じ土俵の測定値の差として確かめるための比較対象。
+ * ライブラリの上乗せ分が小さいことを、同じ土俵の測定値の差として確かめるための比較対象。
  * 件数・列数・行間 / 列間・行の見た目はライブラリ側と同一にする。
  *
  * @param items 表示する要素
@@ -369,7 +500,7 @@ fun BaselineLargeDataGrid(items: List<DemoItem>, modifier: Modifier = Modifier) 
  * 「大量件数」の土俵を、ライブラリを通さず素の LazyColumn で 1 列に描く。
  *
  * ライブラリは 1 列も多列と同じ経路 (1 列のグリッド) で描くため、その選択が Compose の
- * 1 列専用の経路に対してどれだけ違うかをここで見る (android/ADR-0001)。
+ * 1 列専用の経路に対してどれだけ違うかをここで見る。
  *
  * @param items 表示する要素
  */

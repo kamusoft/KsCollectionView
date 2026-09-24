@@ -29,18 +29,31 @@ const val ImageLoadingSlotTag: String = "KsImageLoadingSlot"
  *
  * ## 観測区間 (基準点) と判定規則
  *
- * 判定に使うのは `sized` の側だが、**累計では判定できない**。「戻ってきたときの再表示」を見る
- * 手順は「初回表示 → 画面外へ送る → 戻す」であり、初回表示の時点で対象の `sized` は通常
- * 1 以上になる。累計の `sized == 0` を規則にすると、正しく即時再表示された場合まで不合格に
- * なる。
+ * 読み込み中の数は**累計では判定できない**。「戻ってきたときの再表示」を見る手順は
+ * 「初回表示 → 画面外へ送る → 戻す」であり、初回表示の時点で対象の数は通常 1 以上になる。
+ * 累計が 0 であることを規則にすると、正しく即時再表示された場合まで不合格になる。
  *
  * そこで**基準点** ([beginSession]) を設ける。初回表示が終わった時点・画面外へ送る直前に
- * 基準点を切ると、そこから先の増分だけを数えた観測区間が始まる。判定規則は
- * **対象の要素ごとに「基準点からの差分 `Δsized` が 0」** である。
+ * 基準点を切ると、そこから先の増分だけを数えた観測区間が始まる。判定は対象の要素ごとの
+ * 基準点からの差分で行う (使う数は下の「組み立てと、画面に出た読み込み中」)。
  *
  * 基準点は画面の印 ([ImageLoadingSlotMark]) を叩くと切れる (iOS Sample も同じ操作)。区間には
  * 1 から始まる通し番号 ([session]) が付き、印とログの両方に載る。番号が違う記録は別の区間の
  * ものなので、突き合わせに混ぜてはいけない。
+ *
+ * ## 組み立てと、画面に出た読み込み中
+ *
+ * `sized` / `unsized` は読み込み中の表示が**組み立てられた**回数である。
+ * [jp.kamusoft.kscollectionview.KsImage] は、画面に出る前に組み立てた画像の先読みが未完了のとき、
+ * 要求を出さずに読み込み中の表示を中身として組み立てて待ち、画面に置かれた時点で引き当て直す。
+ * そこで先読みの項目に当たると、読み込み中の表示は 1 度も描かれないまま画像に替わる。この場合も
+ * 組み立ては `sized` に数えられるため、`Δsized` は「読み込み中を画面に出した」ことを意味しない。
+ *
+ * そこで、読み込み中の表示が実際に画面に出た (置かれて描かれ、見える範囲に掛かった) 回数を
+ * `shown` として別に数える ([onLoadingSlotShown])。**判定規則は、対象の要素ごとに「基準点からの
+ * 差分 `Δshown` が 0」** である。`sized` / `unsized` は組み立ての回数として残し、印
+ * ([ImageLoadingSlotMark]) は iOS Sample と同じ書式のまま組み立ての回数を出す。`shown` はログの
+ * `shown` の行で読む。
  *
  * 計数は Activity より長く生きるため、入口 ([MainActivity]) は起動のたびに [reset] を呼んで
  * 前の Activity の値が混ざらないようにする。
@@ -112,7 +125,7 @@ object ImageLoadingSlotCounter {
      * 基準点より前から数えられている要素も差分 0 として残す (`items=` の件数に含まれ、ログ側で
      * 対象 ID の `sized` が増えた行が無いことと突き合わせる材料になる)。ただし印の内訳は差分の
      * 大きい順に並ぶため、差分 0 の要素は最後尾に回り、要素数が上限を超えると内訳には現れない —
-     * 判定対象の `Δsized == 0` はログ側で読む。
+     * 判定対象の差分 (`Δshown`) はログ側で読む。
      */
     fun deltaSnapshot(): Map<Any, ImageLoadingSlotTally> =
         tallies.entries.associate { (id, tally) -> id to tally.subtracting(baselineOf(id)) }
@@ -125,7 +138,7 @@ object ImageLoadingSlotCounter {
     fun tally(itemId: Any): ImageLoadingSlotTally = tallies[itemId] ?: ImageLoadingSlotTally()
 
     /**
-     * 1 要素の、基準点からの差分。判定はこの `sized` が 0 かどうかで行う。
+     * 1 要素の、基準点からの差分。判定はこの `shown` が 0 かどうかで行う。
      *
      * @param itemId 対象の要素の識別子
      */
@@ -148,6 +161,28 @@ object ImageLoadingSlotCounter {
         tallies.clear()
         baseline.clear()
         sessionNumber = 0
+    }
+
+    /**
+     * 読み込み中の表示が実際に画面に出たことを数える。1 つの表示につき 1 回だけ呼ばれる。
+     *
+     * @param itemId 読み込み中を出している要素の識別子
+     * @param width そのときの表示枠の幅 (画素)
+     * @param height そのときの表示枠の高さ (画素)
+     */
+    internal fun recordShown(itemId: Any, width: Int, height: Int) {
+        val next = tallies.compute(itemId) { _, previous ->
+            val base = previous ?: ImageLoadingSlotTally()
+            base.copy(shown = base.shown + 1)
+        } ?: ImageLoadingSlotTally()
+        val delta = next.subtracting(baselineOf(itemId))
+        // 組み立ての行 (`loading`) と区別できるよう、先頭の語を変える。`shown` は基準点からの
+        // 差分、`total=` が累計。iOS Sample の同じ行と同じ書式にそろえる。
+        Log.i(
+            ImageLoadingSlotTag,
+            "shown session=$sessionNumber item=$itemId size=${width}x$height " +
+                "shown=${delta.shown} total=${next.shown}",
+        )
     }
 
     private fun baselineOf(itemId: Any): ImageLoadingSlotTally =
@@ -179,12 +214,13 @@ object ImageLoadingSlotCounter {
 }
 
 /**
- * 1 つの要素が読み込み中を出した回数。
+ * 1 つの要素の読み込み中の表示の回数。
  *
- * @property sized 表示枠が決まった状態で出した回数 (判定に使う側)
- * @property unsized 表示枠が決まる前に出した回数
+ * @property sized 表示枠が決まった状態で組み立てた回数
+ * @property unsized 表示枠が決まる前に組み立てた回数
+ * @property shown 実際に画面に出た回数 (判定に使う側)
  */
-data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0) {
+data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0, val shown: Long = 0) {
 
     /**
      * 基準点の計数を差し引いた差分を返す。
@@ -192,7 +228,11 @@ data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0) {
      * @param other 差し引く計数 (基準点の値)
      */
     fun subtracting(other: ImageLoadingSlotTally): ImageLoadingSlotTally =
-        ImageLoadingSlotTally(sized = sized - other.sized, unsized = unsized - other.unsized)
+        ImageLoadingSlotTally(
+            sized = sized - other.sized,
+            unsized = unsized - other.unsized,
+            shown = shown - other.shown,
+        )
 }
 
 /**
@@ -210,7 +250,14 @@ private fun CountedLoadingSlot(itemId: Any) {
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
         val height = if (constraints.hasBoundedHeight) constraints.maxHeight else 0
         ImageLoadingSlotCounter.record(itemId, width, height)
-        Box(modifier = Modifier.fillMaxSize().background(LoadingSlotColor))
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                // 組み立てとは別に、実際に画面に出たことを数える。画面に出る前に組み立てられ、
+                // 描かれないまま画像に替わった読み込み中を、画面に出た読み込み中と分けるため。
+                .onLoadingSlotShown { ImageLoadingSlotCounter.recordShown(itemId, width, height) }
+                .background(LoadingSlotColor),
+        )
     }
 }
 

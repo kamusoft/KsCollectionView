@@ -20,7 +20,7 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     // 配列が同値の更新が届くたびに可視セルを作り直す (ios/ADR-0006)。
     var observedValue: AnyHashable?
     // プリフェッチ宣言。無い (nil) ときはプリフェッチ機構を組み立てず、可視範囲の観測も行わない。
-    var prefetchResources: ((Item) -> [URL])?
+    var prefetchResources: ((Item) -> [KsResource])?
     var prefetchDestination: KsPrefetchDestination = .disk
     // 画像ローダーへの受け口の差し替え口。宣言が無いときは本番の adapter を組み立てる。
     var imageLoading: (any KsImageLoading)?

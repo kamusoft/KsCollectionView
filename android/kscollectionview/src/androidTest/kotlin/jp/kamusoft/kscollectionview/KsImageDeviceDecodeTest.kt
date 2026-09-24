@@ -1,7 +1,6 @@
 package jp.kamusoft.kscollectionview
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -14,15 +13,16 @@ import coil3.Image
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.DelicateCoilApi
-import coil3.asImage
 import coil3.decode.Decoder
 import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.request.Options
 import kotlinx.coroutines.runBlocking
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -32,22 +32,24 @@ import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * 端末のデコードが選ぶ画素の構成に依存する分岐を、実機の上で確かめる。
+ * 端末のデコードが選ぶ画素の構成に依存する経路を、実機の上で確かめる。
  *
- * 実機のデコードは通常、画像の画素をグラフィックス側に置くため、到達点メモリの先読みが載せる
- * 元寸は読み出せない。表示側はその元寸をその場で縮小できないので、初回の描画には使わずローダーの
- * 縮小デコードを待つ。確かめるのはこの契約 — 落ちないこと、表示に使う画像が枠を超えないこと、
- * そのデコードが 1 回で済むこと。
+ * 実機のデコードは通常、画像の画素をグラフィックス側に置く (画素を読み出せない)。表示の引き当ては
+ * 画素を読まずに寸法だけで判定するため、その画像もそのまま表示に使える。確かめるのはこの契約 —
+ * 先読みが載せたグラフィックス側の画像が引き当てられ読み込み中を経由しないこと、幅を宣言した先読みが
+ * その幅の項目を載せること、許容範囲の外なら枠の大きさの縮小デコードに落ちること、表示のために
+ * 元の大きさの画像をメモリに置かないこと。
  *
- * この分岐は JVM 上のテスト環境 (画素は常にソフトウェア側) では現れず、そちらでは元寸を
- * その場で縮小して即座に描く経路が通る。実機で走るこのテストでしか検証層に載らない。
+ * JVM 上のテスト環境では画素は常にソフトウェア側に置かれるため、グラフィックス側の画像での成立は
+ * 実機で走るこのテストでしか検証層に載らない。
  *
- * 画素がグラフィックス側に置かれるかどうかは端末とローダーの判断であり、実機でも常には
- * 成立しない (ローダーは端末の資源が逼迫すると自ら止める)。そのため構成の確認は契約の
- * アサーションではなく前提 ([org.junit.Assume]) として書く。満たさない端末では、確かめたい
- * 経路を踏めないことがレポートに skip として残る。
+ * 画素がグラフィックス側に置かれるかどうかは端末とローダーの判断であり、実機でも常には成立しない
+ * (ローダーは端末の資源が逼迫すると自ら止める)。グラフィックス側であることを前提にする確認は
+ * 契約のアサーションではなく前提 ([org.junit.Assume]) として書き、満たさない実行は skip として残す。
  *
  * 取得元は端末内に書き出したファイルにする。ネットワークを使うと、回線状態で結果が変わる。
+ * デコードの回数を数えるため、共有インスタンスを観測付きのローダーに差し替えるが、要求を出す経路は
+ * 本番のまま ([KsCoilImageLoading] と [KsImageRequestFactory]) にする。
  */
 @RunWith(AndroidJUnit4::class)
 // 共有インスタンスの差し替えは Coil で delicate 扱い。デコード回数を数えるために受け入れる。
@@ -56,210 +58,176 @@ internal class KsImageDeviceDecodeTest {
 
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
-    /** 枠より十分大きい元寸の画像。縮小が必ず走る大きさにする。 */
+    /** 枠より十分大きい元寸の画像。 */
     private lateinit var sourceFile: File
+
+    private lateinit var loader: ImageLoader
+    private val decodes = AtomicInteger(0)
+    private val starts = AtomicInteger(0)
+
+    /** 取得元のファイルを指す画像ソース。 */
+    private val source: KsImageSource get() = KsImageSource.File(sourceFile)
+
+    /** 先読みに渡す URL。画像ソースと同じ識別子になる。 */
+    private val sourceUrl: String get() = requireNotNull(source.identifier)
 
     @Before
     fun setUp() {
         sourceFile = writeSourceImage()
-        SingletonImageLoader.get(context).memoryCache?.clear()
-    }
-
-    /**
-     * 到達点メモリの先読みは落ちずに元寸をメモリへ載せ、その画素はグラフィックス側に置かれる。
-     *
-     * 以降の 3 件が確かめる「読み出せない元寸を初回の描画に使わない」経路が、この実行機で
-     * 実際に通ることの土台になる。ソフトウェア側に置かれた実行では、その経路は踏まれない。
-     */
-    @Test
-    fun memoryPrefetchStoresGraphicsBackedImage() {
-        prefetchToMemory()
-
-        val stored = awaitMemoryImage()
-        assertTrue(
-            "先読みが載せた画像がビットマップではありません: $stored",
-            stored is BitmapImage,
-        )
-        assumeGraphicsBacked(stored)
-    }
-
-    /**
-     * 到達点メモリの先読みの後で表示を組み立てても落ちず、表示に使う画像は枠を超えない。
-     *
-     * 先読みが載せた元寸は読み出せないため初回の描画には使わない。表示はローダーの縮小
-     * デコードを待ち、そこで枠の大きさに収まった画像が出る。
-     */
-    @Test
-    fun preparedRequestDecodesInsideFrameAfterMemoryPrefetch() {
-        prefetchToMemory()
-        assumeGraphicsBacked(awaitMemoryImage())
-
-        val prepared = KsImageRequestFactory.prepare(
-            context = context,
-            source = KsImageSource.File(sourceFile),
-            width = FrameSide,
-            height = FrameSide,
-            contentMode = KsImageContentMode.Fill,
-        )
-
-        assertNotNull("表示の組み立てが要求を作れませんでした", prepared)
-        assertNull(
-            "読み出せない元寸を初回の描画に使っています (枠を超えた大きさで描かれます)",
-            prepared!!.cachedImage,
-        )
-
-        val decoded = runBlocking { SingletonImageLoader.get(context).execute(prepared.request) }
-        val image = decoded.image
-            ?: throw AssertionError("ローダーが画像を返しませんでした: $decoded")
-        assertEquals("枠を覆う最小の幅になっていません", FrameSide, image.width)
-        assertEquals("枠を覆う最小の高さになっていません", FrameSide, image.height)
-    }
-
-    /**
-     * 読み出せない元寸がメモリにあっても落ちず、枠を超えた画像も描かない。
-     *
-     * 先読み以外の経路 — 利用者が同じ取得元を自分でローダーに要求した場合 — でも、
-     * 読み出せない元寸は同じ鍵へ載る。構成を直に指定して、その状態を作って確かめる。
-     */
-    @Test
-    fun preparedImageSkipsUnreadableOriginal() {
-        val hardware = decodeAsHardware()
-        // 構成の指定は要求であって保証ではないため、前提として扱う。
-        assumeTrue(
-            "この実行機では画素をグラフィックス側に置くデコードが起きず、分岐を確かめられません " +
-                "(構成: ${hardware.config})",
-            hardware.config == Bitmap.Config.HARDWARE,
-        )
-
-        val cacheKey = KsImageSource.File(sourceFile).cacheKey!!
-        SingletonImageLoader.get(context).memoryCache!!
-            .set(MemoryCache.Key(cacheKey), MemoryCache.Value(hardware.asImage()))
-
-        val prepared = KsImageRequestFactory.prepare(
-            context = context,
-            source = KsImageSource.File(sourceFile),
-            width = FrameSide,
-            height = FrameSide,
-            contentMode = KsImageContentMode.Fill,
-        )
-
-        assertNotNull("表示の組み立てが要求を作れませんでした", prepared)
-        assertNull(
-            "縮小できない元寸を初回の描画に使っています (枠を超えた大きさで描かれます)",
-            prepared!!.cachedImage,
-        )
-    }
-
-    /**
-     * 読み出せない元寸がメモリにある場合、表示はローダーのデコード 1 回で枠に収まる画像を得る。
-     *
-     * 表示側は元寸をその場で縮小できないため初回の描画には使わず (読み込み中の表示を経由し)、
-     * ローダーの縮小デコードを待つ。その待ちがちょうど 1 回で済むことをここで固定する。
-     * 元寸のデコードと合わせると、到達点メモリの初回表示は実機で 2 回デコードすることになる。
-     *
-     * 数え上げのため共有インスタンスを観測付きのローダーに差し替えるが、要求を出す経路は
-     * 本番のまま ([KsCoilImageLoading] と [KsImageRequestFactory]) にする。
-     */
-    @Test
-    fun displayAfterMemoryPrefetchDecodesOnceInLoader() {
-        val decodes = AtomicInteger(0)
-        val observed = ImageLoader.Builder(context)
+        decodes.set(0)
+        starts.set(0)
+        loader = ImageLoader.Builder(context)
             .eventListener(object : EventListener() {
-                override fun decodeStart(
-                    request: ImageRequest,
-                    decoder: Decoder,
-                    options: Options,
-                ) {
+                override fun onStart(request: ImageRequest) {
+                    starts.incrementAndGet()
+                }
+
+                override fun decodeStart(request: ImageRequest, decoder: Decoder, options: Options) {
                     decodes.incrementAndGet()
                 }
             })
             .build()
-        SingletonImageLoader.setUnsafe(observed)
-        try {
-            prefetchToMemory()
-            assumeGraphicsBacked(awaitMemoryImage())
-            val afterPrefetch = decodes.get()
+        SingletonImageLoader.setUnsafe(loader)
+        KsImageMemoryIndex.shared.removeAll()
+    }
 
-            val prepared = KsImageRequestFactory.prepare(
-                context = context,
-                source = KsImageSource.File(sourceFile),
-                width = FrameSide,
-                height = FrameSide,
-                contentMode = KsImageContentMode.Fill,
-            )
-            assertNotNull("表示の組み立てが要求を作れませんでした", prepared)
-            assertNull(
-                "読み出せない元寸を初回の描画に使っています (読み込み中を経由しません)",
-                prepared!!.cachedImage,
-            )
-
-            val decoded = runBlocking { observed.execute(prepared.request) }
-            val image = decoded.image
-                ?: throw AssertionError("ローダーが画像を返しませんでした: $decoded")
-            assertEquals("枠を覆う最小の幅になっていません", FrameSide, image.width)
-            assertEquals(
-                "表示のためのデコードが 1 回で済んでいません",
-                afterPrefetch + 1,
-                decodes.get(),
-            )
-        } finally {
-            SingletonImageLoader.reset()
-            observed.shutdown()
-        }
+    @After
+    fun tearDown() {
+        SingletonImageLoader.reset()
+        loader.shutdown()
+        KsImageMemoryIndex.shared.removeAll()
     }
 
     /**
-     * 元寸の画素がグラフィックス側に置かれたことを、確かめる契約ではなく前提として扱う。
+     * 幅の無い到達点メモリの先読みが載せた元寸は、画素がグラフィックス側にあっても引き当てられ、
+     * 表示は読み込み中を経由しない (ローダーへ要求を出さず、デコードもやり直さない)。
+     */
+    @Test
+    fun graphicsBackedOriginalIsMatchedWithoutLoading() {
+        val request = KsPrefetchRequest(sourceUrl)
+        prefetchToMemory(request)
+        val stored = awaitMemoryImage(request.memoryKey)
+        assumeGraphicsBacked(stored)
+        val startsBefore = starts.get()
+        val decodesBefore = decodes.get()
+
+        // 元寸 900 に対して枠 300 (必要な拡大率 1/3。上限 4 倍 = 0.25 の内側)。
+        val prepared = prepare(MatchedFrameSide)
+
+        assertSame("先読みが載せたグラフィックス側の元寸を引き当てませんでした", stored, prepared.matchedImage)
+        assertEquals("引き当てた表示がローダーへ要求を出しました", startsBefore, starts.get())
+        assertEquals("引き当てた表示がデコードをやり直しました", decodesBefore, decodes.get())
+    }
+
+    /**
+     * 幅を宣言した到達点メモリの先読みは、宣言した幅の正方形を覆う大きさの項目を載せ、元寸の項目は
+     * 載せない。その項目は同じ幅の枠の表示で引き当てられる。
+     */
+    @Test
+    fun widthPrefetchStoresTheDeclaredWidth() {
+        val request = KsPrefetchRequest(sourceUrl, widthPixels = FrameSide)
+        prefetchToMemory(request)
+        val stored = awaitMemoryImage(request.memoryKey)
+
+        assertEquals("宣言した幅の正方形を覆う幅になっていません", FrameSide, stored.width)
+        assertEquals("宣言した幅の正方形を覆う高さになっていません", FrameSide, stored.height)
+        assertNull(
+            "元寸の項目がメモリに載りました",
+            loader.memoryCache?.get(KsImageIdentity.originalKey(sourceUrl)),
+        )
+        assertSame("宣言した幅の項目を引き当てませんでした", stored, prepare(FrameSide).matchedImage)
+    }
+
+    /**
+     * 許容範囲の外の項目しか無いときは引き当てず、枠の実サイズへ縮小してデコードする要求に落ちる。
+     * そのデコードは 1 回で済み、枠を覆う最小の大きさになる。
+     */
+    @Test
+    fun itemOutsideTheRangeFallsBackToDownscaledDecode() {
+        val request = KsPrefetchRequest(sourceUrl)
+        prefetchToMemory(request)
+        awaitMemoryImage(request.memoryKey)
+        val decodesBefore = decodes.get()
+
+        // 元寸 900 に対して枠 200 (必要な拡大率 0.22。上限 4 倍 = 0.25 の外側)。
+        val prepared = prepare(FrameSide)
+        assertNull("許容範囲の外の元寸を引き当てました", prepared.matchedImage)
+
+        val image = runBlocking { loader.execute(prepared.request) }.image
+            ?: throw AssertionError("ローダーが画像を返しませんでした")
+        assertEquals("枠を覆う最小の幅になっていません", FrameSide, image.width)
+        assertEquals("枠を覆う最小の高さになっていません", FrameSide, image.height)
+        assertEquals("表示のためのデコードが 1 回で済んでいません", decodesBefore + 1, decodes.get())
+    }
+
+    /** 先読みなしの表示は枠の大きさでデコードし、表示の後もメモリに元寸の画像を置かない。 */
+    @Test
+    fun displayDoesNotKeepTheOriginalInMemory() {
+        val prepared = prepare(FrameSide)
+        assertNull(prepared.matchedImage)
+
+        runBlocking { loader.execute(prepared.request) }
+
+        val memory = requireNotNull(loader.memoryCache)
+        val entries = memory.keys.filter { it.key == sourceUrl }.mapNotNull { memory[it]?.image }
+        assertTrue("表示の項目がメモリに載っていません", entries.isNotEmpty())
+        assertTrue(
+            "表示の後に元寸の画像がメモリにあります: ${entries.map { it.width to it.height }}",
+            entries.none { it.width >= SourceSide || it.height >= SourceSide },
+        )
+        // 次の表示は、いま載った枠の大きさの項目を引き当てる。
+        assertNotNull(prepare(FrameSide).matchedImage)
+    }
+
+    private fun prepare(side: Int): KsPreparedImageRequest = requireNotNull(
+        KsImageRequestFactory.prepare(
+            context = context,
+            source = source,
+            width = side,
+            height = side,
+            contentMode = KsImageContentMode.Fill,
+        ),
+    ) { "表示の組み立てが要求を作れませんでした" }
+
+    /** 到達点メモリで取り込む。 */
+    private fun prefetchToMemory(request: KsPrefetchRequest) {
+        KsCoilImageLoading(context).enqueue(request, KsPrefetchDestination.Memory)
+    }
+
+    /**
+     * 先読みの画素がグラフィックス側に置かれたことを、確かめる契約ではなく前提として扱う。
      *
      * 置き場は端末とローダーの判断で、実機でもソフトウェア側になる実行がある。その実行では
-     * 読み出せない元寸の経路を踏めないため、失敗ではなく skip にする。
+     * グラフィックス側の画像での引き当てを確かめられないため、失敗ではなく skip にする。
      */
     private fun assumeGraphicsBacked(stored: Image) {
         val config = (stored as? BitmapImage)?.bitmap?.config
         assumeTrue(
             "先読みが載せた元寸の画素がグラフィックス側にありません (構成: $config)。" +
-                "この実行では読み出せない元寸の経路を確かめられません",
+                "この実行ではグラフィックス側の画像での引き当てを確かめられません",
             config == Bitmap.Config.HARDWARE,
         )
     }
 
-    /** 到達点メモリで元寸を取り込む。 */
-    private fun prefetchToMemory() {
-        KsCoilImageLoading(context).enqueue(
-            url = KsImageSource.File(sourceFile).cacheKey!!,
-            destination = KsPrefetchDestination.Memory,
-        )
-    }
-
     /**
-     * 先読みがメモリへ載せた元寸を待って返す。
+     * 先読みがメモリへ載せた画像を待って返す。
      *
      * 取得は別のスレッドで進むため、載ったこと自体を条件に待つ。制限時間を超えたら、
      * その時点で読めた内容を添えて失敗させる。
      */
-    private fun awaitMemoryImage(): Image {
-        val memory = SingletonImageLoader.get(context).memoryCache
+    private fun awaitMemoryImage(key: MemoryCache.Key): Image {
+        val memory = loader.memoryCache
             ?: throw AssertionError("共有ローダーがメモリキャッシュを持っていません")
-        val key = MemoryCache.Key(KsImageSource.File(sourceFile).cacheKey!!)
         val deadline = SystemClock.uptimeMillis() + AwaitTimeoutMillis
         while (SystemClock.uptimeMillis() < deadline) {
-            memory.get(key)?.image?.let { return it }
+            memory[key]?.image?.let { return it }
             // 取得のスレッドへ実行機会を譲る。譲らないと、この待機が CPU を占有する。
             Thread.sleep(1)
         }
         throw AssertionError(
-            "先読みの元寸が $AwaitTimeoutMillis ms 以内にメモリへ載りませんでした " +
-                "(メモリの項目数: ${memory.keys.size})",
+            "先読みの項目が $AwaitTimeoutMillis ms 以内にメモリへ載りませんでした " +
+                "(メモリの鍵: ${memory.keys})",
         )
-    }
-
-    /** 端末のデコードに画素をグラフィックス側へ置かせる。 */
-    private fun decodeAsHardware(): Bitmap {
-        val options = BitmapFactory.Options().apply {
-            inPreferredConfig = Bitmap.Config.HARDWARE
-        }
-        return BitmapFactory.decodeFile(sourceFile.absolutePath, options)
-            ?: throw AssertionError("元寸の画像を読み込めませんでした: ${sourceFile.absolutePath}")
     }
 
     /** 元寸の画像を端末内に書き出す。 */
@@ -285,11 +253,14 @@ internal class KsImageDeviceDecodeTest {
     }
 
     private companion object {
-        /** 元寸の一辺。枠より十分大きくして縮小を必ず走らせる。 */
+        /** 元寸の一辺。 */
         const val SourceSide = 900
 
-        /** 表示枠の一辺。 */
+        /** 縮小デコードに落ちる表示枠・幅の宣言の一辺。元寸に対して上限 4 倍の外側になる。 */
         const val FrameSide = 200
+
+        /** 元寸を引き当てられる表示枠の一辺。元寸に対して上限 4 倍の内側になる。 */
+        const val MatchedFrameSide = 300
 
         /** 先読みの完了を待つ上限。 */
         const val AwaitTimeoutMillis = 10_000L

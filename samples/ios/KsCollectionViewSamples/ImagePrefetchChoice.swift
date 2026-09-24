@@ -1,15 +1,19 @@
 import Foundation
 import KsCollectionView
 
-/// 「画像グリッド」画面で選べるプリフェッチの到達点。
+/// 「画像グリッド」画面で選べるプリフェッチの形 (到達点と表示幅)。
+// 並び順と文言は Android Sample の同名の選択肢とそろえる (cross/ADR-0004)。
 enum ImagePrefetchChoice: String, CaseIterable, Identifiable {
     case none = "なし"
     case disk = "ディスクまで"
+    /// 表示幅を宣言せず、元の大きさのままメモリへ載せる。
     case memory = "メモリまで"
+    /// 列幅を宣言し、列幅に縮小してメモリへ載せる。
+    case memoryColumn = "メモリまで (列幅)"
 
     var id: Self { self }
 
-    /// 起動引数 `--prefetch` で要求された選択。指定が無ければ `nil` (画面の初期選択に任せる)。
+    /// 起動引数 `--prefetch` (`none` / `disk` / `memory` / `memory-column`) で要求された選択。指定が無ければ `nil` (画面の初期選択に任せる)。
     ///
     /// 計測では到達点ごとに独立した実行を取るため、画面を開いた後に選び直すのではなく
     /// 起動の時点で決められる必要があります (選び直すと、その前の選択で読み込んだ分が
@@ -23,6 +27,7 @@ enum ImagePrefetchChoice: String, CaseIterable, Identifiable {
         case "none": ImagePrefetchChoice.none
         case "disk": ImagePrefetchChoice.disk
         case "memory": ImagePrefetchChoice.memory
+        case "memory-column": ImagePrefetchChoice.memoryColumn
         default: nil
         }
     }
@@ -41,7 +46,15 @@ enum ImagePrefetchChoice: String, CaseIterable, Identifiable {
         switch self {
         case .none: nil
         case .disk: .disk
-        case .memory: .memory
+        case .memory, .memoryColumn: .memory
+        }
+    }
+
+    /// 先読みの要素に宣言する表示幅。`nil` は元の大きさのまま扱う。
+    var width: KsWidth? {
+        switch self {
+        case .memoryColumn: .column
+        case .none, .disk, .memory: nil
         }
     }
 }

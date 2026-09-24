@@ -27,6 +27,7 @@ import jp.kamusoft.kscollectionview.KsColumns
 import jp.kamusoft.kscollectionview.KsImage
 import jp.kamusoft.kscollectionview.KsLayout
 import jp.kamusoft.kscollectionview.KsPrefetchDestination
+import jp.kamusoft.kscollectionview.KsResource
 
 /** ローダー付属のビューで表示する ID。初期表示の可視範囲より後ろで、先読みの窓に入る位置。 */
 private val SharedIds = (13..36).toList()
@@ -93,7 +94,7 @@ private fun PrefetchingCollection(items: List<DemoItem>) {
             columnSpacing = ImageGridMetrics.spacing,
         ),
         contentPadding = PaddingValues(ImageGridMetrics.spacing),
-        prefetchResources = { item -> listOf(DemoData.imageUrl(item.id)) },
+        prefetchResources = { item -> listOf(KsResource(DemoData.imageUrl(item.id))) },
         prefetchDestination = KsPrefetchDestination.Memory,
     ) {
         template { item -> ImageGridCell(item) }

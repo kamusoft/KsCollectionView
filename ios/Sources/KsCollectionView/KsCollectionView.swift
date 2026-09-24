@@ -194,20 +194,30 @@ public struct KsCollectionView<Item: Equatable>: View {
 
     /// もうすぐ表示される項目の画像を、表示より前に取得しておくことを宣言します。
     ///
-    /// クロージャには項目を渡し、その項目の表示に必要なリモート画像の URL を返します。返す URL が
-    /// 無い項目では空の配列を返してください。この宣言をしないコレクションでは画像の先読みは
-    /// 一切行われません。
+    /// クロージャには項目を渡し、その項目の表示に必要なリモート画像を ``KsResource`` の配列で
+    /// 返します。返す画像が無い項目では空の配列を返してください。この宣言をしないコレクションでは
+    /// 画像の先読みは一切行われません。
     ///
     /// ```swift
     /// KsCollectionView(photos) { photo in
     ///     KsImage(photo.thumbnailURL)
     /// }
-    /// .prefetchResources { [$0.thumbnailURL] }
+    /// .prefetchResources { [KsResource($0.thumbnailURL)] }
     /// ```
     ///
-    /// 先読みした画像は、同じ URL を表示するときに再ダウンロードなしで使われます。`destination` に
+    /// 先読みした画像は、同じ画像を表示するときに再ダウンロードなしで使われます。`destination` に
     /// ``KsPrefetchDestination/memory`` を指定すると、ディスクへの保存に加えてデコード済みの画像を
     /// メモリにも載せ、表示までの待ちをさらに短くします。
+    ///
+    /// メモリまで載せるときは、``KsResource`` に表示するときのおおよその幅を指定できます。幅を
+    /// 指定した画像はその幅に縮小してから載せるので、元の大きさのままよりメモリを使いません。
+    /// 列の幅 (``KsWidth/column``) はコレクションの 1 列分の幅として求められます。
+    ///
+    /// ```swift
+    /// .prefetchResources(destination: .memory) { photo in
+    ///     [KsResource(photo.thumbnailURL, width: .column)]
+    /// }
+    /// ```
     ///
     /// 既定の ``KsPrefetchDestination/disk`` が働くには、ディスクのキャッシュが有効になっている
     /// 必要があります。アプリの起動時に ``KsImagePipeline/enableSharedDiskCache()`` を一度呼んで
@@ -230,7 +240,7 @@ public struct KsCollectionView<Item: Equatable>: View {
     /// 始まる取得にだけ反映されます。
     public func prefetchResources(
         destination: KsPrefetchDestination = .disk,
-        _ resources: @escaping (Item) -> [URL]
+        _ resources: @escaping (Item) -> [KsResource]
     ) -> KsCollectionView<Item> {
         var copy = self
         copy.configuration.prefetchResources = resources

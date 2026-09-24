@@ -63,10 +63,43 @@ class ImageRequestKindTest {
             .size(Size(100, 100))
             .scale(Scale.FILL)
             .precision(Precision.EXACT)
-            .memoryCacheKey(MemoryCache.Key(Url, mapOf("coil#size" to "100x100")))
+            .memoryCacheKey(MemoryCache.Key(Url, mapOf("coil#size" to Size(100, 100).toString())))
             .build()
 
         assertEquals(ImageRequestKind.DisplayOrMemoryPrefetch, ImageRequestKind.of(request))
+    }
+
+    /**
+     * 表示幅を宣言した到達点メモリまでの先読みは、寸法つきの鍵と寸法の一致を求めない指定を持つため、
+     * 表示要求と取り違えずに幅つきの先読みとして記録される。
+     *
+     * 要求の形は本体の `KsCoilImageLoading` の実装に合わせて手で組んでいる (本体は internal)。
+     */
+    @Test
+    fun `幅つきの先読みは表示要求と区別して記録される`() {
+        val request = ImageRequest.Builder(context)
+            .data(Url)
+            .size(100, 100)
+            .scale(Scale.FILL)
+            .precision(Precision.INEXACT)
+            .memoryCacheKey(MemoryCache.Key(Url, mapOf("coil#size" to Size(100, 100).toString())))
+            .build()
+
+        assertEquals(ImageRequestKind.WidthPrefetch, ImageRequestKind.of(request))
+    }
+
+    /** キーを付けた幅つきの先読みも、鍵の本体に関わらず幅つきの先読みとして記録される。 */
+    @Test
+    fun `キー付きの幅つきの先読みも幅つきの先読みとして記録される`() {
+        val request = ImageRequest.Builder(context)
+            .data(Url)
+            .size(100, 100)
+            .precision(Precision.INEXACT)
+            .memoryCacheKey(MemoryCache.Key("ks-key p1", mapOf("coil#size" to Size(100, 100).toString())))
+            .diskCacheKey("ks-key p1")
+            .build()
+
+        assertEquals(ImageRequestKind.WidthPrefetch, ImageRequestKind.of(request))
     }
 
     private companion object {

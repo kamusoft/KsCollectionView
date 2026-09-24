@@ -17,6 +17,12 @@ struct SampleLaunchView: View {
     private let automaticallyVerifiesImagePerformance = ProcessInfo.processInfo.arguments.contains(
         "--verify-image-performance-auto"
     )
+    private let probesImagePrefetchMatch = ProcessInfo.processInfo.arguments.contains(
+        "--verify-image-prefetch-match-auto"
+    )
+    private let verifiesSlotShownClipping = ProcessInfo.processInfo.arguments.contains(
+        "--verify-slot-shown-clipping"
+    )
     private let verifiesLongPress = ProcessInfo.processInfo.arguments.contains(
         "--verify-long-press"
     )
@@ -31,10 +37,6 @@ struct SampleLaunchView: View {
         .dropFirst()
         .first
 
-    /// 画像の土俵で使うプリフェッチの到達点。`nil` は宣言しないことを表す。
-    private var prefetchDestination: KsPrefetchDestination? {
-        ImagePrefetchChoice.resolved.destination
-    }
 
     var body: some View {
         if verifiesInteractiveControl {
@@ -48,10 +50,14 @@ struct SampleLaunchView: View {
             .tint(SampleTheme.accent)
         } else if verifiesImageBehavior {
             ImageBehaviorVerificationView()
+        } else if verifiesSlotShownClipping {
+            ImageLoadingSlotShownClippingView()
+        } else if probesImagePrefetchMatch {
+            ImagePrefetchMatchProbeView()
         } else if automaticallyVerifiesImagePerformance {
             PerformanceVerificationView(
                 automaticallyRuns: true,
-                fixture: .imageGrid(destination: prefetchDestination)
+                fixture: .imageGrid(prefetch: ImagePrefetchChoice.resolved)
             )
         } else if verifiesPerformance || automaticallyVerifiesPerformance {
             PerformanceVerificationView(automaticallyRuns: automaticallyVerifiesPerformance)

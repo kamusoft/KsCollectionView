@@ -23,7 +23,7 @@ val LargeDataLayout: KsLayout = KsLayout.Grid(
 /**
  * 「大量件数」画面。10,000 件を 2 列グリッドで並べ、固定高と可変行高を混ぜて表示する。
  *
- * 件数・列数・行間 / 列間・データの作り方は iOS Sample の同名画面とそろえる (cross/ADR-0004)。
+ * 件数・列数・行間 / 列間・データの作り方は iOS Sample の同名画面とそろえる。
  */
 @Composable
 fun LargeDataDemoScreen(modifier: Modifier = Modifier) {

@@ -1,4 +1,5 @@
 import Darwin
+import Nuke
 @_spi(KsMeasurement) import KsCollectionView
 import SwiftUI
 import UIKit
@@ -14,6 +15,8 @@ struct PerformanceVerificationView: View {
     @State private var visitedItemsInLastRoundTrip: Set<Int> = []
     @State private var footprints: [UInt64] = []
     @State private var isRunning = false
+    // 走行の後に、コレクションを外して解放を確かめる (Debug 構成の画像グリッドだけ)。
+    @State private var showsFixture = true
 
     /// 往復を重ねた結果の判定です。
     enum Judgement: String {
@@ -49,11 +52,32 @@ struct PerformanceVerificationView: View {
             Text(verbatim: "直近往復の通過: \(visitedItemsInLastRoundTrip.count) / \(fixture.itemCount)")
                 .accessibilityIdentifier("performance.visitedItems")
 
-            fixtureCollection
+            if showsFixture {
+                fixtureCollection
+            }
         }
         .task {
             guard automaticallyRuns else { return }
+            if waitsForLoading {
+                // 段ごとの待ちは、観測の記録 (取得中の要求) と画面に出た読み込み中の印で判定する。
+                // どちらかが無いと待たずに進み、手順どおりの往復と区別できなくなるため、走らせない。
+                guard ImageLoadingObservation.isRequested, ImageLoadingSlotCounter.isEnabled else {
+                    print(
+                        "KS_PERF_ERROR=--memory-loaded には "
+                            + "--observe-image-loading と --count-image-loading-slots が必要です"
+                    )
+                    exit(EXIT_FAILURE)
+                }
+                ImageLoadingLedger.shared.startRecording()
+            }
             let isSteady = await runUntilSteady()
+            #if DEBUG
+            // 索引とメモリキャッシュの突き合わせと、画面離脱後の解放の確認。本体の内部を読むため
+            // Debug 構成だけで行う (Release のメモリの値には含まれない)。
+            if case .imageGrid(let prefetch) = fixture {
+                await ImageMemoryIndexReport.run(prefetch: prefetch) { showsFixture = false }
+            }
+            #endif
             // 定常化しないまま終わった走行を成功として終わらせない (未判定が緑にならない)。
             exit(isSteady ? EXIT_SUCCESS : EXIT_FAILURE)
         }
@@ -70,10 +94,10 @@ struct PerformanceVerificationView: View {
             ) { item in
                 DemoListRow(item: item)
             }
-        case .imageGrid(let destination):
+        case .imageGrid(let prefetch):
             // 件数・列数・間隔・外周の余白・セルはデモ画面と同じ宣言元 (ImageGridFixture) から
-            // 取り、プリフェッチの到達点だけを外から選ぶ。
-            ImageGridFixture.collection(destination: destination)
+            // 取り、プリフェッチの形だけを外から選ぶ。
+            ImageGridFixture.collection(prefetch: prefetch)
         }
     }
 
@@ -81,6 +105,17 @@ struct PerformanceVerificationView: View {
         Task { @MainActor in
             await performRoundTrip()
         }
+    }
+
+    /// 段ごとに読み込みを待つ往復にするか。起動引数 `--memory-loaded` を付けた画像グリッドの走行だけで働きます。
+    ///
+    /// 手順どおりの往復は位置をアニメーション無しで書き換えて取得より速く進むため、UIKit が先読みの
+    /// 通知を出さず、画像もほとんど載らないまま終わります。メモリキャッシュが満ちた状態 (先読みの項目の
+    /// 寸法・索引の充足) を見るときは、この往復で送りをアニメーション付きにし、段ごとに進行中の読み込みと
+    /// 見える範囲の読み込み中が無くなるまで (上限 10 秒) 待ってから進みます。
+    private var waitsForLoading: Bool {
+        guard case .imageGrid = fixture else { return false }
+        return ProcessInfo.processInfo.arguments.contains("--memory-loaded")
     }
 
     /// 1 段階の送り量を可視範囲の高さに対する割合で決めます。
@@ -156,6 +191,15 @@ struct PerformanceVerificationView: View {
             "KS_PERF_MEMORY_ROUND_\(completedRoundTrips)=\(text) "
                 + "visited=\(visited.count)/\(fixture.itemCount)"
         )
+        // 画像グリッドでは、往復ごとのメモリキャッシュの大きさ (ローダーの見積もり) と件数も出す。
+        // 展開した画素の記憶域は phys_footprint に表れないことがあるため、別に記録する。
+        if case .imageGrid = fixture,
+           let cache = ImagePipeline.shared.configuration.imageCache as? ImageCache {
+            print(
+                "KS_CACHE round=\(completedRoundTrips) totalCost=\(cache.totalCost) "
+                    + "totalCount=\(cache.totalCount) costLimit=\(cache.costLimit)"
+            )
+        }
 
         let reachedBothEnds = forward.reachedEnd && backward.reachedEnd
         let settledEveryStep = forward.settled && backward.settled
@@ -198,12 +242,16 @@ struct PerformanceVerificationView: View {
                 return (reachedEnd: true, settled: settledEveryStep)
             }
 
+            // 読み込みを待つ往復では、UIKit が先読みの通知を出すようアニメーションで送る。
             collectionView.setContentOffset(
                 CGPoint(x: collectionView.contentOffset.x, y: target),
-                animated: false
+                animated: waitsForLoading
             )
             if await settle(collectionView, target: target) == false {
                 settledEveryStep = false
+            }
+            if waitsForLoading {
+                await Self.waitForLoading(collectionView)
             }
 
             steps += 1
@@ -215,6 +263,31 @@ struct PerformanceVerificationView: View {
         }
         Self.record(collectionView, into: &visited)
         return (reachedEnd: false, settled: settledEveryStep)
+    }
+
+    /// 進行中の読み込み (観測の記録で始まって終わっていないもの) が無くなり、見える範囲に掛かる
+    /// 読み込み中の表示が無くなるまで待ちます。上限 10 秒を過ぎたら待たずに進みます
+    /// (取得の遅れで走査全体が止まらないようにする)。
+    @MainActor
+    private static func waitForLoading(_ collectionView: UICollectionView) async {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while ContinuousClock.now < deadline {
+            // 記録を始める前に始まった要求は終わりだけが記録に残ることがあるため、開始と終了の数の差
+            // ではなく、要求 (種別 + URL) ごとに「始まって終わっていない」ものを数える。
+            var open: Set<String> = []
+            for entry in ImageLoadingLedger.shared.snapshot() {
+                let key = entry.kind + " " + entry.url
+                if entry.event == "start" {
+                    open.insert(key)
+                } else {
+                    open.remove(key)
+                }
+            }
+            if open.isEmpty, ImagePrefetchMatchProbe.placeholdersOnScreen(in: collectionView) == 0 {
+                return
+            }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
     }
 
     /// 目的の位置に到達し、その位置のセルが載るまで待ちます。固定時間ではなく到達そのものを条件にします。

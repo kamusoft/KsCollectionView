@@ -1,70 +1,54 @@
 package jp.kamusoft.kscollectionview
 
 import android.content.Context
-import android.graphics.Bitmap
-import coil3.BitmapImage
 import coil3.Image
+import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import coil3.asImage
-import coil3.decode.DecodeUtils
 import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
 import coil3.size.Precision
 import coil3.size.Scale
 import coil3.size.Size
-import coil3.toBitmap
-import kotlin.math.roundToInt
 
-/** 表示に使う要求と、組み立ての時点でメモリから同期で取り出せた画像の組。 */
+/** 表示に使う要求と、メモリから引き当てた画像の組。 */
 internal data class KsPreparedImageRequest(
-    /** ローダーへ出す要求。 */
+    /** 引き当てに失敗したときにローダーへ出す、枠の実サイズへ縮小してデコードする要求。 */
     val request: ImageRequest,
+    /** [request] がローダーのメモリへ載せる項目の鍵。要求を出す時点で索引に覚えさせる。 */
+    val displayKey: MemoryCache.Key,
     /**
-     * ローダーの応答を待たずにそのまま描ける画像。null になるのは、メモリに何も無い場合と、
-     * メモリにある元寸の画素を読み出せず枠の大きさへ縮小できない場合 ([KsDownscaleResult.Unreadable])
-     * の 2 通りで、どちらも読み込み中の表示から始まる。
+     * メモリから引き当てた、枠にそのまま使える画像。あれば表示はこれで完了し、ローダーへは
+     * 要求を出さない。無ければ null で、[request] を出して読み込み中の表示から始まる。
      */
-    val cachedImage: Image?,
+    val matchedImage: Image?,
+    /**
+     * 引き当てに失敗し、同じ識別子の先読みがまだ取得中で、その項目がまだメモリに無いか。少し待てば
+     * 引き当てられる見込みがあることを表す。完了・失敗・取り消し・追い出し済みの先読みは含まない。
+     * 引き当てたときと、ローダーのメモリキャッシュが無いときは false。
+     */
+    val prefetchPending: Boolean = false,
 )
 
 /**
  * 表示側の要求を組み立てる。
  *
- * 表示枠の実サイズが確定してから、その大きさへ縮小してデコードする要求を作る。要求には
- * 表示サイズを含む鍵を付けるため、同じ取得元でも表示サイズごとに別のキャッシュ項目になる。
+ * 表示枠の実サイズが確定してから、まずライブラリが把握しているメモリの項目を引き当て、使えるものが
+ * 無いときだけ枠の実サイズへ縮小してデコードする要求を作る。縮小はデコード時に行うため、元寸の
+ * 画像はメモリに展開されない。
  *
- * 先読みは寸法を付けない要求で元寸をメモリへ載せるので、表示に使う鍵とは一致しない。
- * そのままでは元寸をそのまま描くか、取得しなおすかのどちらかになるため、[prepare] は
- * 元寸の項目をその場で枠の大きさへ縮小し、表示に使う鍵へ載せ直す。取得もデコードも
- * やり直さず、以後の表示は表示サイズ付きの鍵で当たる。
- *
- * ただしこの引き当てが成立するのは、元寸の画素を読み出せる場合に限る。実機の到達点メモリの
- * 先読みが載せる元寸は通常グラフィックス側に画素を置くため縮小できず、初回の描画には使えない
- * ([KsDownscaleResult.Unreadable])。表示は読み込み中を一瞬経由してローダーの縮小デコードを待つ。
- * 常にではない — ローダーは端末の資源が逼迫するとグラフィックス側への配置を自ら止めるため、
- * 実機でも読み出せる元寸が載る実行がある。先読み自体を表示サイズで出せば引き当ては常に成立するが、
- * それには先読みの時点で表示枠の大きさを知る仕組みが要るため、現状は暫定的にこの形にしている。
+ * 引き当ては、索引 ([KsImageMemoryIndex]) が覚えている同じ識別子の鍵をローダーのメモリキャッシュへ
+ * 問い合わせ、返った画像の実物の寸法が枠に対して許容範囲の内側にあるものを選ぶ ([KsImageMatching])。
+ * 画素を読んで縮小し直すことはしないので、画素がグラフィックス側に置かれた (読み出せない) 画像でも
+ * 成立する。
  */
 internal object KsImageRequestFactory {
 
     /**
-     * 鍵に表示サイズを載せるための付随情報の名前。
+     * 表示枠の大きさと当てはめ方から要求を組み立て、あわせてメモリから枠にそのまま使える画像を
+     * 引き当てる。ローダーを通さないソースと、大きさが未確定 (0 以下) の間は null を返す。
      *
-     * ローダーは鍵に載った表示サイズと要求の表示サイズが食い違う項目を捨てるため、
-     * ローダーが見るのと同じ名前でなければ、載せた項目が使われないまま捨てられる。
-     */
-    private const val SizeExtra: String = "coil#size"
-
-    /**
-     * 鍵に当てはめ方を載せるための付随情報の名前。同じ枠でも fit と fill では縮小後の寸法が
-     * 違うため、これが無いと先に作られた側の画像がもう一方でも使われてしまう。
-     */
-    private const val ScaleExtra: String = "ks#scale"
-
-    /**
-     * 表示枠の大きさと当てはめ方から要求を組み立て、初回の描画に使える画像を同期で用意する。
-     *
-     * ローダーを通さないソースと、大きさが未確定 (0 以下) の間は null を返す。
+     * 引き当てに失敗したときは、返す要求の鍵を索引に覚えさせる (呼び出し側がその要求をすぐに出す
+     * 前提)。要求をすぐには出さない呼び出し側は [lookup] で組み立て、出す時点で [markRequested] を呼ぶ。
      */
     fun prepare(
         context: Context,
@@ -72,105 +56,76 @@ internal object KsImageRequestFactory {
         width: Int,
         height: Int,
         contentMode: KsImageContentMode,
+        loader: ImageLoader = SingletonImageLoader.get(context),
+        index: KsImageMemoryIndex = KsImageMemoryIndex.shared,
     ): KsPreparedImageRequest? {
-        val cacheKey = source.cacheKey ?: return null
+        val prepared = lookup(context, source, width, height, contentMode, loader, index)
+        if (prepared != null && prepared.matchedImage == null) markRequested(prepared, index)
+        return prepared
+    }
+
+    /**
+     * [prepare] と同じく要求を組み立てて引き当てるが、索引には何も覚えさせない。
+     *
+     * 画面に出る前に組み立てられた表示は、ここで引き当てを試すだけにして要求を出さない。要求を
+     * 出すのは画面に出る時点で、そのときに [markRequested] を呼ぶ。完了前の鍵は問い合わせで
+     * 空になるだけで候補にならない。
+     */
+    fun lookup(
+        context: Context,
+        source: KsImageSource,
+        width: Int,
+        height: Int,
+        contentMode: KsImageContentMode,
+        loader: ImageLoader = SingletonImageLoader.get(context),
+        index: KsImageMemoryIndex = KsImageMemoryIndex.shared,
+    ): KsPreparedImageRequest? {
+        val identifier = source.identifier ?: return null
         if (width <= 0 || height <= 0) return null
 
         val size = Size(width, height)
-        val scale = contentMode.toCoilScale()
-        val displayKey = MemoryCache.Key(
-            cacheKey,
-            mapOf(SizeExtra to size.toString(), ScaleExtra to scale.name),
-        )
-        val request = ImageRequest.Builder(context)
+        val displayKey = KsImageIdentity.displayKey(identifier, size, contentMode)
+        val builder = ImageRequest.Builder(context)
             .data(source.loaderModel())
             .size(size)
-            .scale(scale)
+            .scale(contentMode.toCoilScale())
             // 枠の大きさへ確実に収めるため、寸法の一致を求める。緩めると縮小されていない
             // 項目が表示サイズと無関係に使われる。
             .precision(Precision.EXACT)
             .memoryCacheKey(displayKey)
-            .build()
+        // キーのある画像は、ディスクの項目もキーで見分ける。キーの無い画像はローダーの既定
+        // (URL) のままにして、ローダー付属のビューと同じ項目を共有する。
+        if (source.hasKey) builder.diskCacheKey(identifier)
+        val request = builder.build()
 
-        val memory = SingletonImageLoader.get(context).memoryCache
-            ?: return KsPreparedImageRequest(request, null)
-
-        // この大きさで縮小済みの画像が既にあるなら、それをそのまま初回の描画に使う。
-        memory.get(displayKey)?.image?.let { return KsPreparedImageRequest(request, it) }
-
-        // 先読みが載せた元寸の項目。寸法を付けない要求なので鍵は取得元の文字列そのものになる。
-        val original = memory.get(MemoryCache.Key(cacheKey))?.image
-            ?: return KsPreparedImageRequest(request, null)
-
-        return when (val result = downscale(original, width, height, scale)) {
-            is KsDownscaleResult.Done -> {
-                memory.set(displayKey, MemoryCache.Value(result.image))
-                KsPreparedImageRequest(request, result.image)
+        val memory = loader.memoryCache
+        if (memory != null) {
+            val entries = index.cachedEntries(identifier, memory)
+            val best = KsImageMatching.bestMatch(
+                imageSizes = entries.map { (_, image) -> image.width to image.height },
+                frameWidth = width,
+                frameHeight = height,
+                contentMode = contentMode,
+            )
+            if (best != null) {
+                val (key, image) = entries[best]
+                index.markUsed(key)
+                return KsPreparedImageRequest(request, displayKey, image)
             }
-
-            // 枠より小さい画像は縮小しない。ローダーが読み直しを決めるまでの間は元の大きさで描く。
-            KsDownscaleResult.NotNeeded -> KsPreparedImageRequest(request, original)
-
-            // 画素を読み出せない画像はその場で縮小できない。元の大きさのまま描くと表示に使う
-            // 画像が枠を超えてしまうため、初回の描画には使わずローダーの縮小デコードを待つ。
-            // 実機で到達点メモリの先読みが載せた元寸はこの経路を通る。
-            KsDownscaleResult.Unreadable -> KsPreparedImageRequest(request, null)
+            val prefetchPending = index.hasFetchInFlight(identifier, memory)
+            return KsPreparedImageRequest(request, displayKey, null, prefetchPending)
         }
+        return KsPreparedImageRequest(request, displayKey, null)
     }
 
-    /**
-     * 元寸の画像から、当てはめ方に応じた寸法の画像をその場で作る。
-     * fit は枠に収まる最大、fill は枠を覆う最小になる。
-     */
-    private fun downscale(
-        image: Image,
-        width: Int,
-        height: Int,
-        scale: Scale,
-    ): KsDownscaleResult {
-        val sourceWidth = image.width
-        val sourceHeight = image.height
-        if (sourceWidth <= 0 || sourceHeight <= 0) return KsDownscaleResult.NotNeeded
-
-        val multiplier = DecodeUtils.computeSizeMultiplier(
-            srcWidth = sourceWidth,
-            srcHeight = sourceHeight,
-            dstWidth = width,
-            dstHeight = height,
-            scale = scale,
-            maxSize = Size.ORIGINAL,
-        )
-        if (multiplier >= 1.0) return KsDownscaleResult.NotNeeded
-        if (!image.isPixelReadable()) return KsDownscaleResult.Unreadable
-
-        val targetWidth = (sourceWidth * multiplier).roundToInt().coerceAtLeast(1)
-        val targetHeight = (sourceHeight * multiplier).roundToInt().coerceAtLeast(1)
-        return KsDownscaleResult.Done(image.toBitmap(targetWidth, targetHeight).asImage())
+    /** 要求をローダーへ出す時点で、その要求が載せる項目の鍵を索引に覚えさせる。 */
+    fun markRequested(
+        prepared: KsPreparedImageRequest,
+        index: KsImageMemoryIndex = KsImageMemoryIndex.shared,
+    ) {
+        index.register(prepared.displayKey)
     }
 }
-
-/** 元寸の画像をその場で縮小しようとした結果。 */
-private sealed interface KsDownscaleResult {
-
-    /** 縮小した画像ができた。 */
-    data class Done(val image: Image) : KsDownscaleResult
-
-    /** 枠より小さいため縮小する必要が無い。 */
-    data object NotNeeded : KsDownscaleResult
-
-    /** 画素を読み出せないため縮小できない。 */
-    data object Unreadable : KsDownscaleResult
-}
-
-/**
- * その場での縮小に使えるよう画素を読み出せる画像かどうか。
- *
- * 端末のデコードはグラフィックス側に置く構成 ([Bitmap.Config.HARDWARE]) を選ぶことがあり、
- * その画像は画素を読み出せないため、縮小しようとすると実行時に落ちる。読み出せるのは
- * ソフトウェア側の構成の画像と、ビットマップを持たない画像 (図形など) に限られる。
- */
-private fun Image.isPixelReadable(): Boolean =
-    this !is BitmapImage || bitmap.config != Bitmap.Config.HARDWARE
 
 /** 当てはめ方をローダーの縮小の基準へ対応させる。 */
 internal fun KsImageContentMode.toCoilScale(): Scale = when (this) {

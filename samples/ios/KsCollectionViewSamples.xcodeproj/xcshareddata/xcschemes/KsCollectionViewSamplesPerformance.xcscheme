@@ -45,6 +45,9 @@
                <Test
                   Identifier = "LargeDataCountUITests">
                </Test>
+               <Test
+                  Identifier = "ImageGridCountUITests">
+               </Test>
             </SkippedTests>
          </TestableReference>
       </Testables>

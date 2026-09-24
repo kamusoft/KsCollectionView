@@ -30,6 +30,15 @@ object SampleRoutes {
      */
     const val CountImageLoadingSlotsExtra = "ks_count_image_loading_slots"
 
+    /**
+     * 「画像グリッド」画面のプリフェッチの形を起動時に決める Intent の追加情報のキー。
+     *
+     * 値は `none` / `disk` / `memory` / `memory-column` ([ImagePrefetchChoice.argument])。計測では
+     * 到達点ごとに独立した実行を取るため、画面を開いた後に選び直すのではなく起動の時点で決める
+     * (選び直すと、その前の選択で読み込んだ分が観測に混じる)。iOS の起動引数 `--prefetch` と対称。
+     */
+    const val PrefetchExtra = "ks_prefetch"
+
     /** デモ画面の経路。 */
     fun demo(screen: SampleScreen): String = "demo/${screen.name}"
 

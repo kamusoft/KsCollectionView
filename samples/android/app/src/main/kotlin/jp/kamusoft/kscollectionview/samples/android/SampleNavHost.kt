@@ -20,9 +20,11 @@ private const val ScreenArgument = "screen"
  * Sample 全体の画面遷移。
  *
  * @param startRoute 起動直後に開く経路。null ならルートメニューだけを出す
+ * @param requestedPrefetch 起動時に指定された「画像グリッド」のプリフェッチの形。null なら画面の
+ *   初期選択
  */
 @Composable
-fun SampleNavHost(startRoute: String? = null) {
+fun SampleNavHost(startRoute: String? = null, requestedPrefetch: ImagePrefetchChoice? = null) {
     val navController = rememberNavController()
     // 起動時の経路指定は 1 回だけ消費する。構成変更 (回転) で Activity が作り直されても
     // Intent の追加情報は残るため、消費済みを覚えていないと同じ宛先が back stack に積み増し、
@@ -57,7 +59,9 @@ fun SampleNavHost(startRoute: String? = null) {
                     SampleScreen.Scrolling -> ScrollControlDemoScreen()
                     SampleScreen.Spacing -> SpacingPaddingDemoScreen()
                     SampleScreen.LargeData -> LargeDataDemoScreen()
-                    SampleScreen.ImageGrid -> ImageGridDemoScreen()
+                    SampleScreen.ImageGrid -> ImageGridDemoScreen(
+                        initialChoice = requestedPrefetch ?: ImagePrefetchChoice.InitialSelection,
+                    )
                 }
             }
         }

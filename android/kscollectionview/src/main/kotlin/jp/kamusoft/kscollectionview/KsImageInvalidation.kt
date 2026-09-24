@@ -20,8 +20,8 @@ internal object KsImageInvalidation {
 
     private val sourceGenerations = mutableStateMapOf<String, Int>()
 
-    /** キャッシュ鍵に対応する世代。一度も消していないソースは 0 になる。 */
-    fun generation(cacheKey: String): Int = sourceGenerations[cacheKey] ?: 0
+    /** 画像の識別子に対応する世代。一度も消していないソースは 0 になる。 */
+    fun generation(identifier: String): Int = sourceGenerations[identifier] ?: 0
 
     /** 範囲消去の世代を進める。 */
     fun invalidateAll() {
@@ -29,8 +29,8 @@ internal object KsImageInvalidation {
     }
 
     /** ソース 1 つ分の世代を進める。 */
-    fun invalidateSource(cacheKey: String) {
-        sourceGenerations[cacheKey] = generation(cacheKey) + 1
+    fun invalidateSource(identifier: String) {
+        sourceGenerations[identifier] = generation(identifier) + 1
     }
 
     /** テストが互いの世代を持ち込まないために使う。 */

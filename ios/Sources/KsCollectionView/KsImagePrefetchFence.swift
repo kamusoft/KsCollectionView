@@ -6,8 +6,8 @@ internal protocol KsImagePrefetchFencing: AnyObject {
     // 台帳に残っている取得をすべて止め、台帳も空にする。
     func fenceAll()
 
-    // 指定した URL の取得だけを止め、台帳から外す。
-    func fence(url: URL)
+    // 指定した識別子の画像の取得だけを、幅に関わらずすべて止め、台帳から外す。
+    func fence(identifier: String)
 }
 
 // 生存している先読み層の名簿。キャッシュを消すときに、消す前に始まった取得が
@@ -38,11 +38,11 @@ internal final class KsImagePrefetchRegistry {
         }
     }
 
-    // 指定した URL の取得だけを止める。ソース単位の削除で使う。
-    func fence(url: URL) {
+    // 指定した識別子の画像の取得だけを止める。ソース単位の削除で使う。
+    func fence(identifier: String) {
         compact()
         for entry in entries {
-            entry.target?.fence(url: url)
+            entry.target?.fence(identifier: identifier)
         }
     }
 

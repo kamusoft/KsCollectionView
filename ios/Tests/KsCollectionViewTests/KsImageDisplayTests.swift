@@ -25,6 +25,7 @@ final class KsImageDisplayTests: XCTestCase {
         try await super.setUp()
         KsImageIdentity.resetGenerations()
         KsImageInvalidation.shared.reset()
+        KsImageMemoryIndex.shared.removeAll()
         KsRemoteOnlyURLProtocol.reset()
 
         var configuration = ImagePipeline.Configuration()
@@ -53,6 +54,7 @@ final class KsImageDisplayTests: XCTestCase {
         pipeline = nil
         KsImageIdentity.resetGenerations()
         KsImageInvalidation.shared.reset()
+        KsImageMemoryIndex.shared.removeAll()
         try await super.tearDown()
     }
 
@@ -145,7 +147,7 @@ final class KsImageDisplayTests: XCTestCase {
             displayScale: displayScale,
             pipeline: pipeline
         )
-        return prepared?.cachedImage != nil
+        return prepared?.matchedImage != nil
     }
 
     /// メモリにある画像を描く経路で `KsImage` を描き、中心の色を確かめる。

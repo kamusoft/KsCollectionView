@@ -246,9 +246,34 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 resources: resources,
                 destination: configuration.prefetchDestination
             )
+            // 列の幅は先読みの通知が来た時点の表示領域から解く。回転や列数の変化の後に始まる
+            // 先読みは、その時点の列の幅で出る。
+            prefetcher.metrics = { [weak self] in
+                self?.prefetchMetrics() ?? KsPrefetchMetrics(columnWidth: 0, displayScale: 1)
+            }
             imagePrefetcher = prefetcher
         }
         configuration.prefetcher = KsAnyPrefetcher(prefetcher)
+    }
+
+    // 先読みの幅をピクセルへ解くための、現在の表示領域の寸法。列の幅はレイアウトが列数を決めるのと
+    // 同じ規則 (表示領域の大きさ・内側余白・列の間隔) で求める。
+    func prefetchMetrics() -> KsPrefetchMetrics {
+        let insets = collectionView.adjustedContentInset
+        let bounds = collectionView.bounds.size
+        let container = CGSize(
+            width: bounds.width - insets.left - insets.right,
+            height: bounds.height - insets.top - insets.bottom
+        )
+        let padding = configuration.contentPadding
+        let columnWidth = KsLayoutMetrics.columnWidth(
+            for: configuration.layout,
+            containerSize: container,
+            horizontalPadding: padding.leading + padding.trailing
+        )
+        // 画面に載る前は表示倍率が決まっていない (0) ことがある。その間は 1 として解く。
+        let scale = traitCollection.displayScale
+        return KsPrefetchMetrics(columnWidth: columnWidth, displayScale: scale > 0 ? scale : 1)
     }
 
     private func configureCollectionView() {

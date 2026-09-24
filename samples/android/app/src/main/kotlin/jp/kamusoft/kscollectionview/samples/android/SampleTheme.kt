@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.dp
  * Sample 共通の配色と寸法。
  *
  * 実値がプラットフォーム間でずれる OS の semantic color は使わず、iOS Sample の同名定義と
- * 同じ RGBA・同じ寸法をここに置く (cross/ADR-0004)。
+ * 同じ RGBA・同じ寸法をここに置く。
  */
 object SampleTheme {
     val accent = Color(0xFF2F6FED)

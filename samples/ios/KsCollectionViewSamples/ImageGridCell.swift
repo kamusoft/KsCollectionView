@@ -6,6 +6,8 @@ struct ImageGridCell: View {
     let item: DemoItem
 
     var body: some View {
+        // 計測用の画面が観測している間だけ、組み立てた時刻を残す (それ以外の実行では何もしない)。
+        let _ = ImagePrefetchMatchProbe.noteCellBuilt(itemID: item.id)
         VStack(alignment: .leading, spacing: 0) {
             image
                 .aspectRatio(1, contentMode: .fit)

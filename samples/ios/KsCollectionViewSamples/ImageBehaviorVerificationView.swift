@@ -76,7 +76,7 @@ struct ImageBehaviorVerificationView: View {
             ImageGridCell(item: item)
         }
         .prefetchResources(destination: .memory) {
-            [DemoData.imageURL(for: $0.id)]
+            [KsResource(DemoData.imageURL(for: $0.id))]
         }
     }
 

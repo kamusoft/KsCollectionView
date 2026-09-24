@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import jp.kamusoft.kscollectionview.KsCollectionView
 import jp.kamusoft.kscollectionview.KsLayout
 import jp.kamusoft.kscollectionview.KsPrefetchDestination
+import jp.kamusoft.kscollectionview.KsResource
 import jp.kamusoft.kscollectionview.KsScrollPosition
 import jp.kamusoft.kscollectionview.rememberKsScrollController
 import kotlinx.coroutines.delay
@@ -60,10 +61,12 @@ private const val ReleaseDeadlineMillis = 10_000L
  * @param maxRoundTrips 重ねる往復の上限
  * @param layout 土俵の配置
  * @param contentPadding 土俵の外周の余白
- * @param prefetchResources プリフェッチする URL の宣言。宣言しないときは null
+ * @param prefetchResources プリフェッチする画像の宣言。宣言しないときは null
  * @param prefetchDestination プリフェッチの到達点
  * @param replacementItems 定常に達した後に差し替える配列を作る処理。渡さないときは置換しない
  * @param onLeave 置換の後に画面を離れる処理。渡さないときは離れず、この画面が結果を出す
+ * @param roundTripProbe 往復ごとの記録に添える追加の観測を作る処理。渡さないときは添えない
+ * @param afterStep 1 段階の到達の後に、次の段階へ進む前に待つ処理。渡さないときは待たない
  * @param row 1 項目の見た目
  */
 @Composable
@@ -73,10 +76,12 @@ fun MemoryRoundTripScreen(
     modifier: Modifier = Modifier,
     layout: KsLayout = LargeDataLayout,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    prefetchResources: ((DemoItem) -> List<String>)? = null,
+    prefetchResources: ((DemoItem) -> List<KsResource>)? = null,
     prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
     replacementItems: (() -> List<DemoItem>)? = null,
     onLeave: (() -> Unit)? = null,
+    roundTripProbe: (() -> String)? = null,
+    afterStep: (suspend () -> Unit)? = null,
     row: @Composable (DemoItem) -> Unit = { DemoListRow(it) },
 ) {
     val controller = rememberKsScrollController()
@@ -108,7 +113,7 @@ fun MemoryRoundTripScreen(
             // (すでに載っている項目は改めて載り直さないため)。
             visited.clear()
             visited += composed
-            failure = scan(items, composed) { id ->
+            failure = scan(items, composed, afterStep) { id ->
                 controller.scrollTo(id, KsScrollPosition.Start, false)
             }
             if (failure != null) break
@@ -130,6 +135,9 @@ fun MemoryRoundTripScreen(
                 "KsMemoryRoundTrip",
                 "items=${items.size} roundTrip=$trip totalPssKb=$pss visited=${visited.size}",
             )
+            roundTripProbe?.let { probe ->
+                Log.i("KsMemoryRoundTrip", "items=${items.size} roundTrip=$trip probe ${probe()}")
+            }
 
             if (isSteady(readings)) {
                 settledAt = trip
@@ -245,22 +253,27 @@ fun MemoryRoundTripScreen(
 private suspend fun scan(
     items: List<DemoItem>,
     composed: Set<Int>,
+    afterStep: (suspend () -> Unit)?,
     scrollTo: (Any) -> Unit,
 ): String? {
     var index = 0
     while (index < items.size) {
         awaitArrival(items[index].id, composed, scrollTo)?.let { return it }
+        afterStep?.invoke()
         index += ScanStepItems
     }
     // 末尾は刻みの都合で飛ばされうるため、最後に明示して両端到達を保証する。
     awaitArrival(items.last().id, composed, scrollTo)?.let { return it }
+    afterStep?.invoke()
 
     index = items.lastIndex
     while (index >= 0) {
         awaitArrival(items[index].id, composed, scrollTo)?.let { return it }
+        afterStep?.invoke()
         index -= ScanStepItems
     }
     awaitArrival(items.first().id, composed, scrollTo)?.let { return it }
+    afterStep?.invoke()
     return null
 }
 

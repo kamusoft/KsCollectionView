@@ -33,10 +33,10 @@ enum DemoData {
         )
     }
 
-    /// 「画像グリッド」画面の件数。
-    static let imageGridItemCount = 10_000
+    /// 「画像グリッド」画面の件数。既定は 10,000 件で、起動引数で変えられる (``ImageGridCount``)。
+    static let imageGridItemCount = ImageGridCount.value
 
-    /// 「画像グリッド」画面が使う 10,000 件。セルの文言は ID から作る。
+    /// 「画像グリッド」画面が使う項目。セルの文言は ID から作る。
     static let imageGridItems = (1...imageGridItemCount).map {
         DemoItem(id: $0, title: "#\($0)")
     }

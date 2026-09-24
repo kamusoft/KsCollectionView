@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
  * 「大量件数」の土俵のスクロール性能を、ライブラリと素の LazyVerticalGrid で同じ手順で測る。
  *
  * 2 つの結果の差がラッパーの上乗せ分にあたる。候補の実装だけを測ると、値が良いのか悪いのかを
- * 判断する基準がないため、同じ土俵の比較対象を必ず併せて測る (android/ADR-0001)。
+ * 判断する基準がないため、同じ土俵の比較対象を必ず併せて測る。
  */
 @RunWith(AndroidJUnit4::class)
 class LargeDataScrollBenchmark {

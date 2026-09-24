@@ -17,18 +17,31 @@ import os
 ///
 /// ## 観測区間 (基準点) と判定規則
 ///
-/// 判定に使うのは `sized` の側ですが、**累計では判定できません**。「戻ってきたときの再表示」を
-/// 見る手順は「初回表示 → 画面外へ送る → 戻す」であり、初回表示の時点で対象の `sized` は
-/// 通常 1 以上になります。累計の `sized == 0` を規則にすると、正しく即時再表示された場合まで
-/// 不合格になります。
+/// 読み込み中の数は**累計では判定できません**。「戻ってきたときの再表示」を見る手順は
+/// 「初回表示 → 画面外へ送る → 戻す」であり、初回表示の時点で対象の数は通常 1 以上になります。
+/// 累計が 0 であることを規則にすると、正しく即時再表示された場合まで不合格になります。
 ///
 /// そこで**基準点** (``beginSession()``) を設けます。初回表示が終わった時点・画面外へ送る直前に
-/// 基準点を切ると、そこから先の増分だけを数えた観測区間が始まります。判定規則は
-/// **対象の要素ごとに「基準点からの差分 `Δsized` が 0」** です。
+/// 基準点を切ると、そこから先の増分だけを数えた観測区間が始まります。判定は対象の要素ごとの
+/// 基準点からの差分で行います (iOS で使う数は下の「組み立てと、画面に出た読み込み中」)。
 ///
 /// 基準点は画面の印 (``ImageLoadingSlotMark``) を叩くと切れます (Android Sample も同じ操作)。
 /// 区間には 1 から始まる通し番号 (``session``) が付き、印とログの両方に載ります。番号が違う
 /// 記録は別の区間のものなので、突き合わせに混ぜてはいけません。
+///
+/// ## 組み立てと、画面に出た読み込み中
+///
+/// `sized` / `unsized` は読み込み中の表示が**組み立てられた**回数です。iOS の `KsImage` は、
+/// 画面に出る前に組み立てられたとき、要求を出さずに読み込み中の表示を置いて待ち、画面に出る
+/// 時点でメモリを照会し直します。そこで先読みの画像に当たると、読み込み中の表示は 1 度も
+/// 画面に出ないまま画像に替わります。この場合も組み立ては `sized` に数えられるため、iOS では
+/// `Δsized` が「読み込み中を画面に出した」ことを意味しません。
+///
+/// そこで、読み込み中の表示が実際に画面に出た回数を `shown` として別に数えます
+/// (``ImageLoadingSlotShownProbe``)。**iOS の判定規則は、対象の要素ごとに「基準点からの差分
+/// `Δshown` が 0」** です。`sized` / `unsized` は組み立ての回数として残し、印 (``ImageLoadingSlotMark``)
+/// は Android Sample と同じ書式のまま組み立ての回数を出します。`shown` はログの各行と観測の
+/// 経路 (``ImagePrefetchMatchProbe``) の出力で読みます。
 @MainActor
 enum ImageLoadingSlotCounter {
     /// 観測の分類。`log stream` の絞り込みに使います。
@@ -60,14 +73,14 @@ enum ImageLoadingSlotCounter {
     /// 基準点より前から数えられている要素も差分 0 として残します (`items=` の件数に含まれ、
     /// ログ側で対象 ID の `sized` が増えた行が無いことと突き合わせる材料になります)。
     /// ただし印の内訳は差分の大きい順に並ぶため、差分 0 の要素は最後尾に回り、要素数が上限を
-    /// 超えると内訳には現れません — 判定対象の `Δsized == 0` はログ側で読みます。
+    /// 超えると内訳には現れません — 判定対象の差分はログ側で読みます。
     static func deltaSnapshot() -> [Int: ImageLoadingSlotTally] {
         tallies.reduce(into: [:]) { result, entry in
             result[entry.key] = entry.value.subtracting(baseline[entry.key] ?? ImageLoadingSlotTally())
         }
     }
 
-    /// 1 要素の、基準点からの差分。判定はこの `sized` が 0 かどうかで行います。
+    /// 1 要素の、基準点からの差分。iOS の判定はこの `shown` が 0 かどうかで行います。
     ///
     /// - Parameter itemID: 対象の要素の識別子
     static func delta(itemID: Int) -> ImageLoadingSlotTally {
@@ -110,21 +123,48 @@ enum ImageLoadingSlotCounter {
             """
         )
     }
+
+    /// 読み込み中の表示が実際に画面に出たことを記録します。1 つの表示につき 1 回だけ呼ばれます。
+    ///
+    /// - Parameters:
+    ///   - itemID: 読み込み中を出している要素の識別子
+    ///   - size: そのときの表示枠の大きさ
+    static func recordShown(itemID: Int, size: CGSize) {
+        var tally = tallies[itemID] ?? ImageLoadingSlotTally()
+        tally.shown += 1
+        tallies[itemID] = tally
+        let delta = tally.subtracting(baseline[itemID] ?? ImageLoadingSlotTally())
+        // 組み立ての行 (`loading`) と区別できるよう、先頭の語を変えます。`shown` は基準点からの差分、
+        // `total=` が累計です。
+        logger.info(
+            """
+            shown session=\(session, privacy: .public) item=\(itemID, privacy: .public) \
+            size=\(Int(size.width), privacy: .public)x\(Int(size.height), privacy: .public) \
+            shown=\(delta.shown, privacy: .public) total=\(tally.shown, privacy: .public)
+            """
+        )
+    }
 }
 
-/// 1 つの要素が読み込み中を出した回数。
+/// 1 つの要素の読み込み中の表示の回数。
 ///
-/// - `sized`: 表示枠が決まった状態で出した回数 (判定に使う側)
-/// - `unsized`: 表示枠が決まる前に出した回数
+/// - `sized`: 表示枠が決まった状態で組み立てた回数
+/// - `unsized`: 表示枠が決まる前に組み立てた回数
+/// - `shown`: 実際に画面に出た回数 (iOS の判定に使う側)
 struct ImageLoadingSlotTally {
     var sized = 0
     var unsized = 0
+    var shown = 0
 
     /// 基準点の計数を差し引いた差分を返します。
     ///
     /// - Parameter other: 差し引く計数 (基準点の値)
     func subtracting(_ other: ImageLoadingSlotTally) -> ImageLoadingSlotTally {
-        ImageLoadingSlotTally(sized: sized - other.sized, unsized: unsized - other.unsized)
+        ImageLoadingSlotTally(
+            sized: sized - other.sized,
+            unsized: unsized - other.unsized,
+            shown: shown - other.shown
+        )
     }
 }
 
@@ -145,7 +185,15 @@ struct CountedImageLoadingPlaceholder: View {
 
     private func counted(size: CGSize) -> some View {
         ImageLoadingSlotCounter.record(itemID: itemID, size: size)
+        let itemID = itemID
         return Color(uiColor: .systemGray5)
+            // 組み立てとは別に、実際に画面に出たことを数えます。画面に出る前に組み立てられ、
+            // 画面に出ないまま画像に替わった読み込み中を、画面に出た読み込み中と分けるためです。
+            .background {
+                ImageLoadingSlotShownProbe {
+                    ImageLoadingSlotCounter.recordShown(itemID: itemID, size: size)
+                }
+            }
             // 読み上げの性格は本体の既定の表示に合わせます。差があると、数える構成でだけ
             // 読み上げが変わってしまいます。
             .accessibilityElement(children: .ignore)

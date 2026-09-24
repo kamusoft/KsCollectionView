@@ -29,9 +29,12 @@ class MainActivity : ComponentActivity() {
             intent?.getBooleanExtra(SampleRoutes.CountImageLoadingSlotsExtra, false) == true,
         )
         val startRoute = intent?.getStringExtra(SampleRoutes.StartRouteExtra)
+        val requestedPrefetch = ImagePrefetchChoice.fromArgument(
+            intent?.getStringExtra(SampleRoutes.PrefetchExtra),
+        )
         setContent {
             MaterialTheme {
-                SampleNavHost(startRoute = startRoute)
+                SampleNavHost(startRoute = startRoute, requestedPrefetch = requestedPrefetch)
             }
         }
     }

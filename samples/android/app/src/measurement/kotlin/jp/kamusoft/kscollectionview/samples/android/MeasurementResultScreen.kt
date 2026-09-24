@@ -1,5 +1,6 @@
 package jp.kamusoft.kscollectionview.samples.android
 
+import android.os.Debug
 import android.util.Log
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.delay
@@ -34,6 +36,7 @@ private const val ReleaseSampleMillis = 100L
 @Composable
 fun MeasurementResultScreen(modifier: Modifier = Modifier) {
     var status by remember { mutableStateOf("running") }
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
         // 離脱した画面の後始末は、この画面が最初に組まれた時点では終わっていないことがある。
@@ -50,6 +53,17 @@ fun MeasurementResultScreen(modifier: Modifier = Modifier) {
             " replaced:${MeasurementScanResult.aliveAfterReplacement}" +
             " left:$left"
         Log.i("KsMemoryRoundTrip", "result=$status")
+        // 画像の走査から離れた場合は、離脱後のメモリキャッシュと索引の中身も残す。
+        if (MemoryIndexProbe.enabled) {
+            System.gc()
+            delay(300)
+            val info = Debug.MemoryInfo()
+            Debug.getMemoryInfo(info)
+            Log.i(
+                "KsMemoryRoundTrip",
+                "afterLeave totalPssKb=${info.totalPss} probe ${MemoryIndexProbe.describe(context)}",
+            )
+        }
     }
 
     Column(modifier = modifier.fillMaxSize()) {

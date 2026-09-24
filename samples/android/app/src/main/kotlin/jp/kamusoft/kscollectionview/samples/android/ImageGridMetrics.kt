@@ -5,7 +5,7 @@ import androidx.compose.ui.unit.dp
 /**
  * 「画像グリッド」画面だけが使う寸法。
  *
- * 値は iOS Sample の同名定義とそろえる (cross/ADR-0004)。Sample 全体で使い回す値では
+ * 値は iOS Sample の同名定義とそろえる。Sample 全体で使い回す値では
  * ないため [SampleTheme] には置かない。
  */
 object ImageGridMetrics {

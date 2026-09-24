@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -78,10 +79,11 @@ internal object KsTapFeedback {
  * @param listSeparatorColor 区切り線の色。省略するとライブラリ既定の色を使う
  * @param scrollController 外からスクロールさせるためのコントローラ
  * @param prefetchResources もうすぐ表示される要素の画像を、表示より前に取得しておくための宣言。
- *   要素を受け取り、その要素の表示に必要なリモート画像の URL を返す。返す URL が無い要素では空の
- *   配列を返す。省略すると画像の先読みは一切行わない。先読みした画像は、同じ URL を表示するときに
- *   再ダウンロードなしで使われる。このラムダは表示中に差し替えない前提の宣言で、差し替えた場合は
- *   以後に始まる取得にだけ反映される
+ *   要素を受け取り、その要素の表示に必要なリモート画像を [KsResource] の配列で返す。先読みする
+ *   画像が無い要素では空の配列を返す。省略すると画像の先読みは一切行わない。先読みした画像は、
+ *   同じ画像を [KsImage] で表示するときに再ダウンロードなしで使われる。[KsResource] に表示の
+ *   おおよその幅を添えると、到達点がメモリのときその幅に縮小した画像をメモリに載せる。このラムダは
+ *   表示中に差し替えない前提の宣言で、差し替えた場合は以後に始まる取得にだけ反映される
  * @param prefetchDestination 先読みした画像をどこまで用意しておくか。[KsPrefetchDestination.Memory]
  *   を指定すると、ディスクへの保存に加えてデコード済みの画像をメモリにも載せる
  * @param content テンプレートを宣言するブロック
@@ -102,7 +104,7 @@ public fun <Item> KsCollectionView(
     listSeparators: Boolean = true,
     listSeparatorColor: Color? = null,
     scrollController: KsScrollController? = null,
-    prefetchResources: ((Item) -> List<String>)? = null,
+    prefetchResources: ((Item) -> List<KsResource>)? = null,
     prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
     content: KsCollectionViewScope<Item>.() -> Unit,
 ) {
@@ -138,19 +140,6 @@ public fun <Item> KsCollectionView(
     KsDiagnostics.WarnOnce(diagnostics)
 
     val gridState = rememberLazyGridState()
-
-    // プリフェッチは宣言があるときだけ組み立てる。宣言が無いコレクションでは可視範囲の
-    // 観測も先読みも一切起きない。
-    if (prefetchResources != null) {
-        KsPrefetchWindowEffect(
-            gridState = gridState,
-            items = displayedItems,
-            key = key,
-            leadingItemCount = if (header != null) 1 else 0,
-            resources = prefetchResources,
-            destination = prefetchDestination,
-        )
-    }
 
     val receiver = remember(context) { KsScrollCommandReceiver(context) }
     DisposableEffect(scrollController, receiver) {
@@ -235,6 +224,36 @@ public fun <Item> KsCollectionView(
         // 向きの判定はコンポーネント自身のコンテナの縦横比で行う (端末の物理向きでは判定しない)。
         val isPortrait = maxHeight > maxWidth
         val cells = resolveGridCells(layout, isPortrait)
+
+        // プリフェッチは宣言があるときだけ組み立てる。宣言が無いコレクションでは可視範囲の
+        // 観測も先読みも一切起きない。列の幅はコンテナの幅から解くため、この入れ物の中で組み立てる。
+        if (prefetchResources != null) {
+            val density = LocalDensity.current
+            val layoutDirection = LocalLayoutDirection.current
+            val containerWidthPx = if (constraints.hasBoundedWidth) constraints.maxWidth else 0
+            val metrics = remember(layout, contentPadding, containerWidthPx, isPortrait, density, layoutDirection) {
+                KsPrefetchMetrics(
+                    columnWidthPx = resolveColumnWidthPx(
+                        layout = layout,
+                        containerWidthPx = containerWidthPx,
+                        isPortrait = isPortrait,
+                        contentPadding = contentPadding,
+                        layoutDirection = layoutDirection,
+                        density = density,
+                    ),
+                    density = density.density,
+                )
+            }
+            KsPrefetchWindowEffect(
+                gridState = gridState,
+                items = displayedItems,
+                key = key,
+                leadingItemCount = if (header != null) 1 else 0,
+                resources = prefetchResources,
+                destination = prefetchDestination,
+                metrics = metrics,
+            )
+        }
 
         LazyVerticalGrid(
             columns = cells,

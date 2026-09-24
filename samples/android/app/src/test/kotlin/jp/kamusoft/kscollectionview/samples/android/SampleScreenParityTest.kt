@@ -7,7 +7,7 @@ import org.junit.Test
  * 画面の集合・順序・文言が iOS Sample と一致していることを表で確かめる。
  *
  * 期待値は iOS Sample の `SampleScreen.swift` / `VerificationScreen.swift` の宣言をそのまま
- * 書き写したもの。プラットフォーム間の一致 (cross/ADR-0004) は言語をまたぐためコンパイラでは
+ * 書き写したもの。プラットフォーム間の一致は言語をまたぐためコンパイラでは
  * 守れず、片側を写した表との突き合わせで守る。
  */
 class SampleScreenParityTest {

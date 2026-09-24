@@ -50,7 +50,7 @@ object MeasurementTarget {
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
         "measurement/memory/$count/$maxRoundTrips"
 
-    /** ライブラリで描く画像グリッドの土俵。到達点は "none" / "disk" / "memory"。 */
+    /** ライブラリで描く画像グリッドの土俵。プリフェッチの形は "none" / "disk" / "memory" / "memory-column"。 */
     fun imageGrid(count: Int, destination: String): String =
         "measurement/image/$count/$destination"
 

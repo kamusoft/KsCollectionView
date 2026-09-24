@@ -1,7 +1,7 @@
 package jp.kamusoft.kscollectionview.samples.android
 
 /**
- * デモ画面が使うデータ。値は iOS Sample の同名定義とそろえる (cross/ADR-0004)。
+ * デモ画面が使うデータ。値は iOS Sample の同名定義とそろえる。
  */
 object DemoData {
     /** 「リスト」「ルートヘッダー/フッター」画面が使う 6 件。 */

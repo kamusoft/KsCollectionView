@@ -3,7 +3,7 @@ package jp.kamusoft.kscollectionview.samples.android
 import androidx.compose.foundation.layout.PaddingValues
 import jp.kamusoft.kscollectionview.KsColumns
 import jp.kamusoft.kscollectionview.KsLayout
-import jp.kamusoft.kscollectionview.KsPrefetchDestination
+import jp.kamusoft.kscollectionview.KsResource
 
 /**
  * 「画像グリッド」の土俵の宣言元。
@@ -35,13 +35,16 @@ object ImageGridFixture {
         DemoData.imageGridItems(count)
 
     /**
-     * プリフェッチする URL の宣言。
+     * プリフェッチする画像の宣言。
      *
-     * 到達点を選ばない (「なし」) ときは宣言そのものを行わず null を返す。宣言が無いことと
-     * 「空の宣言がある」ことは本体の動きが変わるため、null で区別する。
+     * 「なし」のときは宣言そのものを行わず null を返す。宣言が無いことと「空の宣言がある」ことは
+     * 本体の動きが変わるため、null で区別する。「メモリまで (列幅)」は列幅を宣言する。
      *
-     * @param destination 選んだ到達点。宣言しないときは null
+     * @param choice 選んだプリフェッチの形
      */
-    fun resources(destination: KsPrefetchDestination?): ((DemoItem) -> List<String>)? =
-        destination?.let { { item: DemoItem -> listOf(DemoData.imageUrl(item.id)) } }
+    fun resources(choice: ImagePrefetchChoice): ((DemoItem) -> List<KsResource>)? {
+        if (choice.destination == null) return null
+        val width = choice.width
+        return { item -> listOf(KsResource(DemoData.imageUrl(item.id), width = width)) }
+    }
 }

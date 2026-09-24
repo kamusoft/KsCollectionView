@@ -26,6 +26,9 @@ public enum KsImageCache {
         // 消す前に始まった先読みが、消した後にキャッシュへ書き戻すのを防ぐ。到達点をメモリまでに
         // した先読みはデコード済みの画像をメモリへ載せるため、範囲がメモリだけでも止める必要がある。
         KsImagePrefetchRegistry.shared.fenceAll()
+        // 表示の引き当ての手掛かりも捨てる。ローダーのキャッシュを消した後に捨てるので、戻った
+        // 時点では両方とも消えている。
+        defer { KsImageMemoryIndex.shared.removeAll() }
         switch scope {
         case .memory:
             cache.removeAll(caches: [.memory])
@@ -42,32 +45,41 @@ public enum KsImageCache {
     /// そのソースの ``KsImage`` は読み込み中の表示に戻って取得をやり直し、他のソースの表示は
     /// そのまま残ります。アセットカタログの画像に対しては何もしません。
     ///
-    /// このソースに限り、以後は同じ URL をローダー付属のビューで直接表示している側と
+    /// キーを指定したリモート画像は、同じキーを指定したソースを渡すと消えます (URL は違っていても
+    /// 構いません)。キーを指定していないソースでは、同じ URL でもキー付きの画像は消えません。
+    ///
+    /// キーを指定していないソースに限り、以後は同じ URL をローダー付属のビューで直接表示している側と
     /// キャッシュを共有しなくなります (その側には削除前の画像が残り得ます)。
     public static func remove(_ source: KsImageSource) {
-        guard case .loader(let url) = KsImageRequestFactory.route(for: source) else { return }
+        guard let resolved = KsImageIdentity.resolve(source) else { return }
+        let identifier = resolved.identifier
 
-        let key = url.absoluteString
-        // 削除前に始まったこのソースの取得を止める。止めないと、削除の後で完了した取得が
-        // 削除前の内容を同じ鍵へ書き戻せる。
-        KsImagePrefetchRegistry.shared.fence(url: url)
+        // 削除前に始まったこの画像の取得を、幅に関わらず止める。止めないと、削除の後で完了した
+        // 取得が削除前の内容を同じ鍵へ書き戻せる。
+        KsImagePrefetchRegistry.shared.fence(identifier: identifier)
 
         let cache = ImagePipeline.shared.cache
-        // 元データは素の URL と現在の世代の識別子の両方で消す。
-        for request in requestsForRemoval(url: url, key: key) {
+        // 元データは、世代が進む前の識別子と現在の世代の識別子の両方で消す。それより前の世代は
+        // その世代で削除したときに消えている。
+        for request in requestsForRemoval(url: resolved.url, identifier: identifier) {
             cache.removeCachedData(for: request)
             cache.removeCachedImage(for: request, caches: [.all])
         }
 
-        // 世代を進めると、以後の要求の識別子が変わって削除前のメモリ項目 (どの表示サイズの
-        // ものも) に当たらなくなる。残った項目は使われないまま追い出される。
-        KsImageIdentity.advanceGeneration(forKey: key)
+        // 表示の引き当ての手掛かりを捨ててから世代を進める。世代を進めると、以後の要求の識別子が
+        // 変わって削除前のメモリ項目 (どの表示サイズのものも) に当たらなくなる。残った項目は
+        // 使われないまま追い出される。
+        KsImageMemoryIndex.shared.remove(effectiveID: KsImageIdentity.effectiveID(forIdentifier: identifier))
+        KsImageIdentity.advanceGeneration(forIdentifier: identifier)
         KsImageInvalidation.shared.invalidateSource()
     }
 
-    private static func requestsForRemoval(url: URL, key: String) -> [ImageRequest] {
-        var requests = [ImageRequest(url: url)]
-        if let currentID = KsImageIdentity.imageID(forKey: key) {
+    private static func requestsForRemoval(url: URL, identifier: String) -> [ImageRequest] {
+        // 世代 0 の要求。キーなしの画像では素の URL の要求になる。
+        var original = ImageRequest(url: url)
+        original.imageID = identifier
+        var requests = [original]
+        if let currentID = KsImageIdentity.imageID(forIdentifier: identifier), currentID != identifier {
             var request = ImageRequest(url: url)
             request.imageID = currentID
             requests.append(request)

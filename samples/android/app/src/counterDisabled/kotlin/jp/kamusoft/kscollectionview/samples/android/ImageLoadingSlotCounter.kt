@@ -67,12 +67,13 @@ object ImageLoadingSlotCounter {
 }
 
 /**
- * 1 つの要素が読み込み中を出した回数。
+ * 1 つの要素の読み込み中の表示の回数。
  *
- * @property sized 表示枠が決まった状態で出した回数 (判定に使う側)
- * @property unsized 表示枠が決まる前に出した回数
+ * @property sized 表示枠が決まった状態で組み立てた回数
+ * @property unsized 表示枠が決まる前に組み立てた回数
+ * @property shown 実際に画面に出た回数 (判定に使う側)
  */
-data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0) {
+data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0, val shown: Long = 0) {
 
     /**
      * 基準点の計数を差し引いた差分を返す。
@@ -80,5 +81,9 @@ data class ImageLoadingSlotTally(val sized: Long = 0, val unsized: Long = 0) {
      * @param other 差し引く計数 (基準点の値)
      */
     fun subtracting(other: ImageLoadingSlotTally): ImageLoadingSlotTally =
-        ImageLoadingSlotTally(sized = sized - other.sized, unsized = unsized - other.unsized)
+        ImageLoadingSlotTally(
+            sized = sized - other.sized,
+            unsized = unsized - other.unsized,
+            shown = shown - other.shown,
+        )
 }

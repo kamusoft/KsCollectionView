@@ -1,5 +1,6 @@
 package jp.kamusoft.kscollectionview
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
@@ -35,7 +36,9 @@ internal class KsCollectionViewPrefetchTest {
 
     /** 受け口へ届いた開始・取り消しをそのまま記録する。 */
     private class LoadingRecorder : KsImageLoading {
-        data class Start(val url: String, val destination: KsPrefetchDestination)
+        data class Start(val request: KsPrefetchRequest, val destination: KsPrefetchDestination) {
+            val url: String get() = request.url
+        }
 
         val starts = mutableListOf<Start>()
         val disposed = mutableListOf<String>()
@@ -43,11 +46,11 @@ internal class KsCollectionViewPrefetchTest {
         val startedUrls: List<String> get() = starts.map { it.url }
 
         override fun enqueue(
-            url: String,
+            request: KsPrefetchRequest,
             destination: KsPrefetchDestination,
         ): KsImageRequestHandle {
-            starts.add(Start(url, destination))
-            return KsImageRequestHandle { disposed.add(url) }
+            starts.add(Start(request, destination))
+            return KsImageRequestHandle { disposed.add(request.url) }
         }
     }
 
@@ -61,8 +64,8 @@ internal class KsCollectionViewPrefetchTest {
     private fun urls(range: IntRange): List<String> = range.map { url(it) }
 
     /** 要素の安定 ID から決定的に URL を作る宣言。 */
-    private val itemResources: (TestItem) -> List<String> =
-        { listOf(url(it.id.removePrefix("item-").toInt())) }
+    private val itemResources: (TestItem) -> List<KsResource> =
+        { listOf(KsResource(url(it.id.removePrefix("item-").toInt()))) }
 
     /** 期待が満たされるまで実時間の上限つきで待ち、届かなければ実測値を添えて失敗させる。 */
     private fun awaitCondition(description: String, actual: () -> Any?, condition: () -> Boolean) {
@@ -96,7 +99,9 @@ internal class KsCollectionViewPrefetchTest {
         items: List<TestItem>,
         controller: KsScrollController? = null,
         destination: KsPrefetchDestination = KsPrefetchDestination.Disk,
-        prefetchResources: ((TestItem) -> List<String>)? = itemResources,
+        prefetchResources: ((TestItem) -> List<KsResource>)? = itemResources,
+        layout: KsLayout = KsLayout.List,
+        contentPadding: PaddingValues = PaddingValues(0.dp),
     ) {
         composeTestRule.setContent {
             CompositionLocalProvider(LocalKsImageLoading provides recorder) {
@@ -104,6 +109,8 @@ internal class KsCollectionViewPrefetchTest {
                     KsCollectionView(
                         items = items,
                         key = { it.id },
+                        layout = layout,
+                        contentPadding = contentPadding,
                         scrollController = controller,
                         prefetchResources = prefetchResources,
                         prefetchDestination = destination,
@@ -261,6 +268,84 @@ internal class KsCollectionViewPrefetchTest {
         ) { recorder.disposed.size == recorder.starts.size }
 
         assertEquals(recorder.startedUrls.toSet(), recorder.disposed.toSet())
+    }
+
+    /**
+     * 列幅で宣言した要素は、コンテナの幅・列数・余白・列間隔から解いた 1 列分の幅 (ピクセル) で
+     * 先読みされる。
+     */
+    @Test
+    fun columnWidthIsResolvedFromTheLayout() {
+        val recorder = LoadingRecorder()
+        // 300dp のコンテナ (Robolectric の表示倍率は 1)。余白 10 × 2、列間隔 5 × 2 → (300 - 20 - 10) / 3 = 90。
+        setContent(
+            recorder,
+            testItems(60),
+            destination = KsPrefetchDestination.Memory,
+            prefetchResources = { listOf(KsResource(url(it.id.removePrefix("item-").toInt()), width = KsWidth.Column)) },
+            layout = KsLayout.Grid(columns = KsColumns.Fixed(3), columnSpacing = 5.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp),
+        )
+
+        awaitCondition(
+            description = "列幅の先読みが始まらない",
+            actual = { recorder.starts },
+        ) { recorder.starts.isNotEmpty() }
+
+        assertTrue(
+            "列の幅で先読みされていません: ${recorder.starts.map { it.request.widthPixels }}",
+            recorder.starts.all { it.request.widthPixels == 90 },
+        )
+    }
+
+    /** コンテナの向きが変わった後に始まる先読みは、新しい向きの列幅で行われ、既存の取得は触らない。 */
+    @Test
+    fun orientationChangeUsesTheNewColumnWidthForNewPrefetches() {
+        val recorder = LoadingRecorder()
+        val controller = KsScrollController()
+        // 縦長 (300 × 600) で始め、横長 (400 × 300) へ変える。
+        var container by mutableStateOf(300.dp to 600.dp)
+        composeTestRule.setContent {
+            CompositionLocalProvider(LocalKsImageLoading provides recorder) {
+                TestContainer(container.first, container.second) {
+                    KsCollectionView(
+                        items = testItems(200),
+                        key = { it.id },
+                        layout = KsLayout.Grid(columns = KsColumns.Fixed(portrait = 3, landscape = 5)),
+                        scrollController = controller,
+                        prefetchResources = {
+                            listOf(KsResource(url(it.id.removePrefix("item-").toInt()), width = KsWidth.Column))
+                        },
+                        prefetchDestination = KsPrefetchDestination.Memory,
+                    ) {
+                        template { item -> PrefetchRow(item) }
+                    }
+                }
+            }
+        }
+        awaitCondition(
+            description = "縦向きの先読みが始まらない",
+            actual = { recorder.starts },
+        ) { recorder.starts.isNotEmpty() }
+        val portraitStarts = recorder.starts.toList()
+        assertTrue(portraitStarts.all { it.request.widthPixels == 100 })
+
+        // 横長のコンテナへ変えると 5 列になり、列の幅は 400 / 5 = 80 になる。
+        composeTestRule.runOnUiThread { container = 400.dp to 300.dp }
+        composeTestRule.waitForIdle()
+        composeTestRule.runOnUiThread {
+            controller.scrollTo(id = "item-100", position = KsScrollPosition.Start, animated = false)
+        }
+        awaitCommands(controller, 1)
+        awaitCondition(
+            description = "横向きの列幅で新しい先読みが始まらない",
+            actual = { recorder.starts.map { it.request.widthPixels } },
+        ) { recorder.starts.any { it.request.widthPixels == 80 } }
+
+        assertTrue(
+            "向きの変化の前の取得が出し直されました",
+            recorder.starts.count { it.request.widthPixels == 100 } == portraitStarts.size,
+        )
     }
 
     @Composable

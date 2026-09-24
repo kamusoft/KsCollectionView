@@ -8,6 +8,9 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import jp.kamusoft.kscollectionview.KsColumns
 import jp.kamusoft.kscollectionview.KsLayout
+import jp.kamusoft.kscollectionview.KsPrefetchDestination
+import jp.kamusoft.kscollectionview.KsResource
+import jp.kamusoft.kscollectionview.KsWidth
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -54,9 +57,7 @@ class ImageGridMeasurementFixtureTest {
                 maxRoundTrips = 1,
                 layout = ImageGridFixture.layout,
                 contentPadding = ImageGridFixture.contentPadding,
-                prefetchResources = ImageGridFixture.resources(
-                    ImagePrefetchChoice.Disk.destination,
-                ),
+                prefetchResources = ImageGridFixture.resources(ImagePrefetchChoice.Disk),
                 row = { item -> ImageGridCell(item) },
             )
         }
@@ -93,13 +94,46 @@ class ImageGridMeasurementFixtureTest {
     /** 「なし」の選択では宣言そのものを行わない (空の宣言にしない)。 */
     @Test
     fun `プリフェッチの宣言は到達点を選ばないときだけ無い`() {
-        assertEquals(null, ImageGridFixture.resources(ImagePrefetchChoice.None.destination))
+        assertEquals(null, ImageGridFixture.resources(ImagePrefetchChoice.None))
 
-        val declared = ImageGridFixture.resources(ImagePrefetchChoice.Disk.destination)
+        val declared = ImageGridFixture.resources(ImagePrefetchChoice.Disk)
         assertEquals(
-            listOf(DemoData.imageUrl(7)),
+            listOf(KsResource(DemoData.imageUrl(7))),
             declared?.invoke(DemoItem(id = 7, title = "#7")),
         )
+    }
+
+    /** 「メモリまで」は幅なし、「メモリまで (列幅)」は列幅の要素を宣言する。 */
+    @Test
+    fun `メモリまでの選択は幅の有無で宣言が分かれる`() {
+        val item = DemoItem(id = 7, title = "#7")
+
+        assertEquals(
+            listOf(KsResource(DemoData.imageUrl(7))),
+            ImageGridFixture.resources(ImagePrefetchChoice.Memory)?.invoke(item),
+        )
+        assertEquals(
+            listOf(KsResource(DemoData.imageUrl(7), width = KsWidth.Column)),
+            ImageGridFixture.resources(ImagePrefetchChoice.MemoryColumn)?.invoke(item),
+        )
+        assertEquals(KsPrefetchDestination.Memory, ImagePrefetchChoice.MemoryColumn.destination)
+    }
+
+    /** 選択肢の並び順と文言、起動時の指定の綴りは iOS Sample と同じ。 */
+    @Test
+    fun `プリフェッチの選択肢は iOS と同じ順序と文言である`() {
+        assertEquals(
+            listOf("なし", "ディスクまで", "メモリまで", "メモリまで (列幅)"),
+            ImagePrefetchChoice.entries.map { it.title },
+        )
+        assertEquals(
+            listOf("none", "disk", "memory", "memory-column"),
+            ImagePrefetchChoice.entries.map { it.argument },
+        )
+        assertEquals(ImagePrefetchChoice.MemoryColumn, ImagePrefetchChoice.fromArgument("memory-column"))
+        assertEquals(null, ImagePrefetchChoice.fromArgument("unknown"))
+        assertEquals(null, ImagePrefetchChoice.fromArgument(null))
+        assertEquals("計測用の経路も同じ綴りを使う", "memory-column", ImagePrefetchChoice.MemoryColumn.routeSegment)
     }
 
     private companion object {

@@ -42,9 +42,12 @@ public object KsImageCache {
             KsImageCacheScope.All -> {
                 loader.memoryCache?.clear()
                 loader.diskCache?.clear()
-                KsImageInvalidation.invalidateAll()
             }
         }
+        // 表示の引き当ての手掛かりも捨てる。ローダーのキャッシュを消した後に捨てるので、戻った
+        // 時点では両方とも消えている。
+        KsImageMemoryIndex.shared.removeAll()
+        if (scope == KsImageCacheScope.All) KsImageInvalidation.invalidateAll()
     }
 
     /**
@@ -53,23 +56,32 @@ public object KsImageCache {
      * 消えるのはメモリ上のあらゆる表示サイズの画像と、ディスク上の元データです。表示中の
      * そのソースの [KsImage] は読み込み中の表示に戻って取得をやり直し、他のソースの表示は
      * そのまま残ります。アプリに同梱したリソースの画像に対しては何もしません。
+     *
+     * キーを指定したネットワーク上の画像は、同じキーを指定したソースを渡すと消えます (URL は
+     * 違っていても構いません)。キーを指定していないソースでは、同じ URL でもキー付きの画像は
+     * 消えません。
      */
     public fun remove(source: KsImageSource) {
-        val cacheKey = source.cacheKey ?: return
+        val identifier = source.identifier ?: return
+        source.emptyKeyMessage?.let { message ->
+            // 空文字のキーは誤り。落とさない構成ではキーなし (URL) として消す (core/ADR-0011)。
+            KsAppContext.currentOrNull?.let { KsDiagnostics.invalidInput(it, message) }
+                ?: KsDiagnostics.warn(message)
+        }
         val loader = sharedLoader("remove") ?: return
-        // 削除前に始まったこのソースの取得を止める。止めないと、削除の後で完了した取得が
-        // 削除前の内容を同じ鍵へ書き戻せる。
-        KsImagePrefetchRegistry.fence(cacheKey)
+        // 削除前に始まったこの画像の取得を、幅に関わらず止める。止めないと、削除の後で完了した
+        // 取得が削除前の内容を同じ鍵へ書き戻せる。
+        KsImagePrefetchRegistry.fence(identifier)
 
         loader.memoryCache?.let { memory ->
             // 表示サイズなどの付随情報は鍵の本体と別に持たれるため、リモートの画像は鍵の
             // 完全一致だけで表示サイズ違いまで消える。接頭辞まで広げると、別のソース
             // (`.../a` に対する `.../a-preview` など) を巻き添えで消してしまう。
             val matches: (String) -> Boolean = when (source) {
-                is KsImageSource.Remote -> { key -> key == cacheKey }
+                is KsImageSource.Remote -> { key -> key == identifier }
                 // 端末内のファイルは鍵にライブラリ側の接尾辞が付くことがあるため、
                 // 接頭辞の一致も拾う。
-                else -> { key -> key == cacheKey || key.startsWith("$cacheKey-") }
+                else -> { key -> key == identifier || key.startsWith("$identifier-") }
             }
             // 表示サイズ違いは鍵の本体が同じで付随情報だけが違うため、鍵の一覧を走査しないと
             // 拾えない (ローダーが本体での引き当てを公開していない)。呼び出しスレッドを
@@ -81,9 +93,12 @@ public object KsImageCache {
                 }
             }
         }
-        loader.diskCache?.remove(cacheKey)
+        // キーのある画像はディスクの鍵も識別子にしているため、同じ識別子で消える。
+        loader.diskCache?.remove(identifier)
 
-        KsImageInvalidation.invalidateSource(cacheKey)
+        // 表示の引き当ての手掛かりを捨ててから世代を進める。
+        KsImageMemoryIndex.shared.remove(identifier)
+        KsImageInvalidation.invalidateSource(identifier)
     }
 
     /**
@@ -111,13 +126,3 @@ public object KsImageCache {
         return SingletonImageLoader.get(context)
     }
 }
-
-/**
- * ローダーがキャッシュ鍵の元にする文字列。ローダーを通らないソースでは null になる。
- */
-internal val KsImageSource.cacheKey: String?
-    get() = when (this) {
-        is KsImageSource.Remote -> url
-        is KsImageSource.File -> "file://${file.absolutePath}"
-        is KsImageSource.Resource -> null
-    }

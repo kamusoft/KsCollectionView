@@ -1,6 +1,6 @@
 /// 「画像グリッド」画面だけが使う寸法。
 ///
-/// 値は Android Sample の同名定義とそろえる (cross/ADR-0004)。Sample 全体で使い回す値では
+/// 値は Android Sample の同名定義とそろえる。Sample 全体で使い回す値では
 /// ないため `SampleTheme` には置かない。
 enum ImageGridMetrics {
     /// グリッドの列数。

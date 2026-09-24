@@ -5,8 +5,8 @@ enum PerformanceFixture {
     /// 固定高と可変行高が混在する 2 列グリッド。
     case largeData
 
-    /// リモート画像の 3 列グリッド。プリフェッチの到達点を選べます (nil は宣言しない)。
-    case imageGrid(destination: KsPrefetchDestination?)
+    /// リモート画像の 3 列グリッド。プリフェッチの形 (到達点と表示幅) を選べます。
+    case imageGrid(prefetch: ImagePrefetchChoice)
 
     /// この土俵の件数です。走査が全件を通過したかの判定に使います。
     var itemCount: Int {

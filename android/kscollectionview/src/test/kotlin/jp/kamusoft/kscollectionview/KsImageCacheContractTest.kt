@@ -23,6 +23,7 @@ import coil3.network.NetworkResponse
 import coil3.network.NetworkResponseBody
 import coil3.request.ImageRequest
 import coil3.request.Options
+import coil3.request.SuccessResult
 import coil3.request.allowHardware
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -117,6 +118,9 @@ internal class KsImageCacheContractTest {
      */
     private val startedRequests = CopyOnWriteArrayList<ImageRequest>()
 
+    /** 成功した要求の取得元。出し直した要求の完了を待つために記録する。 */
+    private val succeededData = CopyOnWriteArrayList<Any>()
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -125,10 +129,15 @@ internal class KsImageCacheContractTest {
         network = CountingNetworkClient()
         decodes.set(0)
         startedRequests.clear()
+        succeededData.clear()
         loader = ImageLoader.Builder(context)
             .eventListener(object : EventListener() {
                 override fun onStart(request: ImageRequest) {
                     startedRequests += request
+                }
+
+                override fun onSuccess(request: ImageRequest, result: SuccessResult) {
+                    succeededData += request.data
                 }
             })
             .memoryCache { MemoryCache.Builder().maxSizeBytes(4L * 1024 * 1024).build() }
@@ -144,12 +153,16 @@ internal class KsImageCacheContractTest {
             }
             .build()
         SingletonImageLoader.setUnsafe(loader)
+        KsImageMemoryIndex.shared.removeAll()
+        KsImageInvalidation.reset()
     }
 
     @After
     fun tearDown() {
         loader.shutdown()
         SingletonImageLoader.reset()
+        KsImageMemoryIndex.shared.removeAll()
+        KsImageInvalidation.reset()
         cacheDirectory.deleteRecursively()
     }
 
@@ -175,22 +188,27 @@ internal class KsImageCacheContractTest {
     }
 
     /**
-     * 表示を本番と同じ段取りで 1 回行う。要求の組み立ても、メモリにある元寸をその場で
-     * 縮小して表示用の鍵へ載せる段取りも [KsImageRequestFactory] を通す。
+     * 表示を本番と同じ段取りで 1 回行う。メモリの項目の引き当ても要求の組み立ても
+     * [KsImageRequestFactory] を通し、引き当てられなかったときだけ要求をローダーへ出す。
+     *
+     * @return メモリの項目を引き当てて要求を出さずに済んだら true
      */
-    private fun display(url: String, width: Int = 50, height: Int = 50) {
+    private fun display(url: String, width: Int = 50, height: Int = 50, key: String? = null): Boolean {
         val prepared = requireNotNull(
             KsImageRequestFactory.prepare(
                 context = context,
-                source = KsImageSource.Remote(url),
+                source = KsImageSource.Remote(url, key),
                 width = width,
                 height = height,
                 contentMode = KsImageContentMode.Fill,
             ),
         )
+        // 引き当てた表示はローダーへ要求を出さない。
+        if (prepared.matchedImage != null) return true
         runBlocking {
             loader.execute(prepared.request)
         }
+        return false
     }
 
     /** 到達点 disk は元データだけを残し、デコードせず、表示時に取得をやり直さない。 */
@@ -198,7 +216,7 @@ internal class KsImageCacheContractTest {
     fun diskDestinationStoresDataWithoutDecodingOrRefetching() {
         val target = url("disk")
 
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Disk)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Disk)
         awaitDiskEntry(target)
 
         assertEquals("取得は 1 度だけ走る", 1, network.requestCount)
@@ -211,30 +229,76 @@ internal class KsImageCacheContractTest {
     }
 
     /**
-     * 先読みが載せた元寸の画素を読み出せる場合、到達点 memory は表示時に再デコードしない。
+     * 到達点 memory の後の表示は、先読みが載せた項目を引き当て、ネットワークもデコードのやり直しも
+     * ローダーへの要求も無い。
      *
-     * ここで使うデコーダは画素を読み出せる画像を返すため、表示側は元寸をその場で縮小して
-     * 表示用の鍵へ載せ直せる。この結果が言えるのはその条件の下だけで、到達点 memory が常に
-     * 再デコードを避けることは意味しない。実機の元寸は通常グラフィックス側に画素を置いて
-     * 読み出せないため、表示はローダーの縮小デコードを 1 回待つ — そちらは実機で走る
-     * [KsImageDeviceDecodeTest] が押さえる。
+     * 引き当ては画素を読まないため、画素の置き場 (実機のハードウェア支援) に依存しない。実機で
+     * 同じことを確かめるのは [KsImageDeviceDecodeTest]。
      */
     @Test
-    fun memoryDestinationAvoidsSecondDecodeWhenPrefetchedPixelsAreReadable() {
+    fun memoryDestinationIsDisplayedWithoutSecondDecode() {
         val target = url("memory")
 
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
         awaitCondition(
             description = "メモリ到達点でデコードが走らない",
             actual = { "network=${network.requestCount} decode=$decodeCount" },
-        ) { decodeCount >= 1 }
+        ) { memoryEntryExists(target) }
 
         assertEquals(1, network.requestCount)
+        val startsBefore = startedRequests.size
 
-        display(target)
+        assertTrue("先読みの項目を引き当てませんでした", display(target))
 
         assertEquals("表示でネットワークをやり直さない", 1, network.requestCount)
         assertEquals("表示で再デコードしない", 1, decodeCount)
+        assertEquals("表示がローダーへ要求を出しました", startsBefore, startedRequests.size)
+    }
+
+    /** 列幅の先読みは幅つきの鍵で載り、同じ幅の枠の表示がそれを引き当てる。元寸の鍵には載らない。 */
+    @Test
+    fun columnWidthPrefetchIsMatchedByTheDisplay() {
+        val target = url("column")
+
+        KsCoilImageLoading(context).enqueue(
+            KsPrefetchRequest(target, widthPixels = 100),
+            KsPrefetchDestination.Memory,
+        )
+        awaitCondition(
+            description = "列幅の先読みがメモリに載らない",
+            actual = { "network=${network.requestCount} decode=$decodeCount" },
+        ) { memoryEntryExists(target) }
+
+        assertFalse(
+            "元寸の鍵に載りました",
+            loader.memoryCache?.keys?.any { it.key == target && it.extras.isEmpty() } == true,
+        )
+        assertTrue("列幅の項目を引き当てませんでした", display(target, 100, 100))
+        assertEquals(1, network.requestCount)
+        assertEquals(1, decodeCount)
+    }
+
+    /** メモリから追い出された項目は引き当てず、ディスクの元データから枠の大きさで再デコードする。 */
+    @Test
+    fun evictedItemIsRedecodedFromDisk() {
+        val target = url("evicted")
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        awaitCondition(
+            description = "メモリとディスクの両方に載らない",
+            actual = { "network=${network.requestCount} decode=$decodeCount" },
+        ) { memoryEntryExists(target) && diskEntryExists(target) }
+
+        // 追い出しに相当する (索引には鍵が残る)。
+        loader.memoryCache?.remove(coil3.memory.MemoryCache.Key(target))
+
+        assertFalse("追い出された項目を引き当てました", display(target))
+        assertEquals("再ダウンロードが起きました", 1, network.requestCount)
+        assertEquals("ディスクからの再デコードが起きていません", 2, decodeCount)
+        // 索引から消すのは消去と上限だけで、照会しても追い出された鍵は残る (候補にならないだけ)。
+        assertTrue(
+            "照会しただけで先読みの鍵が索引から外れました",
+            KsImageMemoryIndex.shared.keys(target).any { it.extras.isEmpty() },
+        )
     }
 
     /**
@@ -248,7 +312,7 @@ internal class KsImageCacheContractTest {
     fun memoryDestinationKeepsHardwareBitmapsAllowed() {
         val target = url("hardware")
 
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
         awaitCondition(
             description = "先読みの要求がローダーに届かない",
             actual = { "started=${startedRequests.size}" },
@@ -272,8 +336,8 @@ internal class KsImageCacheContractTest {
         val target = url("removed")
         val other = url("kept")
         val loading = KsCoilImageLoading(context)
-        loading.enqueue(target, KsPrefetchDestination.Memory)
-        loading.enqueue(other, KsPrefetchDestination.Memory)
+        loading.enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        loading.enqueue(KsPrefetchRequest(other), KsPrefetchDestination.Memory)
 
         awaitCondition(
             description = "2 件が両方のキャッシュに載らない",
@@ -306,7 +370,7 @@ internal class KsImageCacheContractTest {
     @Test
     fun clearingMemoryKeepsDiskDataForRedecoding() {
         val target = url("memory-only")
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
 
         awaitCondition(
             description = "メモリとディスクの両方に載らない",
@@ -330,7 +394,7 @@ internal class KsImageCacheContractTest {
     @Test
     fun clearingAllAlsoInvalidatesTheDecodedMemoryImage() {
         val target = url("all-cleared")
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
 
         awaitCondition(
             description = "メモリとディスクの両方に載らない",
@@ -355,8 +419,8 @@ internal class KsImageCacheContractTest {
         val target = "https://images.example.com/a"
         val neighbour = "https://images.example.com/a-preview"
         val loading = KsCoilImageLoading(context)
-        loading.enqueue(target, KsPrefetchDestination.Memory)
-        loading.enqueue(neighbour, KsPrefetchDestination.Memory)
+        loading.enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        loading.enqueue(KsPrefetchRequest(neighbour), KsPrefetchDestination.Memory)
 
         awaitCondition(
             description = "2 件がメモリに載らない",
@@ -383,7 +447,7 @@ internal class KsImageCacheContractTest {
             // 可視範囲 (先頭 1 件) の次に並ぶ 1 件が先読みの対象になる。
             items = listOf("visible", target, control),
             key = { it },
-            resources = { if (it == target) listOf(target) else emptyList() },
+            resources = { if (it == target) listOf(KsResource(target)) else emptyList() },
             destination = KsPrefetchDestination.Memory,
         )
         awaitCondition(
@@ -395,7 +459,7 @@ internal class KsImageCacheContractTest {
 
         // 消去の後に始めた別のソースの取得を、保留していた分と一緒に進める。
         network.isHeld = false
-        KsCoilImageLoading(context).enqueue(control, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(control), KsPrefetchDestination.Memory)
         awaitCondition(
             description = "後から始めた取得が載らない",
             actual = { "network=${network.requestCount}" },
@@ -415,7 +479,7 @@ internal class KsImageCacheContractTest {
             visible = 0..1,
             items = listOf("a", "b", "c", "d"),
             key = { it },
-            resources = { listOf(url(it)) },
+            resources = { listOf(KsResource(url(it))) },
             destination = KsPrefetchDestination.Disk,
         )
         assertEquals(listOf(url("c"), url("d")), recorder.started)
@@ -437,7 +501,7 @@ internal class KsImageCacheContractTest {
             visible = 0..1,
             items = listOf("a", "b", "c", "d"),
             key = { it },
-            resources = { listOf(url(it)) },
+            resources = { listOf(KsResource(url(it))) },
             destination = KsPrefetchDestination.Disk,
         )
         assertEquals(listOf(url("c"), url("d")), recorder.started)
@@ -461,7 +525,7 @@ internal class KsImageCacheContractTest {
             visible = 0..1,
             items = listOf("a", "b", "c", "d"),
             key = { it },
-            resources = { listOf(url(it)) },
+            resources = { listOf(KsResource(url(it))) },
             destination = KsPrefetchDestination.Memory,
         )
         assertEquals(listOf(url("c"), url("d")), recorder.started)
@@ -485,7 +549,7 @@ internal class KsImageCacheContractTest {
             // 可視範囲 (先頭 1 件) の次に並ぶ 1 件が先読みの対象になる。
             items = listOf("visible", target, control),
             key = { it },
-            resources = { if (it == target) listOf(target) else emptyList() },
+            resources = { if (it == target) listOf(KsResource(target)) else emptyList() },
             destination = KsPrefetchDestination.Memory,
         )
         awaitCondition(
@@ -497,7 +561,7 @@ internal class KsImageCacheContractTest {
 
         // 消去の後に始めた別のソースの取得を、保留していた分と一緒に進める。
         network.isHeld = false
-        KsCoilImageLoading(context).enqueue(control, KsPrefetchDestination.Memory)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(control), KsPrefetchDestination.Memory)
         awaitCondition(
             description = "後から始めた取得が載らない",
             actual = { "network=${network.requestCount}" },
@@ -512,11 +576,11 @@ internal class KsImageCacheContractTest {
         val disposed = mutableListOf<String>()
 
         override fun enqueue(
-            url: String,
+            request: KsPrefetchRequest,
             destination: KsPrefetchDestination,
         ): KsImageRequestHandle {
-            started.add(url)
-            return KsImageRequestHandle { disposed.add(url) }
+            started.add(request.url)
+            return KsImageRequestHandle { disposed.add(request.url) }
         }
     }
 
@@ -526,7 +590,7 @@ internal class KsImageCacheContractTest {
         val target = url("shared")
         assertSame("共有インスタンスを使う", loader, SingletonImageLoader.get(context))
 
-        KsCoilImageLoading(context).enqueue(target, KsPrefetchDestination.Disk)
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Disk)
         awaitDiskEntry(target)
 
         // ローダー付属のビューが出す要求と同じ形 (ライブラリ独自の鍵を付けない) で、
@@ -538,5 +602,237 @@ internal class KsImageCacheContractTest {
         }
 
         assertEquals("再ダウンロードは起きない", 1, network.requestCount)
+    }
+
+    // MARK: 任意キー
+
+    private fun signed(name: String, signature: String): String =
+        "https://images.example.com/$name.jpg?sig=$signature"
+
+    private fun keyedMemoryEntryExists(key: String): Boolean =
+        loader.memoryCache?.keys?.any { it.key == KsImageIdentity.identifier("", key) } == true
+
+    private fun keyedDiskEntryExists(key: String): Boolean =
+        diskEntryExists(KsImageIdentity.identifier("", key))
+
+    /** キーを付けた先読みの項目は、署名だけが違う URL に同じキーを付けた表示で引き当てられる。 */
+    @Test
+    fun keyedMemoryPrefetchIsMatchedAcrossSignatures() {
+        KsCoilImageLoading(context).enqueue(
+            KsPrefetchRequest(signed("p1", "a"), key = "p1", widthPixels = 50),
+            KsPrefetchDestination.Memory,
+        )
+        awaitCondition(
+            description = "キー付きの先読みがメモリに載らない",
+            actual = { "network=${network.requestCount}" },
+        ) { keyedMemoryEntryExists("p1") }
+
+        assertTrue("署名違いの URL で先読みの項目を引き当てませんでした", display(signed("p1", "b"), key = "p1"))
+        assertEquals("ネットワークをやり直しました", 1, network.requestCount)
+        assertEquals("デコードをやり直しました", 1, decodeCount)
+    }
+
+    /**
+     * キーを付けて保存したディスクの項目は、起動し直した後 (メモリと索引が空) でも、署名だけが違う URL に
+     * 同じキーを付けた表示でネットワークなしに使われる。
+     */
+    @Test
+    fun keyedDiskItemIsUsedAfterARestart() {
+        KsCoilImageLoading(context).enqueue(
+            KsPrefetchRequest(signed("p1", "a"), key = "p1"),
+            KsPrefetchDestination.Disk,
+        )
+        awaitCondition(
+            description = "キー付きの元データがディスクに残らない",
+            actual = { "network=${network.requestCount}" },
+        ) { keyedDiskEntryExists("p1") }
+        // 起動し直したのと同じく、メモリと索引を空にする (ディスクは残る)。
+        loader.memoryCache?.clear()
+        KsImageMemoryIndex.shared.removeAll()
+
+        display(signed("p1", "b"), key = "p1")
+
+        assertEquals("ディスクの項目を使わずに取り直しました", 1, network.requestCount)
+        assertEquals(1, decodeCount)
+    }
+
+    /** キーの無い画像は URL で識別し、URL が違えば別の画像として取得する。 */
+    @Test
+    fun keylessImagesAreIdentifiedByUrl() {
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(signed("q", "a")), KsPrefetchDestination.Disk)
+        awaitDiskEntry(signed("q", "a"))
+
+        display(signed("q", "b"))
+
+        assertEquals(2, network.requestCount)
+    }
+
+    /** キーを付けた項目は、ローダーを URL で直接使う要求とは共有されない (どちらも壊れない)。 */
+    @Test
+    fun keyedItemsAreNotSharedWithDirectLoaderRequests() {
+        val target = url("keyed-direct")
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target, key = "k"), KsPrefetchDestination.Disk)
+        awaitCondition(
+            description = "キー付きの元データがディスクに残らない",
+            actual = { "network=${network.requestCount}" },
+        ) { keyedDiskEntryExists("k") }
+
+        runBlocking {
+            SingletonImageLoader.get(context).execute(
+                ImageRequest.Builder(context).data(target).size(80, 80).build(),
+            )
+        }
+
+        assertEquals("URL で直接使う側がキー付きの項目を使いました", 2, network.requestCount)
+        assertTrue("キー付きの項目が壊れました", keyedDiskEntryExists("k"))
+        assertTrue("直接使う側の項目がありません", diskEntryExists(target))
+    }
+
+    /**
+     * キーの文字列が別の画像の URL と同じでも、その URL (キーなし) の画像とは衝突しない。
+     * キーなしのソースの削除で消えるのはキーなしの項目だけ。
+     */
+    @Test
+    fun keyEqualToAnotherUrlDoesNotCollide() {
+        val urlA = url("a-image")
+        display(urlA)
+        assertEquals(1, network.requestCount)
+
+        // 別の画像 B に、A の URL と同じ文字列のキーを付ける。
+        assertFalse("B が A の項目を使いました", display(url("b-image"), key = urlA))
+        assertEquals(2, network.requestCount)
+
+        KsImageCache.remove(KsImageSource.Remote(urlA))
+
+        assertFalse("A の項目が残っています", memoryEntryExists(urlA))
+        assertFalse("A の元データが残っています", diskEntryExists(urlA))
+        assertTrue("B のメモリの項目まで消えました", keyedMemoryEntryExists(urlA))
+        assertTrue("B の元データまで消えました", keyedDiskEntryExists(urlA))
+    }
+
+    /** キー付きの画像は同じキーのソースで消える (URL は違ってよい)。キーなしの同じ URL では消えない。 */
+    @Test
+    fun keyedImagesAreRemovedBySameKey() {
+        val first = signed("p2", "a")
+        display(first, key = "p2")
+        assertTrue(keyedMemoryEntryExists("p2"))
+
+        KsImageCache.remove(KsImageSource.Remote(first))
+        assertTrue("キーなしのソースでキー付きの画像が消えました", keyedMemoryEntryExists("p2"))
+        assertTrue(keyedDiskEntryExists("p2"))
+
+        KsImageCache.remove(KsImageSource.Remote(signed("p2", "b"), key = "p2"))
+        assertFalse("同じキーのソースで消えません", keyedMemoryEntryExists("p2"))
+        assertFalse(keyedDiskEntryExists("p2"))
+        assertEquals(1, KsImageInvalidation.generation(KsImageIdentity.identifier("", "p2")))
+    }
+
+    /** 削除した後に表示し直したキー付きの画像は、キーに区切り文字を連ねた別の画像と項目を共有しない。 */
+    @Test
+    fun removedKeyDoesNotCollideWithASuffixedKey() {
+        display(url("p"), key = "p1")
+        KsImageCache.remove(KsImageSource.Remote(url("p"), key = "p1"))
+        display(url("p"), key = "p1")
+        val afterP = network.requestCount
+        assertEquals("削除の後に取り直していません", 2, afterP)
+
+        assertFalse("別の画像 Q が P の項目を使いました", display(url("q"), key = "p1#1"))
+        assertEquals(afterP + 1, network.requestCount)
+        assertTrue("P が自分の項目を引き当てません", display(url("p"), key = "p1"))
+    }
+
+    /**
+     * キーを付けた要素の URL だけが変わった配列に差し替えると新しい URL で出し直すが、取得済みなら
+     * 出し直しはキーでキャッシュに当たり、ネットワークを使わない。
+     */
+    @Test
+    fun reissuedKeyedPrefetchHitsTheCache() {
+        val window = KsImagePrefetchWindow(KsCoilImageLoading(context))
+        fun update(signature: String) = window.update(
+            visible = 0..0,
+            items = listOf("visible", "x"),
+            key = { it },
+            resources = {
+                if (it == "x") listOf(KsResource(signed("x", signature), key = "x")) else emptyList()
+            },
+            destination = KsPrefetchDestination.Disk,
+        )
+
+        update("a")
+        awaitCondition(
+            description = "取得が完了しない",
+            actual = { "network=${network.requestCount}" },
+        ) { keyedDiskEntryExists("x") && succeededData.contains(signed("x", "a")) }
+
+        update("b")
+        awaitCondition(
+            description = "新しい URL で出し直されない",
+            actual = { "succeeded=$succeededData" },
+        ) { succeededData.contains(signed("x", "b")) }
+
+        assertEquals("出し直しでネットワークを使いました", 1, network.requestCount)
+    }
+
+    // MARK: 取得中の先読み
+
+    /**
+     * メモリまでの先読みは、要求を出してから完了するまで取得中として数えられ、完了すると外れる。
+     * 完了した後で項目が追い出されても、取得中の先読みがある画像としては扱わない (表示を遅らせない)。
+     */
+    @Test
+    fun memoryPrefetchIsInFlightOnlyUntilItCompletes() {
+        val target = url("in-flight")
+        val identifier = KsImageIdentity.identifier(target, null)
+        val index = KsImageMemoryIndex.shared
+        val memory = requireNotNull(loader.memoryCache)
+
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        assertTrue("要求を出した時点で取得中になっていません", index.hasFetchInFlight(identifier, memory))
+
+        awaitCondition(
+            description = "完了しても取得中から外れない",
+            actual = { "inFlight=${index.fetchesInFlightCount}" },
+        ) { memoryEntryExists(target) && index.fetchesInFlightCount == 0 }
+        assertFalse("完了した先読みが取得中のままです", index.hasFetchInFlight(identifier, memory))
+
+        memory.clear()
+        assertFalse("追い出された先読みを取得中として扱いました", index.hasFetchInFlight(identifier, memory))
+    }
+
+    /** 取り消した先読みは、その時点で取得中から外れる。 */
+    @Test
+    fun cancelledMemoryPrefetchLeavesInFlightImmediately() {
+        val target = url("in-flight-cancelled")
+        val handle = KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        assertEquals(1, KsImageMemoryIndex.shared.fetchesInFlightCount)
+
+        handle.dispose()
+
+        assertEquals("取り消した先読みが取得中のままです", 0, KsImageMemoryIndex.shared.fetchesInFlightCount)
+        // 取り消しの通知が後から届いても数え直さない。
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals("取り消しの通知で数が崩れました", 0, KsImageMemoryIndex.shared.fetchesInFlightCount)
+    }
+
+    /** 失敗した先読みは、失敗の時点で取得中から外れる。 */
+    @Test
+    fun failedMemoryPrefetchLeavesInFlight() {
+        // 取得層の無い形式の URL は失敗する。
+        val target = "ks-unsupported://images.example.com/in-flight-failed.jpg"
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+        assertEquals(1, KsImageMemoryIndex.shared.fetchesInFlightCount)
+
+        awaitCondition(
+            description = "失敗しても取得中から外れない",
+            actual = { "inFlight=${KsImageMemoryIndex.shared.fetchesInFlightCount}" },
+        ) { KsImageMemoryIndex.shared.fetchesInFlightCount == 0 }
+    }
+
+    /** ディスクまでの先読みは表示を遅らせる対象にしないため、取得中として数えない。 */
+    @Test
+    fun diskPrefetchIsNotCountedAsInFlight() {
+        KsCoilImageLoading(context).enqueue(KsPrefetchRequest(url("in-flight-disk")), KsPrefetchDestination.Disk)
+
+        assertEquals(0, KsImageMemoryIndex.shared.fetchesInFlightCount)
     }
 }

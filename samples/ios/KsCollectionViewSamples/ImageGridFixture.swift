@@ -31,8 +31,8 @@ enum ImageGridFixture {
 
     /// 土俵のコレクションを組み立てます。
     ///
-    /// - Parameter destination: プリフェッチの到達点。宣言しないときは `nil` を渡します。
-    static func collection(destination: KsPrefetchDestination?) -> KsCollectionView<DemoItem> {
+    /// - Parameter prefetch: プリフェッチの形。「なし」のときは宣言そのものを行いません。
+    static func collection(prefetch: ImagePrefetchChoice) -> KsCollectionView<DemoItem> {
         let view = KsCollectionView(
             items,
             layout: layout,
@@ -43,9 +43,10 @@ enum ImageGridFixture {
 
         // 到達点を選ばないときは宣言そのものを行わない。宣言が無いことと「空の宣言がある」ことは
         // 本体の動きが変わるため、nil で区別する。
-        guard let destination else { return view }
+        guard let destination = prefetch.destination else { return view }
+        let width = prefetch.width
         return view.prefetchResources(destination: destination) {
-            [DemoData.imageURL(for: $0.id)]
+            [KsResource(DemoData.imageURL(for: $0.id), width: width)]
         }
     }
 }

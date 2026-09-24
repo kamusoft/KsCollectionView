@@ -118,8 +118,10 @@ final class KsPublicAPITests: XCTestCase {
     func testプリフェッチ宣言を到達点付きで組み立てられる() {
         let item = Item(id: 1, kind: .message, title: "A")
         let expected = [
-            URL(string: "https://example.com/1-a.jpg")!,
-            URL(string: "https://example.com/1-b.jpg")!,
+            KsResource(URL(string: "https://example.com/1-a.jpg")!, width: .column),
+            KsResource(URL(string: "https://example.com/1-b.jpg")!, width: .fixed(40)),
+            KsResource(URL(string: "https://example.com/1-c.jpg")!),
+            KsResource(URL(string: "https://example.com/1-d.jpg?sig=x")!, width: .column, key: "photo-1"),
         ]
         let view = KsCollectionView([item]) { item in
             Text(item.title)
@@ -128,6 +130,17 @@ final class KsPublicAPITests: XCTestCase {
 
         XCTAssertEqual(view.configuration.prefetchDestination, .memory)
         XCTAssertEqual(view.configuration.prefetchResources?(item), expected)
+    }
+
+    func test先読みの要素は幅とキーを省略すると元寸でURLで見分ける() {
+        let url = URL(string: "https://example.com/1.jpg")!
+        let resource = KsResource(url)
+
+        XCTAssertEqual(resource.url, url)
+        XCTAssertNil(resource.width)
+        XCTAssertNil(resource.key)
+        XCTAssertEqual(KsResource(url, width: .fixed(40)).width, .fixed(40))
+        XCTAssertEqual(KsResource(url, width: .column, key: "k").key, "k")
     }
 
     func testプリフェッチ宣言の到達点を省略するとdiskになる() {
@@ -146,6 +159,10 @@ final class KsPublicAPITests: XCTestCase {
         let asset = KsImageSource.asset("thumbnail")
 
         XCTAssertNotEqual(remote, file)
+        // リモートは任意のキーを持てる。省略したものとは別の値になる。
+        let keyed = KsImageSource.remote(URL(string: "https://example.com/1.jpg")!, key: "photo-1")
+        XCTAssertNotEqual(remote, keyed)
+        XCTAssertEqual(remote, KsImageSource.remote(URL(string: "https://example.com/1.jpg")!, key: nil))
         XCTAssertNotEqual(file, asset)
         XCTAssertEqual(asset, KsImageSource.asset("thumbnail"))
     }

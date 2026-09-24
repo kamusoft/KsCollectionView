@@ -144,17 +144,37 @@ class SampleDemoScreenTest {
         composeTestRule.onNodeWithText("行 1 の先頭").assertIsDisplayed()
     }
 
-    /** 「画像グリッド」画面は「ディスクまで」で始まり、3 択を選び直せる。 */
+    /** 「画像グリッド」画面は「ディスクまで」で始まり、メニューから 4 択を選び直せる。 */
     @Test
     fun `画像グリッド画面のプリフェッチの初期選択はディスクまでである`() {
         composeTestRule.setContent { ImageGridDemoScreen() }
 
-        composeTestRule.onNodeWithText("ディスクまで").assertIsSelected()
+        composeTestRule.onNodeWithText("ディスクまで").assertIsDisplayed()
+        composeTestRule.onNodeWithText("メモリまで (列幅)").assertDoesNotExist()
         composeTestRule.onNodeWithText("#1").assertIsDisplayed()
 
-        composeTestRule.onNodeWithText("なし").performClick()
-        composeTestRule.onNodeWithText("なし").assertIsSelected()
+        // メニューを開くと残りの選択肢が現れる。
+        composeTestRule.onNodeWithText("ディスクまで").performClick()
+        for (title in listOf("なし", "メモリまで", "メモリまで (列幅)")) {
+            composeTestRule.onNodeWithText(title).assertIsDisplayed()
+        }
+        composeTestRule.onNodeWithText("メモリまで (列幅)").performClick()
+
+        // 閉じたメニューはいまの選択だけを 1 行で出す。
+        composeTestRule.onNodeWithText("メモリまで (列幅)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("ディスクまで").assertDoesNotExist()
         composeTestRule.onNodeWithText("#1").assertIsDisplayed()
+    }
+
+    /** 起動時の指定で「画像グリッド」画面の最初の選択を決められる。 */
+    @Test
+    fun `画像グリッド画面は起動時の指定の選択で始まる`() {
+        composeTestRule.setContent {
+            ImageGridDemoScreen(initialChoice = ImagePrefetchChoice.MemoryColumn)
+        }
+
+        composeTestRule.onNodeWithText("メモリまで (列幅)").assertIsDisplayed()
+        composeTestRule.onNodeWithText("ディスクまで").assertDoesNotExist()
     }
 
     private companion object {
