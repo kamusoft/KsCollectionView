@@ -2,6 +2,7 @@ package jp.kamusoft.kscollectionview
 
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -220,6 +221,10 @@ public fun <Item> KsCollectionView(
     }
     val tapIndication = KsTapFeedback.indicationOverride ?: defaultIndication
 
+    // 縦スクロールインジケータ。表示の濃さとスクロール位置は描画フェーズでだけ読む。
+    val scrollIndicatorVisibility = rememberKsScrollIndicatorVisibility(gridState)
+    val scrollIndicatorColor = KsScrollIndicatorDefaults.color(isSystemInDarkTheme())
+
     BoxWithConstraints(modifier = modifier) {
         // 向きの判定はコンポーネント自身のコンテナの縦横比で行う (端末の物理向きでは判定しない)。
         val isPortrait = maxHeight > maxWidth
@@ -258,7 +263,9 @@ public fun <Item> KsCollectionView(
         LazyVerticalGrid(
             columns = cells,
             state = gridState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .ksScrollIndicator(gridState, scrollIndicatorVisibility, scrollIndicatorColor),
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(layout.effectiveRowSpacing),
             horizontalArrangement = Arrangement.spacedBy(layout.effectiveColumnSpacing),
