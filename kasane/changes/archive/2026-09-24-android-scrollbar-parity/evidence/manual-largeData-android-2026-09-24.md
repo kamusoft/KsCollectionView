@@ -1,6 +1,6 @@
 # 大量件数 (Android) の手動フリック — 2026-09-24
 
-スクロールインジケータ (スクロール中に毎フレーム描くバー) を足した後の体感ゲート ([handbook/cross/scroll-performance-gate.md](../../../handbook/cross/scroll-performance-gate.md))。iOS は変更していないため対の記録は無い。
+スクロールインジケータ (スクロール中に毎フレーム描くバー) を足した後の体感ゲート ([handbook/cross/scroll-performance-gate.md](../../../../handbook/cross/scroll-performance-gate.md))。iOS は変更していないため対の記録は無い。
 
 ## 環境
 
@@ -46,7 +46,7 @@
 
 - **体感の合否: 合格**
 - 数値 (janky 0.10%・期限超過 1 件・P99 16 ms) は体感と一致する
-- **前回との比較可否: 比較不能**。前回の記録 ([2026-09-08](../../archive/2026-09-17-performance-criteria-review/evidence/manual-largeData-android-2026-09-08.md)) は固定の操作列の制定前で、OS 版も未記録のため
+- **前回との比較可否: 比較不能**。前回の記録 ([2026-09-08](../../2026-09-17-performance-criteria-review/evidence/manual-largeData-android-2026-09-08.md)) は固定の操作列の制定前で、OS 版も未記録のため
 - 描画フレーム数 1,025 は窓の 40.2 秒に対して疎だが、窓には合図の往復 (約 12 秒) と休止 3 秒が含まれ、描画は操作中にだけ起きるため、それ自体は異常を示さない
 
 ## 同じ回の目視 (記録なし)

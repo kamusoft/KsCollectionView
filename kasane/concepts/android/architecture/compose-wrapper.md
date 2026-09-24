@@ -25,6 +25,7 @@ flowchart TD
     BWC["BoxWithConstraints<br/>コンテナの縦横比で portrait / landscape を判定し<br/>KsLayout / KsColumns → GridCells を解決"]
     CTRL["KsScrollController ⇄ KsScrollCommandReceiver<br/>命令キュー (snapshot state) を<br/>Composition 生存期間に 1 本の LaunchedEffect で消費"]
     GRID["LazyVerticalGrid<br/>LazyGridState は 1 つ (list も 1 列グリッド)"]
+    IND["ksScrollIndicator<br/>グリッドの前面にインジケータを描く<br/>(状態は描画フェーズでだけ読む)"]
     HF["header / footer (全幅 span)"]
     ITEMS["items(key, contentType = テンプレートキー)"]
     SEP["ksListSeparator<br/>list のとき content の前面に線を描く"]
@@ -40,6 +41,7 @@ flowchart TD
     KCV --> BWC --> GRID
     KCV --> CTRL -- 命令を解決して state を動かす --> GRID
     SCOPE -. キー → Composable .-> ITEMS
+    GRID -- drawWithContent --> IND
     GRID --> HF
     GRID --> ITEMS
     ITEMS -- 項目ラッパー: 外側から内側へ --> SEP --> TAP --> BOX --> TPL
@@ -58,6 +60,7 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) に先頭項目の上端と全項目の下端の線を全幅 1dp で描く。色は `listSeparatorColor` 未指定なら `#D9D9DE` |
 | 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003) |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
+| `ksScrollIndicator` / `rememberKsScrollIndicatorVisibility` (`KsScrollIndicator.kt`) | `LazyVerticalGrid` の前面 (`drawWithContent`) に縦のインジケータを描く。見た目と時間は `KsScrollIndicatorDefaults` の定数 (iOS の既定の実測値)。表示の濃さは利用者のドラッグで始まったスクロール (慣性を含む) の間だけ 1 にし、止まって 1 秒後に 250 ms でフェードする。位置と長さは `LazyGridState.scrollIndicatorState` から求め、位置だけを `ksAlignedScrollOffset` で補正する |
 | `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID → index (ヘッダー分 +1 込み) を解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
 | `KsImagePrefetchWindow` / `KsCoilImageLoading` | `LazyGridState.layoutInfo` を `snapshotFlow` で観測し、先頭可視 index の変化から進行方向を判定して「可視範囲の外側・進行方向・可視件数と同数」の窓を作る。「アイテム ID → 宣言 (識別子・URL・幅の種類) と取得単位」「取得単位 → 参照数と開始時の取っ手」の 2 層の台帳の差分だけをローダーへ伝える。列幅は `update` のたびに layout・contentPadding・コンテナ幅から解く (`Adaptive` は `LazyVerticalGrid` の規則を再現)。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は Coil の adapter、テストは記録用の fake を注入する |
 | `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の引き当てと表示要求の組み立て (表示サイズと当てはめ方付きの鍵)、識別子 (キーまたは URL) と鍵の算出、キャッシュ消去の世代 (Compose の状態として持ち、読んでいる `KsImage` だけが組み立て直される) |
@@ -81,6 +84,14 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 ### 行の高さ変化は自前の補間で、補間中だけ測り直しと切り取りを行う
 
 `animateContentSize` は子を新しい自然高で測ってから報告するサイズだけを補間するため、縮む向きで content の下端が先に飛び、区切り線との間にページ背景の帯が出る (約 240 ms)。`ksAnimatedHeight` は補間中の高さで content を測り直し、渡した制約に従わない content が行の外へ描かれないよう補間中だけ描画を切り取る。切り取りは描画時に行い合成レイヤは作らない。最初の測定では補間せず、再利用で直前の項目の高さを持ち越さない。`animateItem` は重ねない (中間フレーム数は変わらず性能の上乗せだけ残る)。
+
+### スクロールインジケータは公式の数値を描画フェーズで読み、位置だけ補正する
+
+Compose 1.11 系 (foundation 1.11.4 / material3 1.4.0) には Lazy 系のスクロールバーを描く公式の API が無く、あるのは値を読む `ScrollIndicatorState` (`scrollOffset` / `contentSize` / `viewportSize`) だけである。そのためライブラリが描く。サードパーティは使わない (依存が増え、つまむ操作などの機能が使われない)。
+
+表示の濃さとスクロール位置は描画フェーズでだけ読む。コンポジションで読むと、スクロールの 1 フレームごとに `KsCollectionView` 全体が再コンポーズされる (テストで検出される)。表示の契機は `interactionSource` のドラッグで、`KsScrollController` の命令によるスクロールでは出さない。iOS もプログラムによるスクロールではインジケータを出さないためである。
+
+公式の `scrollOffset` は、先頭の行番号を「見えている最初の行」から、行内のずれを「上側の余白の境目にかかる項目」から取る。上側の `contentPadding` の領域に前の行が見えている間はこの 2 つが食い違い、値が 1 行分小さく出る。そのままでは余白のある画面で、末尾でバーが下端に届かず、送る途中で 1 行ごとに逆戻りする。`ksAlignedScrollOffset` は、食い違った行どうしの実際の距離 (見えている項目の `offset`) を足してこれを揃える。余白の分を一律に差し引く補正では逆戻りが残る。長さ (`contentSize`) は公式の値のままで、行の高さの記録や推定はしない。見えている行の平均から見積もるため、行の高さがばらつくと長さが揺れる。この揺れは基準機の目視で許容と判断した。
 
 ### 向きはコンテナ自身の縦横比で判定する
 
@@ -120,9 +131,9 @@ Coil の `Precision.INEXACT` は下限 1.0・上限なしで許容範囲と合�
 
 10,000 件で初期表示に評価されるテンプレートは可視範囲分 (22) だけで、400 項目を通過しても同時生存の最大は 32 に留まり、範囲外へ出た分は破棄される (Sample debug 構成のカウンタで実測)。配列を別の内容へ置換すると同時生存は可視範囲 + 先読み分に戻り、画面を離れると 0 になる (計測モジュールの自動走査で、先読みなし / `memory` / `disk` の 3 通りとも確認)。
 
-スクロール性能の合否は、基準機でのオーナーの体感で下す (cross/ADR-0006。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md))。文字だけの「大量件数」は体感合格で、iOS で問題になった推定高さの解き直しに相当する費用は無い (Lazy 系は表示中の項目だけを測るため)。この合格は固定の操作列を定める前の記録 (2026-09-08) で、固定の操作列での採り直しは Android 本体に触れる次の変更で行う。画像グリッドの体感と表示待ちは [image-loading](../../core/core-model/image-loading.md) の性能節にある。
+スクロール性能の合否は、基準機でのオーナーの体感で下す (cross/ADR-0006。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md))。文字だけの「大量件数」は体感合格で、iOS で問題になった推定高さの解き直しに相当する費用は無い (Lazy 系は表示中の項目だけを測るため)。固定の操作列での記録は 2026-09-24 (スクロールインジケータを足した後) で、janky frames 0.10%、フレーム時間の P99 16 ms だった ([証跡](../../../changes/archive/2026-09-24-android-scrollbar-parity/evidence/manual-largeData-android-2026-09-24.md))。画像グリッドの体感と表示待ちは [image-loading](../../core/core-model/image-loading.md) の性能節にある。
 
-体感とは別の系統で、比較対象 (ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面) に対する上乗せを Macrobenchmark で測る。事後検証スクリプトが、各試行の描画フレーム数が 90 以上であることと、`frameDurationCpuMs` の P90 / P99 の劣化が 10% 以内であることを判定する。2026-09-15 の基準機では、2 列グリッド・1 列リストともライブラリ側が比較対象より 6〜9% 速かった。ただし比較対象だけが `animateContentSize` の合成レイヤを負う条件なので、この結果はラッパーの薄さそのものの証明にはならない。手順は [Android 性能検証の手順](../../../handbook/android/performance-verification.md)。
+体感とは別の系統で、比較対象 (ライブラリを通さない素の `LazyVerticalGrid` / `LazyColumn` の画面) に対する上乗せを Macrobenchmark で測る。事後検証スクリプトが、各試行の描画フレーム数が 90 以上であることと、`frameDurationCpuMs` の P90 / P99 の劣化が 10% 以内であることを判定する。2026-09-15 の基準機では、2 列グリッド・1 列リストともライブラリ側が比較対象より 6〜9% 速かった。ただし比較対象だけが `animateContentSize` の合成レイヤを負う条件なので、この結果はラッパーの薄さそのものの証明にはならない。また、この計測はスクロールインジケータを足す前のもので、次の相対計測は比較対象にもインジケータを付けてから行う。手順は [Android 性能検証の手順](../../../handbook/android/performance-verification.md)。
 
 ## してはいけないこと
 
@@ -130,6 +141,7 @@ Coil の `Precision.INEXACT` は下限 1.0・上限なしで許容範囲と合�
 - content ラムダを `remember` して初回だけ評価しない。親の state を捕捉したテンプレートが更新されず、iOS (ios/ADR-0006) と食い違う。評価コストは登録数に比例するだけ。
 - スクロール命令の消費を配列をキーにした `LaunchedEffect` にしない (上記)。
 - 項目に `animateItem` を重ねない (上記)。
+- インジケータの表示の濃さやスクロール位置をコンポジションで読まない。スクロールのたびに再コンポーズが起きる (上記)。
 - 計測用画面・テンプレート計数を release のソースセットに置かない。Sample の `measurement` / `counterEnabled` ソースセットの差し替えで release には空実装だけが入る。
 - 画像の要求にハードウェア支援ビットマップを使わない指定 (`allowHardware(false)`) を付けない。クラッシュ対策であっても、描画資源を切る回避策は実装側で選ばずオーナーに諮る (上記「範囲内のメモリ項目は要求を出さずに描く」)。
 - 公開 API に `Context` を引数で足さない。`KsAppContext` から読む (android/ADR-0005)。

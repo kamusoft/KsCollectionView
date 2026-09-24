@@ -10,4 +10,4 @@
 
 ## styling/
 
-- [styling/collection-layout.md](styling/collection-layout.md) — layout 値 (list / grid・列数・向き別列数)・スペーシング・contentPadding・区切り線・ヘッダー/フッター・content 配置・行の高さ変化の契約 (iOS / Android 共通)
+- [styling/collection-layout.md](styling/collection-layout.md) — layout 値 (list / grid・列数・向き別列数)・スペーシング・contentPadding・区切り線・ヘッダー/フッター・content 配置・行の高さ変化・スクロールインジケータの契約 (iOS / Android 共通)
