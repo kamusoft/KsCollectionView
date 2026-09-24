@@ -144,3 +144,7 @@ Android の試作 (エミュレータ) と iOS の試作 (Simulator) を同じ�
 
 見出しの下の間隔の名前は `groupHeaderSpacing` ではどこの間隔か分からないとの指摘で、短い候補 (`headerItemSpacing` / `headerToItemsSpacing` / `belowHeaderSpacing` / `headerSpacing`) から `headerItemSpacing` を採用 (オーナー決定)。layout 値で間隔を持つ見出しはグループの見出しだけなので `group` を外した。提案一式・ADR 4 件の本文で利用者の語彙の意味の「セクション」を「グループ」に揃え、iOS 内部の意味 (内部セクション・compositional layout のセクション) は残した。
 
+## 2026-09-24: 端を表示中の端への挿入 (提案作成後)
+
+オーナーが design Decision 16 (Android でいちばん上での先頭への挿入を先頭に留める) を Android に限定しないよう指示した。いちばん上での先頭への挿入、いちばん下での末尾への挿入は、両プラットフォーム・list / グリッドの両方でアニメーションが見えることを必須とし、画面外でひっそり足されないように工夫する。表示範囲の外での挿入は見えないので考慮不要。これで提案時の未決 (先頭以外を表示中の、表示範囲より前への挿入での位置の保ち方の違い) も決着した。スペックの Requirement を「端を表示中の端への挿入」に広げ、design Decision 16 を両プラットフォームの方式 (iOS の末尾は差分のアニメーションの中で `contentOffset` を下げる、Android は先頭・末尾とも差し替えと同じフレームでスクロールを要求) に書き直し、tasks に iOS (2.11) と目視確認 (5.7) を足した。
+
