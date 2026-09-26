@@ -1,14 +1,14 @@
 ---
 type: concept
 title: iOS コレクションエンジン
-description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・レイアウト・操作契約の実現方法と、その中で守っている仕組み
+description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・グループ・レイアウト・操作契約の実現方法と、その中で守っている仕組み
 tags: [ios, engine, uicollectionview, hosting]
-timestamp: 2026-09-24
+timestamp: 2026-09-26
 ---
 
 # iOS コレクションエンジン
 
-この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。
+この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。画像の先読みと `KsImage` の iOS 側の実現は [iOS 画像の先読みと KsImage の実現](image-pipeline.md) にある。
 
 ## 全体像
 
@@ -17,16 +17,17 @@ KsCollectionView (SwiftUI, 値型 + modifier で KsCollectionConfiguration を�
   └ KsCollectionRepresentable (UIViewControllerRepresentable)
       └ KsCollectionViewController
            ├ UICollectionViewDiffableDataSource<KsSectionID, KsItemIdentifier>
-           │     … item の identity は安定 ID のみ。section は配列を固定件数に区切った内部の塊 (ios/ADR-0009)
+           │     … item の identity は安定 ID のみ。section はグループごとに固定件数に区切った内部の塊 (ios/ADR-0009・0010)
            ├ KsSnapshotPlanner        … 旧新の突き合わせで reconfigure / reload を振り分ける (塊を知らない)
-           ├ KsSectionChunking        … 塊の件数と塊の数を決める
+           ├ KsSectionChunking        … 塊の件数を決める
+           ├ KsGroupChunkTable        … 配列をグループと塊に区切った表 (snapshot と同時に作る)
            ├ KsTemplateRegistry       … テンプレートキー → CellRegistration (遅延登録、snapshot 適用前に全キー準備)
-           ├ UICollectionViewCompositionalLayout (sectionProvider が configuration と塊の位置を実行時参照)
+           ├ KsCompositionalLayout    … UICollectionViewCompositionalLayout の派生。sectionProvider が configuration と
+           │                            塊の表を実行時参照し、固定中の見出しの属性の書き換えと端への挿入の位置を足す
            ├ KsEstimatedHeight        … 自己サイズの実測から推定高さを決める
-           ├ KsImagePrefetcher        … prefetchResources の宣言 (KsResource) を取得単位へ解く台帳 → KsNukeImageLoading (Nuke ImagePrefetcher)
-           └ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
-KsImage (SwiftUI)  … KsImageRequestFactory が索引 (KsImageMemoryIndex) から引き当て、外れたときだけ
-                     NukeUI LazyImage (先読みが取得中なら KsImageDeferredLoad) が共有パイプラインへ要求を出す
+           ├ KsImagePrefetcher        … 画像の先読みの台帳 (image-pipeline.md)
+           ├ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
+           └ KsHostingSupplementaryView … グループの見出しとルートのヘッダー / フッターの UIHostingConfiguration
 ```
 
 Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)。差分計算は diffable に任せ、内容変更の検知だけを旧新突き合わせで行う。
@@ -36,19 +37,17 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 | 部品 | 責務 |
 |---|---|
 | `KsSnapshotPlanner` | 旧新の配列から「識別子だけの snapshot」と、再構成 (同 ID・内容変化・キー不変) / 置換 (同 ID・キー変化) の対象を計算する。返すのは配列全体の識別子の列で、塊への区切りは controller が snapshot を組む直前に行う。重複 ID は debug assertion、release は後勝ち |
-| `KsSectionChunking` / `KsSectionID` | 配列を載せる塊の件数と塊の数を決める (後述)。`KsSectionID` は塊の並び順だけを持つ識別子 |
+| `KsSectionChunking` / `KsSectionID` | 塊の件数を決める (後述)。`KsSectionID` は「グループの値 + 離れて現れた同じ値の何回目か + グループの中の塊の順番」で塊を識別する |
+| `KsGroupChunkTable` / `KsChunkInfo` / `KsGroupInfo` | 配列を先頭から走査してグループ (同じグループの値が続く範囲) に分け、各グループを先頭から塊に区切った表。塊ごとにグループの中の位置・塊の数・件数を持ち、sectionProvider・区切り線・見出しの構成が引く。離れて現れた同じ値もここで検知する |
+| `KsCompositionalLayout` | 塊に割れたグループの見出しを 1 つとして固定する属性の書き換え (後述)、端を表示中の端への挿入で表示範囲を留める位置の移動 |
 | `KsTemplateRegistry` / `KsTemplate` | 値キーごとの `CellRegistration` を保持する。登録は snapshot 適用前に使用キー全てを準備する「登録準備の前倒し」(iOS 26 で初回セル取得中に登録を生成すると実行時例外になるため) |
-| `KsCollectionViewController` | 塊ごとの snapshot の構築と適用、塊の件数が変わったときの組み直し、同値配列時の可視セル再構成 (ios/ADR-0006。観測する値が宣言されていればその変化時だけ、ios/ADR-0008)、レイアウト生成、区切り線とタッチ feedback の表示切替、表示位置の控えと復元、スクロール命令のキューと apply completion での flush、`applyingSnapshotCount` による再入防止 |
-| `KsHostingCell` | `UIHostingConfiguration` の適用、再利用時のホスティング破棄 (state 非保持、ios/ADR-0002)、上下の区切り線ビューとタッチ feedback ビュー、hitTest による「セル内の操作要素か」の判定、自己サイズ結果の通知 |
+| `KsCollectionViewController` | 塊ごとの snapshot の構築と適用、塊の件数やグループの値の並びが変わったときの組み直し、同値配列時の可視セル再構成 (ios/ADR-0006。観測する値が宣言されていればその変化時だけ、ios/ADR-0008)、表示中の見出しの内容の設定し直し、レイアウト生成、区切り線とタッチ feedback の表示切替、表示位置の控えと復元、スクロール命令のキューと apply completion での flush、`applyingSnapshotCount` による再入防止 |
+| `KsHostingCell` | `UIHostingConfiguration` の適用、再利用時のホスティング破棄 (state 非保持、ios/ADR-0002)、上下の区切り線ビューとタッチ feedback ビュー、hitTest による「セル内の操作要素か」の判定、自己サイズ結果の通知、上下の安全領域を中身へ渡さないこと (後述) |
+| `KsHostingSupplementaryView` | グループの見出しとルートのヘッダー / フッターのホスティング。上下の安全領域を中身へ渡さず、透明にされた見出しを読み上げの対象から外す (`accessibilityElementsHidden`) |
 | `KsRowContentPlacement` | セル content を包む `Layout`。行の高さの遅れによる中央配置はみ出しを防ぐ (後述) |
 | `KsEstimatedHeight` | 自己サイズの実測から推定高さを決める値型 (後述) |
 | `KsScrollController` | 命令を受け取り VC へ転送する。未接続のときは何もしない。複数のコレクションに接続されたときは、最後に接続したコレクションだけへ転送する |
 | `KsLayoutDiagnostics` / `KsItemOffsetLookup` | 計測のための入口 (`@_spi(KsMeasurement)` を付けて読み込んだときだけ見える。利用者向け API ではない)。前者は Debug 構成だけに載る「自己サイズを返したセル数と、推定と不一致だった回数」の計数、後者は Release にも載る「画面の indexPath を配列全体の通し番号へ変換する」入口 |
-| `KsImagePrefetcher` / `KsNukeImageLoading` | システムの先読み通知 (`KsPrefetching`、アイテム単位) を取得単位へ翻訳し、「アイテム ID → 宣言 (識別子・URL・幅の種類)」「取得単位 → 参照数と開始時の `ImageRequest`」の 2 層の台帳で寿命を管理する。列幅は controller が先読み通知の時点で `KsLayoutMetrics` の列数と bounds・余白・列間隔から解き、px で渡す。ローダー操作は internal な受け口 `KsImageLoading` に集め、本番は到達点ごとの `ImagePrefetcher` へ写像、テストは記録用の fake を注入する |
-| `KsImageRequestFactory` / `KsImageIdentity` / `KsImageInvalidation` | `KsImage` の引き当てと表示要求の組み立て (外れたときの枠の実サイズからのデコード時縮小)、識別子 (キーまたは URL) と世代付き識別子の算出、キャッシュ消去の通知 (`ObservableObject`。下限 iOS 16 のため `@Observable` は使わない) |
-| `KsImageMemoryIndex` / `KsImageMatching` | 引き当ての候補になる「メモリへ載せるよう要求した鍵」の索引 (主スレッドに閉じた LRU、上限 20,000 件) と、許容範囲の判定 (定数 0.5 / 4 はここに 1 か所) |
-| `KsImageRetainedMatch` / `KsImageDeferredLoad` | 引き当てた画像と表示経路の選択を条件ごとに持ち続ける値と、画面に出る時点で引き当てを照会し直してから要求を出す包み (後述) |
-| `KsImagePipeline` | `enableSharedDiskCache()` の実装。`dataCache` が未設定なら `configuration` を引き継いで差し替える (core/ADR-0012) |
 
 ## 保証すること (実測で確かめた罠対策)
 
@@ -79,6 +78,8 @@ compositional layout の `.estimated` は item 定義単位で index path ごと
 
 最頻値化だけでは、少数派の行が可視になるたびにセクション全体を解き直す費用が残る。解き直しの費用は 1 セクションの件数に比例するため、10,000 件を 1 セクションに載せると、解き直しの主スレッド占有率が 2,000 件のときの 4.1 倍になり、基準機での体感は不合格だった。そこで配列を固定件数の塊に区切り、塊ごとに diffable のセクションへ載せて、1 回の解き直しの上限を塊の件数で抑える。
 
+塊は利用者のグループごとに、その先頭から区切る (ios/ADR-0010)。1 つの塊が 2 つのグループにまたがることはなく、大きいグループは複数の塊に割れる。グループを宣言しない場合は配列全体を値なしの 1 つのグループとして同じ経路に乗せ、境界の処理を 2 系統にしない。帰結として、小さいグループが多いデータではグループの数がそのままセクションの数になる (「グループ化」画面の体感で合格を確かめた)。
+
 塊の件数は基準 500 件を、次の列数の倍数へ切り上げた値にする。列数の倍数にするのは、塊の境界に列数に満たない行を作らないためである。
 
 | layout | 塊の件数が倍数になる列数 |
@@ -88,15 +89,59 @@ compositional layout の `.estimated` は item 定義単位で index path ごと
 | 向き別列数 (portrait, landscape) | 両者の最小公倍数。回転しても塊を組み直さずに済む。最小公倍数の計算があふれるか 2,000 を超える組み合わせは、確定した列数へ縮退して回転で組み直す |
 | adaptive | 確定した列数 (まだ解いていなければ 1) |
 
-塊の数は件数を塊の件数で割って切り上げた数で、空配列でも 1 塊を載せる (ヘッダー / フッターを表示するため)。
+各グループの塊の数はグループの件数を塊の件数で割って切り上げた数で、空配列でも項目の無い 1 塊を載せる。
 
-塊の境界が見た目に出ないよう、sectionProvider (`makeLayout`) が塊の位置で次を切り替える。内側余白の上端は先頭の塊だけ、下端は末尾の塊だけに付け、先頭以外の塊の上端には行間を入れる (compositional layout はセクションの間に行間を入れないため)。ヘッダーは先頭の塊、フッターは末尾の塊にだけ付け、区切り線の上線は先頭の塊の先頭の項目にだけ出す。
+塊とグループの境界が見た目に出ないよう、sectionProvider (`makeLayout`) が塊のグループの中での位置で次を切り替える。compositional layout はセクションの間に行間を入れず、見出しを内側余白の外側に置くため、間隔を内側余白で表す。
+
+| 塊の位置 | 上端の内側余白 | 下端の内側余白 | 見出し |
+|---|---|---|---|
+| グループの先頭の塊 | 見出しがあれば `headerItemSpacing` (見出しはこの外側) | — | 場所を取る形で付ける |
+| グループの 2 つめ以降の塊 | `rowSpacing` (他の行間と同じにする) | — | 固定するときだけ、場所を取らない形 (`extendsBoundary = false`) で付ける |
+| 最後のグループ以外の末尾の塊 | — | `groupSpacing` | — |
+
+ルートのヘッダー / フッターは塊ではなくレイアウト全体の boundary supplementary item (`UICollectionViewCompositionalLayoutConfiguration.boundarySupplementaryItems`) に 1 つずつ付け、`contentPadding` の上端 / 下端をその外側 (ヘッダーの上・フッターの下) に置く (core/ADR-0006)。ヘッダーが無くても余白があれば、余白の高さの空白を同じ位置に置く。塊の内側余白に置くと、グループの見出しの下に余白が入ってしまうためである。左右の余白だけは各塊の内側余白に入る。
 
 塊の件数は snapshot を組むたびに現在の layout と確定した列数から計算し直し、適用済みの件数と違えば同値配列でも組み直す。この比較は、同値配列で早期に抜ける判定より前に行う。列数はレイアウトを解いて初めて分かるので、`viewDidLayoutSubviews` と適用の完了で判定し、組み直しは次の実行機会へ回す (レイアウトの途中で snapshot を適用しない)。組み直しの適用にはアニメーションを付けない。塊の件数が変わると先頭以外のほぼ全項目が隣の塊へ移る差分になり、動かすと位置の復元と重なって表示が乱れるためである。
 
 効果は基準機の手動フリックで確かめた。先頭から未訪問の範囲へ下向きに 10 秒送る区間 (初回区間) で、解き直しの主スレッド占有率は 2,000 件 4.75%・10,000 件 4.94% (1.04 倍) となり、件数に比例しなくなった。
 
 差分更新の挙動も確かめてある。先頭に 1 件挿入すると各塊の末尾の項目が次の塊へ移るが、塊の所属が変わった可視セルも作り直されず、同じセルのまま移動する。このとき表示範囲の先頭の項目の位置は動かない (UIKit が表示中の内容を留めるため、0.0pt)。
+
+グループの値の取り出し方 (キーパス) が表示中に差し替わったときは、配列が同じでもグループの値の並びを求め直し、前回と違えば組み直して差分として適用する。取り出し方が同じなら同じ配列から同じ並びが得られるので求め直さない。
+
+### 塊に割れたグループの見出しを 1 つとして固定する (ios/ADR-0010 の方式 3c)
+
+compositional layout の固定 (`pinToVisibleBounds`) はセクション単位なので、そのままでは塊の境目で見出しが押し出されて差し替わる。そこで固定するときは全塊に同じ見出しを固定の形で付け、`KsCompositionalLayout` が `layoutAttributesForElements(in:)` と `layoutAttributesForSupplementaryView(ofKind:at:)` の返す見出しの属性を複製して書き換える。
+
+| 書き換える値 | 内容 |
+|---|---|
+| y | グループの見出しの本来の位置と固定する上端の大きい方。ただしグループの最終行の下端から見出しの高さを引いた位置まで (そこから次の見出しに押し上げられる) |
+| 横位置と幅 | グループの先頭の塊の見出しに揃える (場所を取らない見出しは塊の左右の内側余白を無視した位置に置かれ、塊の境目で横にずれるため) |
+| 透明度 | 表示範囲の上端を含む塊の見出しだけを 1、他の塊の見出しを 0。押し上げの間も 1 に保つ |
+
+最終行の下端は、行の中でいちばん背の高い項目の下端で見積もる。グリッドでは最後の項目が同じ行の他の項目より低いことがあり、最後の項目の下端を使うと押し上げが早く始まって上端に見出しの無い帯ができた (実装中に 60pt の差で観測して修正)。固定を外したときは `pinToVisibleBounds` を付けず、書き換えもしない。
+
+透明度を 1 に保つのは、UIKit が押し出される固定見出しを透明度で薄める版があるためである。iOS 26.5 の Simulator では `1 − 押し上げ量 / 15` で薄れ、3c で 1 に戻った。iOS 18.6 ではそもそも薄めなかった。iOS 16 は未確認 (ランタイムが手元に無い)。透明にした見出しのビューは画面に残るので、読み上げの対象から外して、塊の境目でも読み上げの要素に見出しが 1 つだけ出るようにしている (アクセシビリティの要素の木で確認。実際の VoiceOver の読み上げは確かめていない)。
+
+効果は位置の記録で確かめた。塊の境目 6 か所で、隙間・行へのかぶり・動き・欠けはゆっくり・速い・指のスワイプのいずれでも 0 だった。書き換えの費用は基準機の「グループ化」の手動フリックで主スレッドの 0.72% で、hitch の帰属先にはならなかった。
+
+### 見出しの内容は作り直さずに設定し直す
+
+diffable の差分は項目の identity と再構成だけを扱い、supplementary view の内容はグループの識別子が変わらない限り更新されない。そのままでは件数を出す見出しや親の状態を読む見出しに古い内容が残る。そこで、配列の適用の完了時 (差分の有無によらない) と観測する値が変わったときに、表示中の見出し (塊の見出しを含む) を集め、新しい配列でのグループの値とグループ内の項目で `UIHostingConfiguration` を設定し直す。同じグループの塊の見出しはすべて同じ内容にする。
+
+識別子を変えて作り直させる形は採らない。見出しの作り直しで固定中の見出しが一瞬消え、差分の移動アニメーションも崩れるためである。見出しを組み立てるときにだけ、適用済みの識別子の範囲から項目を引く (配列全体の写しを持たない)。
+
+### 端を表示中の端への挿入 (core/ADR-0018)
+
+先頭を表示中の先頭への挿入は、UIKit の既定 (コンテンツの位置を保つ) のままで先頭に留まる。末尾を表示中の末尾への挿入は既定では下に外れるため、`KsCompositionalLayout` が `finalizeCollectionViewUpdates()` の中でコンテンツの高さの変化分だけ表示位置を下げ、挿入のアニメーションと同じアニメーションで表示範囲を末尾に留める。
+
+更新の後の位置を問い合わせる `targetContentOffset(forProposedContentOffset:)` で返す形は採れない。差分の適用ではこの戻り値が使われないことを確かめた。端にいるかの判定は差し替えの直前に行い、1pt 未満の差は一致とみなす。
+
+### 安全領域は固定中の見出しにだけ合わせる (core/ADR-0017)
+
+`UIHostingConfiguration` は、一番外側の画面として載せたセル・補助ビューの中身を、上端の安全領域に重なった分だけ押し下げて高さを増やす。`KsHostingCell` と `KsHostingSupplementaryView` は上下の安全領域を中身へ渡さない (左右は従来どおり渡す)。コレクションの `contentInsetAdjustmentBehavior = .never` は変えていないので、安全領域は `adjustedContentInset` に入らず `safeAreaInsets` からだけ得られる。
+
+固定中の見出しの上端は「表示範囲の上端 + 上端の安全領域」とし、押し上げ・固定中の見出しに覆われた範囲・位置の復元・スクロール命令も同じ境目を基準にする。安全領域に重ならない置き方ではこれらの追加の値がすべて 0 で、見え方は変わらない。
 
 ### 表示位置の控えと復元
 
@@ -109,13 +154,13 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 | 向き別列数の回転 (塊は組み直さない) | `viewWillTransition(to:with:)` | `viewDidLayoutSubviews` で確定した列数が変わっていたら次の実行機会。変わっていなければ控えを捨てる |
 | 項目の追加・削除・並べ替え | 控えない | — (位置の動きは塊が無い場合と同じ) |
 
-表示範囲の先頭の項目 (`leadingVisibleID()`) は、可視セル一覧の最小の indexPath ではなく、レイアウト属性の矩形が表示範囲と重なる項目のうち先頭を採る。遠くへ送った直後は送る前のセルが可視一覧に残っており、一覧の先頭を採ると画面外の項目を控えて、復元で先頭へ飛ぶためである。回転の控えを `viewWillTransition` で取るのは、`viewWillLayoutSubviews` まで待つと bounds だけが新しく contentOffset が古い、食い違った組になるためである。列数が変わると同じ項目が行頭に来るとは限らないので、保つのは「控えた項目が、復元後も表示範囲の先頭の行に含まれる」ことまでになる。
+表示範囲の先頭の項目 (`leadingVisibleID()`) は、可視セル一覧の最小の indexPath ではなく、レイアウト属性の矩形が表示範囲と重なる項目のうち先頭を採る。遠くへ送った直後は送る前のセルが可視一覧に残っており、一覧の先頭を採ると画面外の項目を控えて、復元で先頭へ飛ぶためである。見出しを固定しているときは、固定中の見出しに覆われた範囲を表示範囲から除いて先頭の項目を選び、復元ではその項目を見出しの高さの分だけ下へずらして見出しのすぐ下に置く。表示範囲の先頭へ戻すと、項目が固定中の見出しの裏に隠れるためである。回転の控えを `viewWillTransition` で取るのは、`viewWillLayoutSubviews` まで待つと bounds だけが新しく contentOffset が古い、食い違った組になるためである。列数が変わると同じ項目が行頭に来るとは限らないので、保つのは「控えた項目が、復元後も表示範囲の先頭の行に含まれる」ことまでになる。
 
 復元を適用の直後ではなく次の実行機会まで遅らせるのは、同じ実行の中で戻すと、その後に UIKit 自身が行う位置の調整に上書きされ、表示範囲が 1 画面ぶんずれるためである (iPad で実測)。遅らせた復元には、控えるたびに 1 増える通し番号 (`anchorGeneration`) を持たせ、実行時に番号が変わっていたら取り下げる。番号は控え直したときと、利用者がドラッグを始めたとき (`scrollViewWillBeginDragging` で控えを捨てる) に変わる。番号が無いと、復元を待つ間に別の更新が控え直しても、先に予約した復元が古い控えの位置へ戻してしまう。
 
 ### 区切り線はセルのサブビュー
 
-システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを content の前面に持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。先頭行の判定は配列全体の先頭 (先頭の塊の先頭の項目) で行う。色は `listSeparatorColor` 未指定なら固定値 (core/ADR-0010)。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
+システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを content の前面に持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。上線を出すのはグループの先頭の塊の先頭の項目で、見出しを宣言しないときは最初のグループだけ (core/ADR-0016)。判定は塊の表から引く。色は `listSeparatorColor` 未指定なら固定値 (core/ADR-0010)。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
 
 ### 位置依存の表示とタッチ feedback の揃え直し
 
@@ -148,25 +193,12 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 
 親の state 変更で Representable に届く `context.transaction` は `animation=nil` で、`withTransaction` で再構成へ引き渡しても載せるものが無い。タップを `withAnimation` で包んで `DefaultAnimation` を届けても、中身 (SwiftUI 側の描画) はアニメーションしなかった (Simulator でのフレームログ A/B とオーナー目視、2026-09-05)。行の高さの変化自体は UICollectionView の自己サイズ変更として約 0.35 秒かけて動き、transaction の有無に依存しない。`UIHostingConfiguration` の content view は内部の描画レイヤーを外から観測できないため、中身のアニメーションの判定は目視で行う。中身をアニメーションさせるには別の解き方が要る。
 
-### 画像の先読みは controller 生成時の共有パイプラインを捕捉する
-
-`KsCollectionViewController` は生成時に `ImagePipeline.shared` を読んで `KsNukeImageLoading` を作る。`KsImagePipeline.enableSharedDiskCache()` を後から呼んでも既存のコレクションの先読みは差し替え前のパイプラインを使い続けるため、利用者契約は「起動時に一度呼ぶ」になる ([画像の先読みと KsImage](../../core/core-model/image-loading.md))。取り消し通知には到達点が付かないため、`KsNukeImageLoading` は作成済みの全到達点の `ImagePrefetcher` へ停止を伝える。`ImagePrefetcher` は解放時に未完了の取得を止めるので、controller の解放で先読みは全停止する。
-
-### 範囲内のメモリ項目は要求を出さずに描き、外れたときだけ 1 本の鍵で要求する
-
-Nuke には近い大きさの項目を引き当てる手段も鍵の列挙も無く、`ThumbnailOptions` 付きの要求は寸法の違うメモリ項目を再利用せず再デコードする。そのため `KsImageMemoryIndex` が識別子ごとに `ImageRequest` を覚え、`KsImageRequestFactory` が組み立ての時点で候補をパイプラインのメモリキャッシュへ問い合わせて `KsImageMatching` で判定する (契約は [画像の先読みと KsImage](../../core/core-model/image-loading.md)、core/ADR-0013)。外れたときの表示要求は、常にデコード時縮小の指定 (`ThumbnailOptions` の `.aspectFit` / `.aspectFill`) を持つ 1 本の形にする。ローダーは要求そのものの鍵でメモリを引き、結果も同じ鍵へ書くため、経路ごとに鍵を変えると自分で書いた項目に次の表示が当たらない。
-
-UIKit はセルの中身を先読みの開始と同じ頃に組み立てるので、組み立てで一度だけ引き当てると、先読みの完了後に画面に出たセルもディスクから再デコードする (実機で 147 件中 136 件)。そこで、先読みが取得中の可能性 (`mayBeLoadingPrefetch`) があるときだけ `KsImageDeferredLoad` で包み、画面に出る時点 (`onAppear`) で照会し直してから要求を出す。それ以外は組み立て時に `LazyImage` を置く (`LazyImage` も要求の開始は画面に出る時点)。`KsImageRetainedMatch` は、引き当てた画像と包みを選んだことを条件 (識別子と世代・`reloadToken`・枠・表示倍率・当てはめ方) ごとに覚える。`clear(.memory)` は索引と取得中の記録を消すが世代を進めないため、覚えていないと直後の組み立て直しで `LazyImage` に切り替わり、表示中の画像をディスクから再デコードする。
-
-### ソース単位の削除は世代付き識別子で旧項目を避ける
-
-Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどのサイズで要求したかを後から列挙できない。`KsImageIdentity` は識別子を 1 か所で求める。キーなしは URL の文字列、キーありは `"ks-key " + key`、削除後は `"ks-gen N " + 識別子` で、キーと URL・世代付きの形と別のキーが衝突しない (core/ADR-0014)。`KsImageCache.remove(source)` は世代 0 の要求と現在の世代の要求の両方で消し、そのソースの世代を進める。以後の `KsImage` と先読みの要求は `ImageRequest.imageID` に世代付きの識別子を入れて発行する。世代 0 でキーなしのソースは識別子を付けず、NukeUI の `LazyImage` を直接使った表示と同じ項目を指し続ける。キーありのソースは世代 0 でも `imageID` を付け、メモリとディスクの両方の鍵がキーになる。`clear` は識別子を変えず、`KsImageInvalidation` の世代だけを進めて表示中の `KsImage` を組み立て直す。`clear` / `remove` は、生存している先読み層の一覧 (`KsImagePrefetchRegistry`) を通じて進行中の取得を止めてから消す。表示側の進行中の取得は止めない (Android に公開の取り消し口が無く、両プラットフォームで揃えるため)。
-
 ### レイアウト切替・入力・命令
 
 - **レイアウトオブジェクトは差し替えない**。list ⇄ grid・列数・スペーシング・向き変更のいずれも、sectionProvider が `configuration.layout` を実行時参照し `invalidateLayout()` で反映する。`setCollectionViewLayout` を使うと全セルがバウンドして描画が乱れる (翻案元の実績。ios/ADR-0003)。
 - **セル内の操作要素はタップを奪わない**。`KsHostingCell` の hitTest で操作要素 (UIControl 系) に当たったタッチはセル選択に流さず、feedback も出さない。長押し認識器はハンドラ未宣言時は無効。
-- **スクロール命令は apply completion で flush**。データ差し替えと同時に来た命令は未完了の最後の apply が終わってから実行する。ID への命令と末尾への命令は `dataSource.indexPath(for:)` で解決するので、塊をまたいでも同じに動く。
+- **スクロール命令は apply completion で flush**。データ差し替えと同時に来た命令は未完了の最後の apply が終わってから実行する。ID への命令と末尾への命令は `dataSource.indexPath(for:)` で解決するので、塊とグループをまたいでも同じに動く。
+- **固定中の見出しの下へ送る**。対象のグループの見出しが固定される場合の先頭合わせは、`scrollToItem` ではなく見出しの高さの分だけ上を空けた位置へ送る。行と見出しの高さは表示されたときに推定から実測へ変わるため、アニメーションしないときは送った先でレイアウトを確定させて数回送り直す。
 
 ## 分かっている限界
 
@@ -174,6 +206,8 @@ Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどの
 - 塊の件数が変わる適用の最中に配列と layout 値の更新が重なると、遅らせた復元が通し番号の不一致で取り下げられ、新しい控えが使われないまま残る。その更新の後は表示範囲の先頭の項目が保たれない。
 - adaptive では、列数が変わってから塊を組み直すまでの間 (次の実行機会まで)、塊の境界に列数に満たない行が 1 フレーム出うる。
 - 回転と adaptive の組み直しで位置が保たれることは、Simulator のテストでしか確かめていない。`viewWillTransition` と `scrollViewWillBeginDragging` が SwiftUI の representable 経由で実際に届くことはテストで担保していない。Sample に列数が変わる大量件数の画面が無く、実機でも目視できていない。
+- 10,000 件の一覧の途中でグループの並び順を反転すると、新しく画面に来る項目が遠い元の位置から動いてくるため約 0.35 秒 (21 フレーム) 画面にセルも見出しも出ず、最後のフレームで見出しとセルが一緒に 222〜278pt 跳ぶ。見出しとその塊のセルの相対位置は保たれる。基準機の目視でオーナーが妥協できると判断した。
+- 押し上げ中の見出しを UIKit が透明度以外の方法で薄める版があれば、方式 3c では打ち消せない。確かめたのは iOS 18.6 と 26.5 だけで、下限の iOS 16 は未確認。
 - 2 列 grid に自己サイズの行を載せ、静止を待たずに半画面ずつ送り続けると、セルが自己サイズで返す高さが 1 画素ずつ伸び続け、UIKit のレイアウトループ検出で落ちる (Simulator のテストで発見。別の変更 `kasane/changes/ios-self-sizing-layout-loop` で調査中)。
 
 ## してはいけないこと
@@ -207,6 +241,8 @@ Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどの
 | 大量件数 2,000 件 | 合格 | 初回区間の解き直し 4.75%、不一致率 0.023 |
 | 画像グリッド | 合格 | 全セルが同じ高さで、解き直しは time profile に一度も現れない |
 
+グループを実装した後の「グループ化」(10,000 件・2 列、1,200 件の大きいグループ 3 つと 5〜30 件の小さいグループ多数、見出しは固定) も同じ基準機で体感合格だった (2026-09-26)。入力区間の hitch time ratio は 125.0 ms/s、主スレッドの費用の主役はセルの生成 (45.7%) と hosting の計測 (25.4%) で、見出しの書き換えは 0.72%、見出しの生成は 2.1% だった ([証跡](../../../changes/archive/2026-09-26-sections-grouping/evidence/performance-5.5.md))。
+
 体感と数値は食い違ったままである。体感は操作のどの段階でも引っかかりなしだが、hitch は残る。10,000 件では重大度 High の hitch が 36 件あり、記録全体で 1 秒あたり 76.8 ms がコマ落ちで失われた。画像グリッドでは、未訪問の範囲へ続けて送る区間に hitch が集中する。数値は合否に入れない規則なので、食い違いは証跡に書いて残している。
 
 件数を変えた比較は、2,000 件の走行が初回区間で末尾に達していないことを成立条件にしている。末尾に達すると未訪問のセルが尽きて解き直しが減り、2 つの件数で仕事量が揃わないためである。Instruments の記録には到達した項目の番号が残らないため、この条件はオーナーへの確認で判定している。
@@ -223,20 +259,21 @@ Nuke のメモリ鍵は縮小オプションを含み、ライブラリはどの
 | 登録準備の前倒し | snapshot 適用前に使用する全テンプレートキーの `CellRegistration` を生成すること。画面外の未登録キーもこの時点で検知される |
 | 解き直し | compositional layout が、推定高さと違う高さに測られたセルを受けてセクションの配置を計算し直すこと。費用はセクションの件数に比例する |
 | 不一致率 | 自己サイズを返したセルのうち、渡されていた推定高さと違う高さに測られた割合。解き直しの回数の上界になる |
-| 塊 (内部セクション) | 配列を固定件数に区切って載せた diffable のセクション。利用者の宣言にも公開 API にも現れず、将来の論理セクションとは別物 (ios/ADR-0009) |
+| 塊 (内部セクション) | グループごとに固定件数に区切って載せた diffable のセクション。利用者の宣言にも公開 API にも現れない。利用者のグループとは別物で、1 つのグループが複数の塊に割れうる (ios/ADR-0009・0010) |
+| 場所を取らない見出し | `extendsBoundary = false` で付けた補助ビュー。レイアウト上の高さを占めず、塊に割れたグループの 2 つめ以降の塊で固定のためだけに使う |
+| 方式 3c | 塊に割れたグループの見出しを、属性の書き換えでグループ全体の 1 つとして固定する方式 (ios/ADR-0010 の採用案) |
 | 確定した列数 | 直近のレイアウトパスで決まった列数。固定列数以外はレイアウトを解くまで分からない |
 | 同値配列 | 前回適用した配列と等しい配列 |
 | 次の実行機会 | 今の処理を抜けた後にメインキューで実行される処理 (`DispatchQueue.main.async`)。レイアウトの途中や UIKit 自身の調整の前を避けるために使う |
 | 控え | 行の並びが変わる更新の前後で位置を保つために記録する「表示範囲の先頭の項目と、表示範囲の上端からのオフセット」 |
 | hitch | 描画が表示の期限に間に合わず、フレームが遅れて出た事象 (Instruments の指標。High は遅れの大きいもの) |
-| 到達点 | 先読みが画像をどこまで持ってくるか。`disk` (元データをディスクまで) と `memory` (デコード済みをメモリまで) |
-| 受け口 (`KsImageLoading`) | ローダーへの操作を集めた internal な境界。本番は Nuke の adapter、テストは記録用の fake が入る |
-| 識別子 / 索引 / 引き当て | 画像の鍵の基準 (キーまたは URL)、引き当ての候補の一覧、許容範囲に入る項目を探して使うこと。意味は [画像の先読みと KsImage](../../core/core-model/image-loading.md) の用語節 |
 
 ## 関連
 
 - [項目モデルと差分更新](../../core/core-model/collection-items.md)、[レイアウト語彙](../../core/styling/collection-layout.md)、[操作とスクロール制御](../../core/core-model/collection-interaction.md)
-- [画像の先読みと KsImage](../../core/core-model/image-loading.md) — 先読み・到達点・キャッシュ操作の契約 (この文書はその iOS 側の実現)
-- ios/ADR-0001〜0009 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0012 (Nuke への直接依存と共有パイプライン)、core/ADR-0013・0014 (許容範囲の引き当て・任意キー)、cross/ADR-0006 (性能の完了判定)
+- [iOS 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の iOS 側の実現 (契約は [画像の先読みと KsImage](../../core/core-model/image-loading.md))
+- ios/ADR-0001〜0010 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊、0010: 塊とグループ・見出しの固定)
+- core/ADR-0010 (区切り線の既定外観)、core/ADR-0015・0016 (グループの宣言・グループごとの区切り線)、cross/ADR-0006 (性能の完了判定)
+- core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)
 - handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
 - 翻案元: `../KsSettingsView/ios/Sources/KsSettingsViewUI/` (`FullSnapshotContentTargets` / `KsCellRegistry` / `CustomCellRowPlacement` / `SectionBoxLayout`)

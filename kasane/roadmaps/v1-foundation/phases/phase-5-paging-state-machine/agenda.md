@@ -27,6 +27,12 @@ Pull to Refresh の Compose 側の流儀を確認済み (phase-3 agenda「決定
 
 `touchFeedbackColor` の意味論が両プラットフォームで非対称: iOS は渡された色をそのままセル全面の塗りにし、Android は material3 の `ripple` が渡された色に自前で不透明度を掛ける (android/ADR-0003 の帰結)。同じ生値を渡すと Android では不可視になるため、Sample「リスト」は描画結果を揃える別の生値を渡している (iOS は accent の 15%、Android は accent そのまま — `kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md` 4 件目)。本フェーズは両プラットフォームの DSL に同時に触るため、ここで統一の方向 (iOS が不透明度を掛ける側に寄せる / Android が生値をそのまま塗る / 語彙を分ける) を決めて sample-parity の生値一致を回復する。
 
+### phase-4 からの申し送り (2026-09-26 実装結果)
+
+- 端を表示中の端への挿入 (core/ADR-0018): いちばん下を表示中に末尾へ項目を足すと、表示範囲は末尾へ送られて末尾に留まる。末尾への追加読み込みでこれがそのまま働くと、フッター (末尾ローディング) が見え続けて次の読み込みが連鎖しうる。追加読み込みの反映を「端への挿入」として扱うか (発火の抑止・フッターを含めた末尾の定義) を本フェーズで決める
+- グループとの組み合わせ: 追加読み込みで末尾のグループと同じグループの値の項目が続くと、既存のグループが伸びる (見出しの件数が変わる)。グループの値の不連続は不正入力 (core/ADR-0015) なので、ページの境目でグループが割れない順に並べる責任は利用者にある。この前提と見出しの件数の見え方を、Sample と利用者ドキュメントで扱うかを決める
+- 実装の実際: `kasane/changes/archive/2026-09-26-sections-grouping/deviation.md`、Android は末尾への送りを `KsPositionKeeper` の `followEnd` が行う
+
 ## 決定事項
 
 (議論で確定したらここに移動)

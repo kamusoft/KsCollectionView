@@ -17,7 +17,7 @@ import androidx.compose.runtime.setValue
  *
  * - 先頭を表示中に配列の先頭へ項目を挿入すると、元の先頭の項目を表示範囲の先頭に保つため、
  *   挿入した項目が表示範囲の上に外れて見えない。末尾を表示中に配列の末尾へ挿入したときも、
- *   挿入した項目が表示範囲の下に外れる。端を表示中の端への挿入は、表示範囲を端に留める。
+ *   挿入した項目が表示範囲の下に外れる。端を表示中の端への挿入は、表示範囲を端に留める (core/ADR-0018)。
  *   先頭では表示範囲を先頭に要求し直す (挿入した項目がフェードで現れ、元の項目は配置の
  *   アニメーションで後ろへずれる)。末尾では、挿入を反映した次のフレームから表示範囲を末尾まで
  *   なめらかに送り ([followEnd])、挿入した項目はフェードで現れる
@@ -135,6 +135,7 @@ internal class KsPositionKeeper<Item> {
      * 送る距離は、足された項目を表示範囲の端に配置させてから実測する。
      */
     suspend fun followEnd(state: LazyGridState) {
+        // 挿入と同じフレームでは位置を要求せず、挿入を反映した後から送る (android/ADR-0006)。
         appearing.removeAll(state.layoutInfo.visibleItemsInfo.map { it.key })
         try {
             if (!state.canScrollForward) return

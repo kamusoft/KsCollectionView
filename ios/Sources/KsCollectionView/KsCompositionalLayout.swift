@@ -8,9 +8,9 @@ import UIKit
 //    位置・横位置と幅・透明度を書き換える。書き換えるのは見出しを固定する構成のときだけ。
 //    一覧が画面上端の安全領域 (ステータスバー・ナビゲーションバー) に重なって置かれたときは、
 //    固定する位置を安全領域の境目 (バーのすぐ下) にする。行とルートのヘッダーは安全領域に
-//    被ったまま流れ、安全領域に合わせるのは固定中の見出しだけである。
-// 2. 配列の差し替えで、端を表示中の端へ項目が入ったときに表示範囲をその端へ留める。差分の適用の
-//    アニメーションの中で表示範囲も一緒に動くよう、更新のアニメーションの中で表示位置を動かす。
+//    被ったまま流れ、安全領域に合わせるのは固定中の見出しだけである (core/ADR-0017)。
+// 2. 配列の差し替えで、端を表示中の端へ項目が入ったときに表示範囲をその端へ留める (core/ADR-0018)。
+//    差分の適用のアニメーションの中で表示範囲も一緒に動くよう、更新のアニメーションの中で表示位置を動かす。
 //    更新の後の位置を問い合わせる `targetContentOffset(forProposedContentOffset:)` の戻り値は、
 //    差分の適用では使われない。
 internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout {
@@ -45,7 +45,7 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     }
 
     // 差分の適用のアニメーションの中で呼ばれる。ここで表示位置を動かすと、項目の挿入・削除と
-    // 同じアニメーションで表示範囲が動く。
+    // 同じアニメーションで表示範囲が動く (core/ADR-0018)。
     override func finalizeCollectionViewUpdates() {
         super.finalizeCollectionViewUpdates()
         guard let edge = edgeToKeepAfterUpdate, let collectionView else { return }
@@ -63,7 +63,7 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     }
 
     // 固定中のグループの見出しを置く上端の位置 (内容の座標)。表示範囲の上端に、上端の安全領域に
-    // 重なる分を足した位置。`contentInsetAdjustmentBehavior = .never` のため、安全領域は
+    // 重なる分を足した位置 (core/ADR-0017)。`contentInsetAdjustmentBehavior = .never` のため、安全領域は
     // `adjustedContentInset` に入らず `safeAreaInsets` からだけ得られる。
     func pinnedGroupHeaderTop(in collectionView: UICollectionView) -> CGFloat {
         collectionView.contentOffset.y
@@ -135,7 +135,8 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     }
 
     // 塊の最後の行の下端。最後の項目から前へ、同じ行に並ぶ項目 (上端が揃う項目) をたどり、
-    // その中でいちばん下の下端を返す。list では最後の項目の下端と同じになる。
+    // その中でいちばん下の下端を返す。list では最後の項目の下端と同じになる。塊に割れたグループの
+    // 見出しは、グループの最後の塊のこの位置を下端として押し上げられる (ios/ADR-0010)。
     private func lastRowBottom(endingWith lastItem: UICollectionViewLayoutAttributes, section: Int) -> CGFloat {
         var bottom = lastItem.frame.maxY
         var item = lastItem.indexPath.item - 1

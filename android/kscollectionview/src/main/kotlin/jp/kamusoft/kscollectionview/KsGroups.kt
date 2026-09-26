@@ -49,6 +49,8 @@ public class KsGroups<Item, Group>(
     public val pinnedHeaders: Boolean = true,
     public val header: (@Composable (group: Group, items: List<Item>) -> Unit)? = null,
 ) {
+    // 平らな配列のまま、項目のグループの値を指してグループにする (core/ADR-0015)。
+
     /**
      * グループの値の型を消した見出しの内容。
      *

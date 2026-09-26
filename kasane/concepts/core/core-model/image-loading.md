@@ -8,7 +8,7 @@ timestamp: 2026-09-24
 
 # 画像の先読みと KsImage
 
-この文書を読むと、コレクションが「もうすぐ表示される項目」の画像を先読みする仕組みを利用者がどう宣言し、先読みした画像がどこまで・どの大きさで届き、`KsImage` がそれをどう引き当てて表示し、キャッシュをどう消せるかが分かる。あわせて、両プラットフォームで揃わない箇所とその理由が分かる。項目モデルの契約は [collection-items](collection-items.md) を先に読むと分かりやすい。実現方法は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) と [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) にある。ADR は `kasane/decisions/<domain>/` にあり、本文では `core/ADR-0012` の形で指す。
+この文書を読むと、コレクションが「もうすぐ表示される項目」の画像を先読みする仕組みを利用者がどう宣言し、先読みした画像がどこまで・どの大きさで届き、`KsImage` がそれをどう引き当てて表示し、キャッシュをどう消せるかが分かる。あわせて、両プラットフォームで揃わない箇所とその理由が分かる。項目モデルの契約は [collection-items](collection-items.md) を先に読むと分かりやすい。実現方法は [iOS 画像の先読みと KsImage の実現](../../ios/architecture/image-pipeline.md) と [Android 画像の先読みと KsImage の実現](../../android/architecture/image-pipeline.md) にある。ADR は `kasane/decisions/<domain>/` にあり、本文では `core/ADR-0012` の形で指す。
 
 ## 目的
 
@@ -245,8 +245,8 @@ Android のライブラリは `InitializationProvider` に相乗りしてアプ�
 
 - [collection-items](collection-items.md) — 項目モデルと安定 ID (先読みの台帳は安定 ID で項目を追う)
 - [collection-layout](../styling/collection-layout.md) — layout 値・contentPadding・列間隔 (列幅の解決に使う)
-- [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — Nuke への接続、索引と引き当て、画面に出る時点の引き当てのやり直し、世代付きの鍵の実現
-- [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — 先読み窓、表示要求の鍵、画面に出る時点の引き当てのやり直し、アプリケーションコンテキストの捕捉
+- [iOS 画像の先読みと KsImage の実現](../../ios/architecture/image-pipeline.md) — Nuke への接続、索引と引き当て、画面に出る時点の引き当てのやり直し、世代付きの鍵の実現
+- [Android 画像の先読みと KsImage の実現](../../android/architecture/image-pipeline.md) — 先読み窓、表示要求の鍵、画面に出る時点の引き当てのやり直し、アプリケーションコンテキストの捕捉
 - core/ADR-0008 (DSL 外形)、core/ADR-0013 (先読みの幅と許容範囲の引き当て)、core/ADR-0014 (任意キー)
 - core/ADR-0012 (ローダーの直接依存と共有キャッシュ・iOS のディスクキャッシュの明示的な有効化)、core/ADR-0002 (記法差)、core/ADR-0011 (不正入力)、android/ADR-0005 (アプリケーションコンテキストの捕捉)
 - [dsl-samples](../../../roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) のシナリオ 5 — 利用形の全体 (先読みの要素が URL だった時点の形)

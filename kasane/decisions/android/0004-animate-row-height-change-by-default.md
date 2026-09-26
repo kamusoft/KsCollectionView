@@ -3,6 +3,7 @@ id: 0004
 title: 行の高さ変化を既定でアニメーションさせ、補間中は content を行の高さで測り直して切り取る
 status: accepted
 date: 2026-09-05
+amended-by: 0006
 ---
 
 ## Context

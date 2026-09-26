@@ -3,6 +3,7 @@ id: 0010
 title: list の区切り線の既定外観 — 先頭行の上端・行間・最終行の下端に全幅 1pt の固定色で描く
 status: accepted
 date: 2026-09-02
+amended-by: 0016
 ---
 
 ## Context

@@ -135,6 +135,34 @@ iOS の内部の塊は論理セクションごとに先頭から区切り、塊�
 
 セクションの見出しは既定で上端に固定し、設定 1 つで外せる (仮称 Swift `.sectionHeadersPinned(false)` / Kotlin `sectionHeadersPinned = false`。名前は提案化で確定)。区切り線と同じ「既定オン・1 行で外す」形。固定あり / なしの両方を両プラットフォームで揃える。core/ADR-0015 に追記。
 
+## 実装結果 (2026-09-26 反映)
+
+change `sections-grouping` (L 級) で両プラットフォームにグループ化を追加した。公開 API は iOS `.groups(by:pinnedHeaders:header:)` / Android `KsGroups` と layout 値の `groupSpacing` / `headerItemSpacing` (core/ADR-0015)。iOS は塊をグループごとに区切り、塊に割れたグループの見出しを方式 3c で 1 つとして固定する (ios/ADR-0010)。Android は並べ方の表と `stickyHeader`、移動・挿入・削除を `animateItem` で見せる (android/ADR-0006)。契約の全体は concepts `core/core-model/collection-items.md` / `core/styling/collection-layout.md`、実装の実際は `kasane/changes/archive/2026-09-26-sections-grouping/deviation.md`。
+
+決定事項から変わった点・足した点:
+
+| 決定事項 | 実装の実際 | 理由 |
+|---|---|---|
+| (なし: 全画面時の扱いは未議論) | 全画面 (iOS `.ignoresSafeArea()` / Android edge-to-edge) では固定中の見出しを上端の安全領域の境目で止め、先頭・末尾に余白は足さない (core/ADR-0017) | オーナー指示 (iOS の連絡先アプリと同じ見え方)。ルートのヘッダーの配置は利用者の責任 |
+| 差分更新の見え方 (論点 5) | 端を表示中の端への挿入はアニメーションを見せて端に留まる (core/ADR-0018) | オーナー指示で両プラットフォーム・list / グリッドの必須に。Android の末尾は snap を使わず次のフレームからなめらかに送る |
+| `animateItem` の付け方は試作の目視で決める | 項目・見出し (固定中を含む)・ルートのヘッダー / フッターに、フェードあり・修飾のいちばん外側で付け、高さの補間中は配置のアニメーションを止める | 試作のオーナー目視と、補間中に行の間へ帯ができる不具合 |
+| グループの値の取り出し方 (未議論) | 表示中に切り替えてよく、値の列が変われば組み直す | レビューの双方一致の指摘の裁定 |
+| 見出しの方式 3c の未確認 4 点 | 5.1〜5.5 で確認 (書き換えの費用は主スレッドの 0.72%)。押し出し中の薄めは iOS 26.5 にあり 18.6 に無い。iOS 16 は未確認 (オーナー判断で 18.6 で代替) | 5.4 の実測 |
+| 差分更新の見え方 | 10,000 件の途中で反転すると iOS で約 0.35 秒空になり最後に跳ぶ | オーナーが実機で目視し、合意済みの妥協として受け入れ |
+
+検証: 自動テスト (iOS 341 件 / Android 321 件 / Sample iOS 18 件・Android 83 件)、独立レビュー 9 周と相方レビュー 3 周で APPROVED、verify-002 VALID、5.x の証跡 (iOS のフレームの記録・Android の相対計測・基準機の体感・オーナー目視) を `kasane/changes/archive/2026-09-26-sections-grouping/evidence/` に保存。基準機 (iPhone 11 / Pixel 4a) の体感は両方とも「引っかかりなし」。
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| 端を表示中の端への挿入 (末尾に留める) と末尾への追加読み込みの相互作用 — フッターや読み込み中の表示が見え続けて読み込みが連鎖しうる (core/ADR-0018 の帰結) | phase-5 の agenda に追記 |
+| グループとページングの組み合わせ — 追加読み込みで末尾のグループが続くとき (同じグループの値の項目を足す) の見出し・件数の扱い | phase-5 の agenda に追記 |
+| 利用者ドキュメント (グループの宣言、全画面時のルートのヘッダーの大きさは利用者の責任、Android のグループの値は状態保存に載る型、取り出し方の切り替え) | phase-7 の agenda に追記 (原料は concepts `core/core-model/collection-items.md` / `core/styling/collection-layout.md`) |
+| iOS の反転で一瞬空になり跳ぶ件の改善 | 見送り (オーナーが合意済みの妥協として受け入れ。必要になったら独立変更で扱う) |
+| iOS 16 での方式 3c の確認 | 見送り (オーナー判断で iOS 18.6 で代替。ios/ADR-0010 の Revisit When で監視) |
+| iPhone 11 の hitch の主因 (セルの生成 45.7% / hosting の計測 25.4%、グループ化とは別の既存の費用) | 見送り (体感は合格。性能規約の見直しは既存の独立変更 `performance-criteria-review` の材料) |
+
 ## TODO
 
 ### 提案化まで
@@ -145,19 +173,19 @@ iOS の内部の塊は論理セクションごとに先頭から区切り、塊�
 
 ### 提案・design で扱う
 
-- [ ] 論理セクションをまたぐ挿入・削除で、塊の件数の変化判定と世代番号つきのアンカー (performance-criteria-review の deviation.md「アンカーの控えの扱い」) が成り立つことを design で確かめる
-- [ ] Android のバーの位置の補正 (上側の余白に前の行が見える間の食い違い。`kasane/changes/archive/2026-09-24-android-scrollbar-parity/deviation.md`) が、数え直した全体の行数と複数の全幅見出しの組み合わせで成り立つことを design で確かめる
-- [ ] Android で見出しの前後に行間を入れず、見出しの下の余白とセクション間の余白だけを入れる並べ方を design で決める (今は `Arrangement.spacedBy` で全項目に一律)。ルートの見出しと先頭行の間の余白が両プラットフォームで揃っているかも確かめる
+- [x] 論理セクションをまたぐ挿入・削除で、塊の件数の変化判定と世代番号つきのアンカー (performance-criteria-review の deviation.md「アンカーの控えの扱い」) が成り立つことを design で確かめる
+- [x] Android のバーの位置の補正 (上側の余白に前の行が見える間の食い違い。`kasane/changes/archive/2026-09-24-android-scrollbar-parity/deviation.md`) が、数え直した全体の行数と複数の全幅見出しの組み合わせで成り立つことを design で確かめる
+- [x] Android で見出しの前後に行間を入れず、見出しの下の余白とセクション間の余白だけを入れる並べ方を design で決める (今は `Arrangement.spacedBy` で全項目に一律)。ルートの見出しと先頭行の間の余白が両プラットフォームで揃っているかも確かめる
 
 ### 実装・計測
 
-- [ ] 見出しの方式 3c の未確認 4 点を確かめる: 項目の追加・削除のアニメーション中の見出しの位置、VoiceOver での見出しの数と読み上げ、塊が多いときの位置の書き換えの費用、基準機での体感 (「グループ化」画面)
-- [ ] 両プラットフォームの Sample に「グループ化」の画面 (大小のグループ混在・10,000 件・縦 2 / 横 4 列・差分アニメーションの操作ボタン 2 つ) を sample-parity 準拠で追加する
-- [ ] 相対計測の前に、比較対象の画面へスクロールインジケータを付ける (android-scrollbar-parity で既定機能になったが未付与。[Android 性能検証の手順](../../../../handbook/android/performance-verification.md) の「比較対象と、それが測るもの」)
+- [x] 見出しの方式 3c の未確認 4 点を確かめる: 項目の追加・削除のアニメーション中の見出しの位置、VoiceOver での見出しの数と読み上げ、塊が多いときの位置の書き換えの費用、基準機での体感 (「グループ化」画面)
+- [x] 両プラットフォームの Sample に「グループ化」の画面 (大小のグループ混在・10,000 件・縦 2 / 横 4 列・差分アニメーションの操作ボタン 2 つ) を sample-parity 準拠で追加する
+- [x] 相対計測の前に、比較対象の画面へスクロールインジケータを付ける (android-scrollbar-parity で既定機能になったが未付与。[Android 性能検証の手順](../../../../handbook/android/performance-verification.md) の「比較対象と、それが測るもの」)
 
 ### 蒸留時
 
-- [ ] 蒸留時に ios/ADR-0009 の frontmatter へ `amended-by: 0010` と index 行の「一部改訂: 0010」を書く (ios/ADR-0010 の accepted 昇格と同時)
-- [ ] 蒸留時に core/ADR-0010 の frontmatter へ `amended-by: 0016` と index 行の「一部改訂: 0016」を書く (core/ADR-0016 の accepted 昇格と同時)
-- [ ] 蒸留時に android/ADR-0004 の frontmatter へ `amended-by: 0006` と index 行の「一部改訂: 0006」を書く (ADR-0006 の昇格と同時)。compose-wrapper.md の「`animateItem` を重ねない」も追随
-- [ ] 蒸留時に core/ADR-0006 の footer へ「関連: core/ADR-0015 (セクションごとの layout 値は持たない)」を書き足す
+- [x] 蒸留時に ios/ADR-0009 の frontmatter へ `amended-by: 0010` と index 行の「一部改訂: 0010」を書く (ios/ADR-0010 の accepted 昇格と同時)
+- [x] 蒸留時に core/ADR-0010 の frontmatter へ `amended-by: 0016` と index 行の「一部改訂: 0016」を書く (core/ADR-0016 の accepted 昇格と同時)
+- [x] 蒸留時に android/ADR-0004 の frontmatter へ `amended-by: 0006` と index 行の「一部改訂: 0006」を書く (ADR-0006 の昇格と同時)。compose-wrapper.md の「`animateItem` を重ねない」も追随
+- [x] 蒸留時に core/ADR-0006 の footer へ「関連: core/ADR-0015 (セクションごとの layout 値は持たない)」を書き足す

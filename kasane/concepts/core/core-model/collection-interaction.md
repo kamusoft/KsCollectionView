@@ -3,7 +3,7 @@ type: concept
 title: コレクションの操作とスクロール制御
 description: onItemTap / onItemLongTap / touchFeedback の発火規則と、KsScrollController によるスクロール命令の順序保証と位置指定の意味 (iOS / Android 共通)
 tags: [core-model, interaction, scroll]
-timestamp: 2026-09-05
+timestamp: 2026-09-26
 ---
 
 # コレクションの操作とスクロール制御
@@ -58,6 +58,8 @@ KsCollectionView(
 - **命令は呼んだ順に取り出され、取りこぼされない**。次の命令の実行開始時に先行するアニメーションは中断されるため、最終位置は最後の命令のものになる。
 - **アニメーションは一方向で着地する**。`Center` / `End` 指定でも、対象を行き過ぎてから戻る動きにならない (Sample「スクロール制御」で実機確認。観測点は [実行時挙動の検証規約](../../../handbook/cross/runtime-behavior-verification.md))。
 - **位置の基準は `contentPadding` ([collection-layout](../styling/collection-layout.md)) の内側の表示範囲**。到達できない位置はスクロール可能範囲で clamp される。先頭・末尾付近の項目はスクロール端で止まり、表示範囲より高い項目は先頭合わせになる。
+- **固定中の見出しの裏に置かない**。`start` で送る対象のグループの見出しが上端に固定される場合、対象は固定中の見出しのすぐ下に置かれる。全画面に広げたときは、安全領域の境目で止まった見出しの下になる ([collection-layout](../styling/collection-layout.md))。
+- **グループをまたいで解決される**。ID と末尾への命令は、グループ (iOS では内部の塊も) の区切りに依らず同じに解決される。
 - **未接続・接続解除後・存在しない ID への命令は no-op**。クラッシュも例外も出ない。対象の削除と命令が競合して正当に起きうるため不正入力とは扱わず、debug でも assertion ではなく警告ログに留める。1 つのコントローラを複数の `KsCollectionView` に接続した場合は最後の接続だけが有効 (debug では警告ログ)。
 
 ## してはいけないこと

@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
  *
  * 一覧を画面の全体に広げて置く (edge-to-edge で、上端をステータスバーの裏まで広げる) と、上端に
  * 固定したグループの見出しがバーの裏に隠れる。固定中の見出しは安全領域の境目 (バーのすぐ下) で
- * 止めるため、その境目がコレクションの上端からどれだけ下にあるかをここで求める。
+ * 止めるため (core/ADR-0017)、その境目がコレクションの上端からどれだけ下にあるかをここで求める。
  *
  * 安全領域とみなすのは、ウィンドウの insets のうち `WindowInsets.systemBars` と
  * `WindowInsets.displayCutout` の和から、祖先がすでに消費した分 (`consumeWindowInsets` や

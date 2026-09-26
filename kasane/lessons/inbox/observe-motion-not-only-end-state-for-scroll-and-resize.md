@@ -2,11 +2,12 @@
 scope: code-review
 kind: pain
 severity: normal
-count: 1
+count: 2
 first-seen: 2026-09-05
-last-seen: 2026-09-05
+last-seen: 2026-09-26
 evidence:
   - android-wrapper-foundation (Center 指定のスクロールが「行き過ぎてから戻る」動きになっていた点と、行の高さ変化にアニメーションが無い点を、review-002〜005 と verify はいずれも検出せず (テストと目視は最終位置・最終状態だけを見ていた)、オーナーの実機操作で判明)
+  - sections-grouping (Android の端を表示中の末尾への挿入 (tasks 3.10) は、テストが「末尾に留まる」最終位置だけを見て緑だったが、`requestScrollToItem` が配置と出現のアニメーションを捨てて 1 フレームで末尾へ飛んでおり、オーナーがエミュレータの試作で「即反映に見える」と指摘して判明。直した後は毎フレームの連写で出現と表示位置の進みを確かめた)
 ---
 
 ## ルール文
@@ -14,3 +15,4 @@ evidence:
 
 ## 経緯
 - 2026-09-05 android-wrapper-foundation: `scrollTo(id, Center)` の 2 段階補正 (先頭合わせ → `scrollBy` で中央へ) は最終位置のテストを通り、レビューの実機確認も「X が表示範囲内」までで、往復の動きを見ていなかった。行の高さ変化も静止画照合 (展開前 / 後) だけで、アニメーションの有無は評価軸に無かった。
+- 2026-09-26 sections-grouping: 端への挿入の Requirement は「アニメーションが見えること」を求めていたが、実装とテストは端に留まる最終位置だけを確かめていた。オーナーの目視で発覚し、原因 (Compose の snap がアニメーションを reset する) を特定して作り直した。

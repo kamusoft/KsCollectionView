@@ -25,7 +25,8 @@ internal final class KsHostingSupplementaryView: UICollectionReusableView {
 
     // 上端・下端の安全領域を中身へ渡さない。一覧が画面上端の安全領域に重なって置かれると、
     // 重なった位置のセル・補助ビューに安全領域が伝わり、SwiftUI の中身がその分だけ押し下げられて
-    // 高さも増える。行と補助ビューは安全領域に被ったまま中身どおりの大きさで流すため、上下は 0 にする。
+    // 高さも増える。行と補助ビューは安全領域に被ったまま中身どおりの大きさで流すため、上下は 0 にする
+    // (core/ADR-0017)。
     // 左右 (横向きの切り欠き等) は変えずに渡す。
     override var safeAreaInsets: UIEdgeInsets {
         var insets = super.safeAreaInsets

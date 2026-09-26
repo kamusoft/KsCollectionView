@@ -47,6 +47,15 @@
 | 任意キー | 署名付き URL のように URL が変わる画像に使う。先読みの要素とセルの `KsImage` の 2 か所に同じキーを書き (モデルから両方を作る関数を 1 つ用意すると食い違わない)、違う画像に同じキーを付けない |
 | キー付きの画像の削除とローダー付属ビュー | `KsImageCache.remove` には同じキーを付けたソースを渡す。キー付きの項目はローダー付属ビュー (`LazyImage` / `AsyncImage`) とキャッシュを共有しない |
 
+### phase-4 からの申し送り (2026-09-26、sections-grouping)
+
+利用者ドキュメントに載せる事項 (原料は concepts `core/core-model/collection-items.md` / `core/styling/collection-layout.md`):
+
+- グループの宣言 (iOS `.groups(by:pinnedHeaders:header:)` / Android `KsGroups`) と、同じグループの項目を配列の中で続けて並べる責任が利用者にあること (離れて現れる同じ値は不正入力)
+- 全画面に広げた一覧 (iOS `.ignoresSafeArea()` / Android edge-to-edge) では、ルートのヘッダーは安全領域に被ってよく、バーの分の大きさは利用者がルートのヘッダーで調整すること。ライブラリが合わせるのは固定中の見出しだけ (core/ADR-0017)
+- Android のグループの値は状態保存に載る型 (Bundle に入る型) であること
+- グループの値の取り出し方 (キーパス / ラムダ) は表示中に切り替えてよいこと
+
 ## 決定事項
 
 (議論で確定したらここに移動)
