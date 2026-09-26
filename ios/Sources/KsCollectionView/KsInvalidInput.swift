@@ -14,7 +14,9 @@ internal enum KsInvalidInput {
     private(set) static var reportedWarnings: [String] = []
     private static let reportedWarningLimit = 256
 
-    private static let logger = Logger(subsystem: "jp.kamusoft.kscollectionview", category: "image")
+    // 画像・layout 値・グループ・先読みの宣言など、どの機能の誤りもこの窓口から出るため、
+    // 機能ごとの category ではなく利用者の入力の誤りを表す category に出す。
+    private static let logger = Logger(subsystem: "jp.kamusoft.kscollectionview", category: "input")
 
     static func report(_ message: String) {
         #if DEBUG

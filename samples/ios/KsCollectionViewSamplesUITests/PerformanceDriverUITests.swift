@@ -159,6 +159,16 @@ final class PerformanceDriverUITests: XCTestCase {
     /// 定常の判定には 3 往復ぶんの実測が要るため、上限を 1 往復にすれば定常化に届かない状態を
     /// 作れます。このときドライバが緑で終わると、証跡に使えない走行が「定常化を確かめた」
     /// 結果として通ってしまいます。
+    /// 「グループ化」の土俵 (固定される見出しつきで大小のグループに分けたグリッド) で、同じ往復を
+    /// 定常化するまで重ねます。判定の規則と失敗の扱いは「大量件数」と同じです。
+    @MainActor
+    func testグループ化を全件通過で定常化するまで往復してメモリを記録する() {
+        assertSteadies(
+            within: Self.maximumRoundTrips,
+            launchArguments: ["--verify-performance", "--performance-fixture", "グループ化"]
+        )
+    }
+
     @MainActor
     func test上限までに定常化しなければ未判定として失敗する() {
         let options = XCTExpectedFailure.Options()
@@ -170,11 +180,16 @@ final class PerformanceDriverUITests: XCTestCase {
 
     /// 定常化するまで往復を重ね、往復ごとの記録を出して、定常化したことを確かめます。
     ///
-    /// - Parameter limit: 重ねる往復数の上限
+    /// - Parameters:
+    ///   - limit: 重ねる往復数の上限
+    ///   - launchArguments: 計測の画面を開く起動引数 (既定は「大量件数」の土俵)
     @MainActor
-    private func assertSteadies(within limit: Int) {
+    private func assertSteadies(
+        within limit: Int,
+        launchArguments: [String] = ["--verify-performance"]
+    ) {
         let app = XCUIApplication()
-        app.launchArguments = ["--verify-performance"]
+        app.launchArguments = launchArguments
         app.terminate()
         app.launch()
 

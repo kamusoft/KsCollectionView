@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -25,6 +27,104 @@ internal class KsCollectionViewPublicApiTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    /** layout 値のグループ間の間隔と見出しの下の間隔は既定で 0 で、名前付き引数で指定できる。 */
+    @Test
+    fun layoutGroupSpacingsDefaultToZero() {
+        assertEquals(0.dp, KsLayout.List.groupSpacing)
+        assertEquals(0.dp, KsLayout.List.headerItemSpacing)
+        val grid = KsLayout.Grid(KsColumns.Fixed(2))
+        assertEquals(0.dp, grid.groupSpacing)
+        assertEquals(0.dp, grid.headerItemSpacing)
+
+        val list = KsLayout.List(rowSpacing = 1.dp, groupSpacing = 24.dp, headerItemSpacing = 8.dp)
+        assertEquals(24.dp, list.groupSpacing)
+        assertEquals(8.dp, list.headerItemSpacing)
+        assertEquals(KsLayout.List(rowSpacing = 1.dp, groupSpacing = 24.dp, headerItemSpacing = 8.dp), list)
+        assertNotEquals(KsLayout.List(rowSpacing = 1.dp, groupSpacing = 24.dp), list)
+        assertEquals(
+            KsLayout.Grid(KsColumns.Fixed(portrait = 2, landscape = 4), rowSpacing = 8.dp, groupSpacing = 24.dp, headerItemSpacing = 8.dp),
+            KsLayout.Grid(KsColumns.Fixed(2, 4), 8.dp, 0.dp, 24.dp, 8.dp),
+        )
+    }
+
+    /** グループの宣言は、見出しの固定が既定で有効、見出しは省略できる。 */
+    @Test
+    fun groupsDeclarationDefaults() {
+        val withoutHeader = KsGroups<TestItem, TestKind>(by = { it.kind })
+        assertTrue("見出しの固定は既定で有効", withoutHeader.pinnedHeaders)
+        assertEquals("見出しは省略できる", null, withoutHeader.header)
+        assertEquals(TestKind.Ad, withoutHeader.by(TestItem("a", "a", TestKind.Ad)))
+
+        val unpinned = KsGroups<TestItem, TestKind>(by = { it.kind }, pinnedHeaders = false) { _, _ -> }
+        assertEquals(false, unpinned.pinnedHeaders)
+        assertTrue(unpinned.header != null)
+    }
+
+    /**
+     * 利用者向けの書き方 (基本形・固定を外す・見出しなし・間隔) で、項目とグループの値の型を
+     * 書かずに組み立てられ、見出しにグループの値と項目が型を保ったまま渡る。
+     */
+    @Test
+    fun groupsComposeWithInferredTypes() {
+        val items = listOf(
+            TestItem("a", "a", TestKind.Message),
+            TestItem("b", "b", TestKind.Message),
+            TestItem("c", "c", TestKind.Ad),
+        )
+        composeTestRule.setContent {
+            TestContainer {
+                KsCollectionView(
+                    items = items,
+                    key = { it.id },
+                    groups = KsGroups(by = { it.kind }) { kind, itemsInGroup ->
+                        // 型引数は推論され、グループの値は enum、項目は TestItem のまま受け取れる。
+                        val name: String = kind.name
+                        val firstId: String = itemsInGroup.first().id
+                        Text("$name ${itemsInGroup.size} $firstId", Modifier.testTag("basic-${kind.name}"))
+                    },
+                ) {
+                    template { item -> ItemRow(item) }
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("basic-Message").assertTextEquals("Message 2 a")
+        composeTestRule.onNodeWithTag("basic-Ad").assertTextEquals("Ad 1 c")
+    }
+
+    /** 固定を外す形・見出しなしの形・間隔の指定も同じ引数で書ける。 */
+    @Test
+    fun groupsVariantsCompose() {
+        composeTestRule.setContent {
+            TestContainer {
+                KsCollectionView(
+                    items = testItems(3),
+                    key = { it.id },
+                    groups = KsGroups(by = { it.kind }, pinnedHeaders = false) { kind, _ ->
+                        Text(kind.name, Modifier.testTag("unpinned"))
+                    },
+                ) {
+                    template { item -> ItemRow(item) }
+                }
+                KsCollectionView(
+                    items = testItems(3),
+                    key = { it.id },
+                    layout = KsLayout.Grid(
+                        KsColumns.Fixed(portrait = 2, landscape = 4),
+                        rowSpacing = 8.dp,
+                        groupSpacing = 24.dp,
+                        headerItemSpacing = 8.dp,
+                    ),
+                    groups = KsGroups(by = { it.kind }),
+                ) {
+                    template { item -> ItemRow(item) }
+                }
+            }
+        }
+
+        assertEquals(1, composeTestRule.countNodesWithTag("unpinned"))
+    }
 
     /** プリフェッチの到達点は disk と memory の 2 種で表す。 */
     @Test

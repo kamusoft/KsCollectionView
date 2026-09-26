@@ -46,6 +46,12 @@ object MeasurementTarget {
     /** 素の LazyColumn で描く 1 列の比較対象。 */
     fun baselineLargeList(count: Int): String = "measurement/baseline-list/$count"
 
+    /** ライブラリで描く「グループ化」の土俵。 */
+    fun ksGrouping(): String = "measurement/grouping"
+
+    /** 素の LazyVerticalGrid で描く「グループ化」の比較対象。 */
+    fun baselineGrouping(): String = "measurement/baseline-grouping"
+
     /** メモリの定常判定のための自動往復。 */
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
         "measurement/memory/$count/$maxRoundTrips"

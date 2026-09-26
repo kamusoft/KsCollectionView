@@ -23,7 +23,12 @@ enum DemoData {
     }
 
     /// 「大量件数」画面の項目。件数は起動引数で変えられ、内容は ID から決まるため件数に依らない。
-    static let largeItems = (1...LargeDataCount.value).map { index in
+    static let largeItems = (1...LargeDataCount.value).map { largeItem($0) }
+
+    /// 「大量件数」と同じ行の見た目の項目。7 の倍数の ID だけ長文の説明を持ち、行の高さが変わる。
+    ///
+    /// 「グループ化」画面も同じ作り方を使う。
+    static func largeItem(_ index: Int) -> DemoItem {
         DemoItem(
             id: index,
             title: "Item \(index)",

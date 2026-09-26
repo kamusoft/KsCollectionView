@@ -62,6 +62,8 @@ fun SampleNavHost(startRoute: String? = null, requestedPrefetch: ImagePrefetchCh
                     SampleScreen.ImageGrid -> ImageGridDemoScreen(
                         initialChoice = requestedPrefetch ?: ImagePrefetchChoice.InitialSelection,
                     )
+                    SampleScreen.Grouping -> GroupingDemoScreen()
+                    SampleScreen.DiffUpdate -> DiffUpdateDemoScreen()
                 }
             }
         }

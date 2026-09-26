@@ -18,4 +18,6 @@ enum class SampleScreen(val title: String) {
     Spacing("スペーシングと余白"),
     LargeData("大量件数"),
     ImageGrid("画像グリッド"),
+    Grouping("グループ化"),
+    DiffUpdate("差分更新"),
 }

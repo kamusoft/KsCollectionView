@@ -19,6 +19,8 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     // テンプレートのクロージャが読む呼び出し側の状態を型消去して保持する。宣言が無い (nil) ときは
     // 配列が同値の更新が届くたびに可視セルを作り直す (ios/ADR-0006)。
     var observedValue: AnyHashable?
+    // グループ化の宣言。無い (nil) ときは配列全体を 1 続きで表示する。
+    var grouping: KsGrouping<Item>?
     // プリフェッチ宣言。無い (nil) ときはプリフェッチ機構を組み立てず、可視範囲の観測も行わない。
     var prefetchResources: ((Item) -> [KsResource])?
     var prefetchDestination: KsPrefetchDestination = .disk

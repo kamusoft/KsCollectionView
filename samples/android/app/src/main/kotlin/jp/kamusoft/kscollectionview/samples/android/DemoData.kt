@@ -73,15 +73,22 @@ object DemoData {
      *
      * @param count 作る件数
      */
-    fun largeItems(count: Int): List<DemoItem> = (1..count).map { index ->
-        DemoItem(
-            id = index,
-            title = "Item $index",
-            detail = if (index % 7 == 0) {
-                "可変行高を確認するための固定シード長文データ $index — KsCollectionView"
-            } else {
-                null
-            },
-        )
-    }
+    fun largeItems(count: Int): List<DemoItem> = (1..count).map { largeItem(it) }
+
+    /**
+     * 「大量件数」と同じ行の見た目の項目。7 の倍数の ID だけ長文の説明を持ち、行の高さが変わる。
+     *
+     * 「グループ化」画面も同じ作り方を使う。
+     *
+     * @param index 項目の ID
+     */
+    fun largeItem(index: Int): DemoItem = DemoItem(
+        id = index,
+        title = "Item $index",
+        detail = if (index % 7 == 0) {
+            "可変行高を確認するための固定シード長文データ $index — KsCollectionView"
+        } else {
+            null
+        },
+    )
 }

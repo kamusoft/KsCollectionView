@@ -60,7 +60,10 @@ struct SampleLaunchView: View {
                 fixture: .imageGrid(prefetch: ImagePrefetchChoice.resolved)
             )
         } else if verifiesPerformance || automaticallyVerifiesPerformance {
-            PerformanceVerificationView(automaticallyRuns: automaticallyVerifiesPerformance)
+            PerformanceVerificationView(
+                automaticallyRuns: automaticallyVerifiesPerformance,
+                fixture: PerformanceFixture.requested
+            )
         } else if let requestedScreen,
            let screen = SampleScreen.allCases.first(where: { $0.rawValue == requestedScreen }) {
             NavigationStack {

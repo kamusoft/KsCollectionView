@@ -139,6 +139,64 @@ public struct KsCollectionView<Item: Equatable>: View {
         return copy
     }
 
+    /// 項目をグループに分け、各グループの先頭に見出しを表示します。
+    ///
+    /// 配列の順に、`by` で指したグループの値が等しい項目が続く範囲が 1 つのグループになります。
+    /// 配列は平らなまま渡し、項目の型を変える必要はありません。同じグループの値を持つ項目は
+    /// 配列の中で続けて並べてください。離れた位置に同じ値が再び現れると、デバッグビルドでは
+    /// 停止して知らせ、リリースビルドでは配列の順のまま別々のグループとして表示します。
+    /// 表示中に `by` を別のキーパスへ切り替えると、配列が同じでも新しいグループの値でグループを
+    /// 組み直します (グループの値の並びが変わらなければ組み直しません)。
+    ///
+    /// 見出しのクロージャには、グループの値とそのグループの項目が渡されます。見出しの高さは
+    /// 中身から決まり、グリッドでは全幅に表示されます。見出しは既定でスクロール時に表示範囲の
+    /// 上端へ固定されます。固定しない場合は `pinnedHeaders` に `false` を渡してください。
+    ///
+    /// ```swift
+    /// KsCollectionView(products) { product in ProductRow(product) }
+    ///     .groups(by: \.category) { category, productsInGroup in
+    ///         Text("\(category) (\(productsInGroup.count))")
+    ///     }
+    /// ```
+    ///
+    /// グループとグループの間の間隔と、見出しと先頭行の間の間隔は、``KsCollectionLayout`` の
+    /// `groupSpacing` と `headerItemSpacing` で指定します。
+    public func groups<Group: Hashable, Header: View>(
+        by group: KeyPath<Item, Group>,
+        pinnedHeaders: Bool = true,
+        @ViewBuilder header: @escaping (Group, [Item]) -> Header
+    ) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.grouping = KsGrouping(
+            value: { AnyHashable($0[keyPath: group]) },
+            valueSource: AnyHashable(group),
+            header: { first, items in AnyView(header(first[keyPath: group], items)) },
+            pinsHeaders: pinnedHeaders
+        )
+        return copy
+    }
+
+    /// 項目を見出しなしのグループに分けます。
+    ///
+    /// 配列の順に、`by` で指したグループの値が等しい項目が続く範囲が 1 つのグループになります。
+    /// グループの区切りに見出しは表示されず、グループとグループの間の間隔 (``KsCollectionLayout``
+    /// の `groupSpacing`) と、リストの区切り線の単位としてだけ使われます。`pinnedHeaders` は
+    /// 見出しを宣言しないこの形では使われません。
+    /// 表示中に `by` を別のキーパスへ切り替えたときの扱いは、見出しつきの形と同じです。
+    public func groups<Group: Hashable>(
+        by group: KeyPath<Item, Group>,
+        pinnedHeaders: Bool = true
+    ) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.grouping = KsGrouping(
+            value: { AnyHashable($0[keyPath: group]) },
+            valueSource: AnyHashable(group),
+            header: nil,
+            pinsHeaders: pinnedHeaders
+        )
+        return copy
+    }
+
     /// コンテンツ全体の先頭に、コンテンツと一緒にスクロールするビューを追加します。
     public func header<Content: View>(
         @ViewBuilder _ content: @escaping () -> Content

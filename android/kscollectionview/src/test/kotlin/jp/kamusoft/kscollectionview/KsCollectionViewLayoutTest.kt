@@ -475,6 +475,60 @@ internal class KsCollectionViewLayoutTest {
         composeTestRule.onNodeWithText("見出し").assertIsNotDisplayed()
     }
 
+    /**
+     * 内側余白はヘッダーの上とフッターの下に入り、ヘッダーと先頭行の間・最終行とフッターの間には
+     * 行間が入らない。
+     */
+    @Test
+    fun contentPaddingAndRowSpacingAroundHeaderAndFooter() {
+        composeTestRule.setContent {
+            TestContainer(width = 300.dp, height = 600.dp) {
+                KsCollectionView(
+                    items = testItems(3),
+                    key = { it.id },
+                    layout = KsLayout.List(rowSpacing = 10.dp),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
+                    listSeparators = false,
+                    header = { Box(Modifier.fillMaxWidth().height(40.dp).testTag("header")) },
+                    footer = { Box(Modifier.fillMaxWidth().height(40.dp).testTag("footer")) },
+                ) {
+                    template { item ->
+                        Text(item.text, Modifier.fillMaxWidth().height(50.dp).testTag(item.id))
+                    }
+                }
+            }
+        }
+
+        assertNear(12.dp, topOf("header"), "上の内側余白はヘッダーの上")
+        assertNear(bottomOf("header"), topOf("item-0"), "ヘッダーと先頭行の間に行間は無い")
+        assertNear(10.dp, topOf("item-1") - bottomOf("item-0"), "行と行の間には行間")
+        assertNear(bottomOf("item-2"), topOf("footer"), "最終行とフッターの間に行間は無い")
+    }
+
+    /** グリッドでもヘッダー / フッターの前後に行間は入らない。 */
+    @Test
+    fun gridRowSpacingIsNotAddedAroundHeaderAndFooter() {
+        composeTestRule.setContent {
+            TestContainer(width = 300.dp, height = 600.dp) {
+                KsCollectionView(
+                    items = testItems(4),
+                    key = { it.id },
+                    layout = KsLayout.Grid(columns = KsColumns.Fixed(2), rowSpacing = 10.dp),
+                    header = { Box(Modifier.fillMaxWidth().height(40.dp).testTag("header")) },
+                    footer = { Box(Modifier.fillMaxWidth().height(40.dp).testTag("footer")) },
+                ) {
+                    template { item ->
+                        Text(item.text, Modifier.fillMaxWidth().height(50.dp).testTag(item.id))
+                    }
+                }
+            }
+        }
+
+        assertNear(bottomOf("header"), topOf("item-0"), "ヘッダーと先頭行の間に行間は無い")
+        assertNear(10.dp, topOf("item-2") - bottomOf("item-0"), "行と行の間には行間")
+        assertNear(bottomOf("item-2"), topOf("footer"), "最終行とフッターの間に行間は無い")
+    }
+
     /** 配列が空でもヘッダーとフッターは表示される。 */
     @Test
     fun headerAndFooterAreShownForEmptyItems() {

@@ -61,12 +61,16 @@ _SCROLL_CLASS = (
 _IMAGE_CLASS = (
     "jp.kamusoft.kscollectionview.samples.android.benchmark.ImageGridBenchmark"
 )
+_GROUPING_CLASS = (
+    "jp.kamusoft.kscollectionview.samples.android.benchmark.GroupingScrollBenchmark"
+)
 
 #: 相対判定の対象。(表示名, ライブラリ側のテスト, 比較対象側のテスト)。
 #: 計測モジュールは対象アプリのコードを参照できないため、対応付けはテスト名で行う。
 RELATIVE_PAIRS = (
     ("2 列グリッド", (_SCROLL_CLASS, "ksCollectionView"), (_SCROLL_CLASS, "baselineLazyVerticalGrid")),
     ("1 列リスト", (_SCROLL_CLASS, "ksCollectionViewList"), (_SCROLL_CLASS, "baselineLazyColumn")),
+    ("グループ化", (_GROUPING_CLASS, "ksCollectionView"), (_GROUPING_CLASS, "baselineLazyVerticalGrid")),
 )
 
 #: 比較対象を持たないため計測の成立だけを見る対象。

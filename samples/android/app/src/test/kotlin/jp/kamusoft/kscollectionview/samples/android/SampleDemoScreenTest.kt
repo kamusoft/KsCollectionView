@@ -1,6 +1,8 @@
 package jp.kamusoft.kscollectionview.samples.android
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -175,6 +177,95 @@ class SampleDemoScreenTest {
 
         composeTestRule.onNodeWithText("メモリまで (列幅)").assertIsDisplayed()
         composeTestRule.onNodeWithText("ディスクまで").assertDoesNotExist()
+    }
+
+    /** 「グループ化」画面は先頭のグループの見出しを件数つきで出す。 */
+    @Test
+    fun `グループ化画面は先頭のグループの見出しと件数を出す`() {
+        composeTestRule.setContent { GroupingDemoScreen() }
+
+        composeTestRule.onNodeWithText("グループ 1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1,200 件").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Item 1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("10,000 件・縦 2 列 / 横 4 列・見出しは固定").assertIsDisplayed()
+    }
+
+    /** 反転するとグループの順が逆になり、最後のグループが先頭に来る。 */
+    @Test
+    fun `グループ化画面の反転で最後のグループが先頭に来る`() {
+        composeTestRule.setContent { GroupingDemoScreen() }
+
+        composeTestRule.onNodeWithText("並び順を反転").performClick()
+
+        composeTestRule.onNodeWithText("グループ 378").assertIsDisplayed()
+        composeTestRule.onNodeWithText("23 件").assertIsDisplayed()
+        composeTestRule.onNodeWithText("グループ 1").assertDoesNotExist()
+    }
+
+    /**
+     * 表示中の項目を移すと、その項目のグループの件数が 1 減る。
+     *
+     * 初期表示の真ん中の項目はグループ 1 の先頭寄りにあり、前のグループが無いため次のグループへ移る。
+     */
+    @Test
+    fun `グループ化画面の項目の移動で表示中のグループの件数が減る`() {
+        composeTestRule.setContent { GroupingDemoScreen() }
+
+        composeTestRule.onNodeWithText("項目を別のグループへ").performClick()
+
+        composeTestRule.onNodeWithText("1,199 件").assertIsDisplayed()
+        composeTestRule.onNodeWithText("1,200 件").assertDoesNotExist()
+    }
+
+    /** 「差分更新」画面はリスト・グループありで始まり、挿入と更新が表示に反映される。 */
+    @Test
+    fun `差分更新画面は挿入と更新を表示に反映する`() {
+        composeTestRule.setContent { DiffUpdateDemoScreen() }
+
+        composeTestRule.onNodeWithText("リスト").assertIsSelected()
+        composeTestRule.onNodeWithText("先頭").assertIsSelected()
+        composeTestRule.onNodeWithText("グループ A").assertIsDisplayed()
+
+        composeTestRule.onNodeWithText("挿入").performClick()
+        composeTestRule.onNodeWithText("Item 21").assertIsDisplayed()
+        composeTestRule.onNodeWithText("6 件").assertIsDisplayed()
+
+        composeTestRule.onNodeWithText("更新").performClick()
+        composeTestRule.onNodeWithText("Item 21 ★").assertIsDisplayed()
+    }
+
+    /** グループの切り替えで見出しが消え、グリッドへ切り替えても同じ項目を出す。 */
+    @Test
+    fun `差分更新画面はグループの有無と表示の形を切り替えられる`() {
+        composeTestRule.setContent { DiffUpdateDemoScreen() }
+
+        composeTestRule.onNodeWithText("グループ").assertIsOn()
+        composeTestRule.onNodeWithText("グループ").performClick()
+        composeTestRule.onNodeWithText("グループ").assertIsOff()
+        composeTestRule.onNodeWithText("グループ A").assertDoesNotExist()
+
+        composeTestRule.onNodeWithText("グリッド").performClick()
+        composeTestRule.onNodeWithText("グリッド").assertIsSelected()
+        composeTestRule.onNodeWithText("Item 1").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Item 2").assertIsDisplayed()
+    }
+
+    /** 配列と選択は保存と復元をまたいで残る。 */
+    @Test
+    fun `差分更新画面の配列と選択は保存と復元をまたいで残る`() {
+        val restorationTester = StateRestorationTester(composeTestRule)
+        restorationTester.setContent { DiffUpdateDemoScreen() }
+
+        composeTestRule.onNodeWithText("挿入").performClick()
+        composeTestRule.onNodeWithText("更新").performClick()
+        composeTestRule.onNodeWithText("末尾").performClick()
+
+        restorationTester.emulateSavedInstanceStateRestore()
+
+        composeTestRule.onNodeWithText("末尾").assertIsSelected()
+        // 先頭に挿入して更新した項目が、印つきのまま残る。
+        composeTestRule.onNodeWithText("Item 21 ★").assertIsDisplayed()
+        composeTestRule.onNodeWithText("6 件").assertIsDisplayed()
     }
 
     private companion object {

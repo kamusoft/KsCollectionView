@@ -116,20 +116,52 @@ internal fun resolveColumnWidthPx(
     layoutDirection: LayoutDirection,
     density: Density,
 ): Int = with(density) {
-    val horizontalPadding = contentPadding.calculateLeftPadding(layoutDirection).roundToPx() +
-        contentPadding.calculateRightPadding(layoutDirection).roundToPx()
-    val available = containerWidthPx - horizontalPadding
+    val available = availableCrossAxisPx(containerWidthPx, contentPadding, layoutDirection, density)
     val spacing = layout.effectiveColumnSpacing.roundToPx()
-    val count = when (layout) {
+    val count = resolveColumnCount(layout, containerWidthPx, isPortrait, contentPadding, layoutDirection, density)
+    val withoutSpacing = available - spacing * (count - 1)
+    if (withoutSpacing <= 0) 0 else withoutSpacing / count
+}
+
+/**
+ * コレクションの列数を、`LazyVerticalGrid` が列数を決めるのと同じ規則で求める。
+ *
+ * list なら 1、`KsColumns.Fixed` はコンテナの向きで、`KsColumns.Adaptive` は
+ * `floor((利用可能幅 + 列間隔) / (最小幅 + 列間隔))` (1 以上) で決まる。
+ *
+ * @param containerWidthPx コンテナの幅 (ピクセル)。未確定なら 0
+ * @param isPortrait コンテナの高さが幅より大きいなら true
+ */
+internal fun resolveColumnCount(
+    layout: KsLayout,
+    containerWidthPx: Int,
+    isPortrait: Boolean,
+    contentPadding: PaddingValues,
+    layoutDirection: LayoutDirection,
+    density: Density,
+): Int = with(density) {
+    when (layout) {
         is KsLayout.List -> 1
         is KsLayout.Grid -> when (val columns = layout.columns) {
             is KsColumns.Fixed -> columns.resolveCount(isPortrait)
             is KsColumns.Adaptive -> {
+                val available = availableCrossAxisPx(containerWidthPx, contentPadding, layoutDirection, density)
+                val spacing = layout.effectiveColumnSpacing.roundToPx()
                 val minWidth = columns.minItemWidth.coerceAtLeast(1.dp).roundToPx()
                 max((available + spacing) / (minWidth + spacing), 1)
             }
         }
     }
-    val withoutSpacing = available - spacing * (count - 1)
-    if (withoutSpacing <= 0) 0 else withoutSpacing / count
+}
+
+/** 左右の内側余白を除いた、列を並べられる幅 (ピクセル)。 */
+private fun availableCrossAxisPx(
+    containerWidthPx: Int,
+    contentPadding: PaddingValues,
+    layoutDirection: LayoutDirection,
+    density: Density,
+): Int = with(density) {
+    val horizontalPadding = contentPadding.calculateLeftPadding(layoutDirection).roundToPx() +
+        contentPadding.calculateRightPadding(layoutDirection).roundToPx()
+    containerWidthPx - horizontalPadding
 }

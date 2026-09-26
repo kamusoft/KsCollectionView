@@ -305,6 +305,43 @@ internal class KsScrollIndicatorTest {
         assertBarNeverMovesBackwardWhileDragging()
     }
 
+    /**
+     * 行と見出しの高さが揃った 2 列のグリッドで奇数件のグループが多数あっても、バーは末尾に達したときに
+     * 下端に届き、途中で下端に着かない。
+     *
+     * 3 件ずつ 30 グループ (見出し 1 行 + 項目 2 行) で全体は 90 行 (9,000)。見出しを 1 ÷ 列数 行と
+     * 数えると 60 行 (6,000) と見積もられ、スクロール量 5,400 の時点でバーが下端に着いてしまう。
+     */
+    @Test
+    fun indicatorReachesBottomOnlyAtEndWithManyOddGroups() {
+        setScrollableContent(
+            itemCount = 90,
+            layout = KsLayout.Grid(columns = KsColumns.Fixed(2)),
+            groups = KsGroups(by = { it.id.removePrefix("item-").toInt() / 3 }) { _, _ ->
+                Box(Modifier.fillMaxWidth().height(itemHeight))
+            },
+        )
+        composeTestRule.mainClock.autoAdvance = false
+        val bottomEdge = { image: PixelMap ->
+            image.height - with(composeTestRule.density) { KsScrollIndicatorDefaults.edgeInset.roundToPx() } - 1
+        }
+
+        dragWithoutRelease(distance = 6000.dp)
+        val midway = collectionPixels()
+        val midwayBottom = barRows(midway).last()
+        assertTrue(
+            "末尾の手前ではバーは下端に着かない (バーの下端 $midwayBottom / 下端 ${bottomEdge(midway)})",
+            midwayBottom < bottomEdge(midway) - 20,
+        )
+        releaseWithoutFling()
+
+        dragWithoutRelease(distance = 6000.dp)
+        composeTestRule.onNodeWithTag("item-89").assertExists()
+        val atEnd = collectionPixels()
+        assertEquals("末尾ではバーが下端に届く", bottomEdge(atEnd).toFloat(), barRows(atEnd).last().toFloat(), 1f)
+        releaseWithoutFling()
+    }
+
     /** 項目の高さより細かい刻みで上へドラッグし、刻みごとにバーの上端が逆戻りしないことを確かめる。 */
     private fun assertBarNeverMovesBackwardWhileDragging() {
         composeTestRule.mainClock.autoAdvance = false
@@ -437,6 +474,7 @@ internal class KsScrollIndicatorTest {
         contentPadding: PaddingValues = PaddingValues(0.dp),
         layout: KsLayout = KsLayout.List,
         headerHeight: Dp? = null,
+        groups: KsGroups<TestItem, *>? = null,
     ) {
         composeTestRule.setContent {
             TestContainer(width = containerWidth, height = containerHeight) {
@@ -449,6 +487,7 @@ internal class KsScrollIndicatorTest {
                     contentPadding = contentPadding,
                     layout = layout,
                     header = headerHeight?.let { height -> { Box(Modifier.fillMaxWidth().height(height)) } },
+                    groups = groups,
                 ) {
                     template { item -> Box(Modifier.fillMaxWidth().height(itemHeight).testTag(item.id)) }
                 }

@@ -9,6 +9,8 @@ enum SampleScreen: String, CaseIterable, Hashable, Identifiable {
     case spacing = "スペーシングと余白"
     case largeData = "大量件数"
     case imageGrid = "画像グリッド"
+    case grouping = "グループ化"
+    case diffUpdate = "差分更新"
 
     var id: Self { self }
 }

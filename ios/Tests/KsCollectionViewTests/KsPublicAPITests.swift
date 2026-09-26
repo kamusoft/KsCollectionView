@@ -20,6 +20,12 @@ final class KsPublicAPITests: XCTestCase {
         let title: String
     }
 
+    // ライブラリの型に準拠しない、既存のプロパティ (カテゴリ) を持つ項目。
+    private struct Product: Identifiable, Equatable {
+        let id: Int
+        let category: String
+    }
+
     func test単一テンプレートと利用者向けmodifierを組み立てられる() {
         let controller = KsScrollController()
         let view = KsCollectionView(
@@ -189,5 +195,106 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertEqual(KsImage(url, loading: { Color.clear }).source, source)
         XCTAssertEqual(KsImage(url, failure: { Color.clear }).source, source)
         XCTAssertEqual(KsImage(url, loading: { Color.clear }, failure: { Color.clear }).source, source)
+    }
+
+    func test項目のプロパティをグループの値にして見出しつきのグループを宣言できる() {
+        let products = [
+            Product(id: 1, category: "果物"),
+            Product(id: 2, category: "果物"),
+            Product(id: 3, category: "野菜"),
+        ]
+        var received: [(String, [Int])] = []
+        let view = KsCollectionView(products) { product in
+            Text("\(product.id)")
+        }
+        .groups(by: \.category) { category, productsInGroup in
+            let _ = received.append((category, productsInGroup.map(\.id)))
+            Text("\(category) (\(productsInGroup.count))")
+        }
+
+        guard let grouping = view.configuration.grouping else {
+            XCTFail("グループの宣言が構成に渡っていません")
+            return
+        }
+        XCTAssertEqual(grouping.value(products[0]), AnyHashable("果物"))
+        XCTAssertEqual(grouping.value(products[2]), AnyHashable("野菜"))
+        // 既定で見出しを固定する。
+        XCTAssertTrue(grouping.pinsHeaders)
+        // 見出しにはグループの値が型を保ったまま、グループ内の項目と一緒に渡る。
+        _ = grouping.header?(products[0], Array(products[0..<2]))
+        XCTAssertEqual(received.map(\.0), ["果物"])
+        XCTAssertEqual(received.map(\.1), [[1, 2]])
+    }
+
+    func test見出しの固定を外せる() {
+        let view = KsCollectionView([Product(id: 1, category: "果物")]) { product in
+            Text("\(product.id)")
+        }
+        .groups(by: \.category, pinnedHeaders: false) { category, _ in
+            Text(category)
+        }
+
+        XCTAssertEqual(view.configuration.grouping?.pinsHeaders, false)
+        XCTAssertNotNil(view.configuration.grouping?.header)
+    }
+
+    func test見出しなしのグループを宣言できる() {
+        let view = KsCollectionView([Product(id: 1, category: "果物")]) { product in
+            Text("\(product.id)")
+        }
+        .groups(by: \.category)
+
+        XCTAssertNotNil(view.configuration.grouping)
+        XCTAssertNil(view.configuration.grouping?.header)
+    }
+
+    func testグループを宣言しなければ構成にグループ化は無い() {
+        let view = KsCollectionView([Product(id: 1, category: "果物")]) { product in
+            Text("\(product.id)")
+        }
+
+        XCTAssertNil(view.configuration.grouping)
+    }
+
+    func testグループまわりの間隔をlayout値で宣言でき既定は0になる() {
+        let grid = KsCollectionLayout.grid(
+            columns: .fixed(portrait: 2, landscape: 4),
+            rowSpacing: 8,
+            groupSpacing: 24,
+            headerItemSpacing: 6
+        )
+        XCTAssertEqual(grid.rowSpacing, 8)
+        XCTAssertEqual(grid.groupSpacing, 24)
+        XCTAssertEqual(grid.headerItemSpacing, 6)
+
+        let list = KsCollectionLayout.list(groupSpacing: 12)
+        XCTAssertEqual(list.rowSpacing, 0)
+        XCTAssertEqual(list.groupSpacing, 12)
+        XCTAssertEqual(list.headerItemSpacing, 0)
+
+        for layout in [KsCollectionLayout.list, .list(rowSpacing: 4), .grid(columns: .fixed(2))] {
+            XCTAssertEqual(layout.groupSpacing, 0)
+            XCTAssertEqual(layout.headerItemSpacing, 0)
+        }
+    }
+
+    func test負の間隔を不正入力として名前を挙げ0に置き換えられる() {
+        let layout = KsCollectionLayout.grid(
+            columns: .fixed(2),
+            rowSpacing: 4,
+            columnSpacing: -2,
+            groupSpacing: -10,
+            headerItemSpacing: 6
+        )
+        XCTAssertEqual(layout.negativeSpacingNames, ["columnSpacing", "groupSpacing"])
+
+        let clamped = layout.clampingNegativeSpacings()
+        XCTAssertEqual(clamped.rowSpacing, 4)
+        XCTAssertEqual(clamped.columnSpacing, 0)
+        XCTAssertEqual(clamped.groupSpacing, 0)
+        XCTAssertEqual(clamped.headerItemSpacing, 6)
+        XCTAssertEqual(clamped.kind, layout.kind)
+        XCTAssertTrue(clamped.negativeSpacingNames.isEmpty)
+        XCTAssertTrue(KsCollectionLayout.list(rowSpacing: 8).negativeSpacingNames.isEmpty)
     }
 }

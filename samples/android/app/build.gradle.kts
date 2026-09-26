@@ -1,7 +1,7 @@
 // KsCollectionView Android Sample — :app モジュール
 //
 // 役割:
-//   - デモ 9 画面と Android 固有の検証画面のルートメニューと遷移 (Navigation Compose)
+//   - デモ画面と Android 固有の検証画面のルートメニューと遷移 (Navigation Compose)
 //   - 本体 KsCollectionView を利用者と同じ配布座標 1 行の依存で使う
 //   - 計測用の入口 (素の LazyVerticalGrid による比較対象画面) を release 以外に同梱する
 

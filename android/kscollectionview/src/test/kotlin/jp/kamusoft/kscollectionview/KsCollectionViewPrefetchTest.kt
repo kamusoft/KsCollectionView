@@ -102,6 +102,7 @@ internal class KsCollectionViewPrefetchTest {
         prefetchResources: ((TestItem) -> List<KsResource>)? = itemResources,
         layout: KsLayout = KsLayout.List,
         contentPadding: PaddingValues = PaddingValues(0.dp),
+        groups: KsGroups<TestItem, *>? = null,
     ) {
         composeTestRule.setContent {
             CompositionLocalProvider(LocalKsImageLoading provides recorder) {
@@ -114,6 +115,7 @@ internal class KsCollectionViewPrefetchTest {
                         scrollController = controller,
                         prefetchResources = prefetchResources,
                         prefetchDestination = destination,
+                        groups = groups,
                     ) {
                         template { item -> PrefetchRow(item) }
                     }
@@ -132,6 +134,29 @@ internal class KsCollectionViewPrefetchTest {
 
         assertEquals(urls(visibleCount until visibleCount * 2), recorder.startedUrls)
         assertTrue("可視範囲の要素は先読みしない", recorder.disposed.isEmpty())
+    }
+
+    /**
+     * グループの見出しは先読み窓の件数に数えない。見出しと項目の lazy の index のずれは、グループの
+     * 構成から項目の位置へ写し直して窓を作る。
+     *
+     * 5 件ずつのグループに高さ 100dp の見出しが付くと、表示範囲 600dp には見出し 1 つと項目 5 件が
+     * 入る。窓は項目 5..9 になる (見出しの分だけ項目の位置がずれた添字では 4..8 になる)。
+     */
+    @Test
+    fun groupHeadersAreNotCountedInWindow() {
+        val recorder = LoadingRecorder()
+        setContent(
+            recorder,
+            testItems(40),
+            groups = KsGroups(by = { it.id.removePrefix("item-").toInt() / 5 }) { _, _ ->
+                PrefetchRow(TestItem("header", "header"))
+            },
+        )
+
+        awaitStarted(recorder, urls(5..9))
+
+        assertEquals(urls(5..9), recorder.startedUrls)
     }
 
     /** 末尾方向へ 1 要素分進むと窓が 1 つ進み、可視範囲に入った要素は取り消されない。 */

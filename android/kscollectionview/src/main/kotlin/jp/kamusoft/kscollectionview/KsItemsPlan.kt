@@ -88,7 +88,7 @@ private fun <Item> deduplicate(
 }
 
 /** Android の状態保存 (Bundle) に載せられる型かどうか。 */
-private fun isSavableKey(id: Any): Boolean = when (id) {
+internal fun isSavableKey(id: Any): Boolean = when (id) {
     is String, is Char, is Boolean -> true
     is Number -> true
     is Parcelable, is Serializable -> true

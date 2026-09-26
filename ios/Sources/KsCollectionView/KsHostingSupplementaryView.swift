@@ -16,6 +16,24 @@ internal final class KsHostingSupplementaryView: UICollectionReusableView {
         fatalError("init(coder:) は使用しません")
     }
 
+    // レイアウトが透明にした補助ビューは読み上げの対象から外す。塊に割れたグループでは同じ見出しが
+    // 塊ごとに置かれ、見せる 1 つ以外は透明にしてあるため、外さないと同じ見出しが重ねて読まれる。
+    override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
+        super.apply(layoutAttributes)
+        accessibilityElementsHidden = layoutAttributes.alpha < 0.01
+    }
+
+    // 上端・下端の安全領域を中身へ渡さない。一覧が画面上端の安全領域に重なって置かれると、
+    // 重なった位置のセル・補助ビューに安全領域が伝わり、SwiftUI の中身がその分だけ押し下げられて
+    // 高さも増える。行と補助ビューは安全領域に被ったまま中身どおりの大きさで流すため、上下は 0 にする。
+    // 左右 (横向きの切り欠き等) は変えずに渡す。
+    override var safeAreaInsets: UIEdgeInsets {
+        var insets = super.safeAreaInsets
+        insets.top = 0
+        insets.bottom = 0
+        return insets
+    }
+
     override func prepareForReuse() {
         super.prepareForReuse()
         hostedView?.removeFromSuperview()

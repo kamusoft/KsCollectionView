@@ -338,9 +338,9 @@ final class KsCollectionEngineTests: XCTestCase {
         defer { window.isHidden = true }
         await waitUntil("header/footer 表示", value: {
             controller.collectionView.visibleSupplementaryViews(
-                ofKind: UICollectionView.elementKindSectionHeader
+                ofKind: KsSupplementaryKind.rootHeader
             ).count + controller.collectionView.visibleSupplementaryViews(
-                ofKind: UICollectionView.elementKindSectionFooter
+                ofKind: KsSupplementaryKind.rootFooter
             ).count
         }) { $0 == 2 }
 
@@ -1005,12 +1005,12 @@ final class KsCollectionEngineTests: XCTestCase {
 
         let counts = supplementaryKindCounts(in: controller)
         XCTAssertEqual(
-            counts[UICollectionView.elementKindSectionHeader] ?? 0,
+            counts[KsSupplementaryKind.rootHeader] ?? 0,
             1,
             "ヘッダーが塊の数だけ作られています (\(counts))"
         )
         XCTAssertEqual(
-            counts[UICollectionView.elementKindSectionFooter] ?? 0,
+            counts[KsSupplementaryKind.rootFooter] ?? 0,
             1,
             "フッターが塊の数だけ作られています (\(counts))"
         )
@@ -1035,7 +1035,7 @@ final class KsCollectionEngineTests: XCTestCase {
         await waitUntil("空配列のヘッダー", value: { visibleHeaderCount(in: controller) }) { $0 == 1 }
         await waitUntil("空配列のフッター", value: {
             controller.collectionView.visibleSupplementaryViews(
-                ofKind: UICollectionView.elementKindSectionFooter
+                ofKind: KsSupplementaryKind.rootFooter
             ).count
         }) { $0 == 1 }
     }
@@ -1228,7 +1228,7 @@ final class KsCollectionEngineTests: XCTestCase {
         // 表示領域の大きさが変わる直前の経路で位置を控えさせる (frame はまだ差し替えない)。
         controller.viewWillTransition(
             to: CGSize(width: 844, height: 390),
-            with: TransitionCoordinatorStub(containerView: window)
+            with: KsTransitionCoordinatorStub(containerView: window)
         )
         XCTAssertTrue(controller.hasPendingAnchor, "表示領域の変化の直前に位置を控えていません")
 
@@ -2488,11 +2488,11 @@ final class KsCollectionEngineTests: XCTestCase {
         defer { window.isHidden = true }
         await waitUntil("header 表示", value: {
             controller.collectionView.visibleSupplementaryViews(
-                ofKind: UICollectionView.elementKindSectionHeader
+                ofKind: KsSupplementaryKind.rootHeader
             ).count
         }) { $0 == 1 }
         guard let headerView = controller.collectionView.visibleSupplementaryViews(
-            ofKind: UICollectionView.elementKindSectionHeader
+            ofKind: KsSupplementaryKind.rootHeader
         ).first as? KsHostingSupplementaryView else {
             XCTFail("header のホスティングビューを取得できませんでした")
             return
@@ -2540,12 +2540,27 @@ final class KsCollectionEngineTests: XCTestCase {
     private func footerFrame(
         in controller: KsCollectionViewController<Item>
     ) -> CGRect? {
-        let lastSection = controller.collectionView.numberOfSections - 1
-        guard lastSection >= 0 else { return nil }
-        return controller.collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
-            ofKind: UICollectionView.elementKindSectionFooter,
-            at: IndexPath(item: 0, section: lastSection)
-        )?.frame
+        supplementaryFrames(ofKind: KsSupplementaryKind.rootFooter, in: controller).first
+    }
+
+    // レイアウトに載っている、指定した種類の補助ビューの矩形 (上から順)。ルートのヘッダー /
+    // フッターはレイアウト全体に付くため、位置 (indexPath) ではなく種類で引く。
+    private func supplementaryFrames(
+        ofKind kind: String,
+        in controller: KsCollectionViewController<Item>
+    ) -> [CGRect] {
+        controller.collectionView.layoutIfNeeded()
+        let rect = CGRect(
+            origin: .zero,
+            size: CGSize(
+                width: controller.collectionView.bounds.width,
+                height: max(controller.collectionView.contentSize.height, controller.collectionView.bounds.height)
+            )
+        )
+        return (controller.collectionView.collectionViewLayout.layoutAttributesForElements(in: rect) ?? [])
+            .filter { $0.representedElementKind == kind }
+            .map(\.frame)
+            .sorted { $0.minY < $1.minY }
     }
 
     // 目的の位置まで、途中の行を解かせながら送る。送り終えたときの先頭可視要素を返す。
@@ -2933,57 +2948,9 @@ final class KsCollectionEngineTests: XCTestCase {
     ) {
         controller.viewWillTransition(
             to: size,
-            with: TransitionCoordinatorStub(containerView: window)
+            with: KsTransitionCoordinatorStub(containerView: window)
         )
         resize(window: window, controller: controller, to: size)
-    }
-
-    // viewWillTransition(to:with:) を呼ぶためだけの調整役。位置の維持は size だけで決まるため、
-    // 併走アニメーションの登録はいずれも受け取って何もしない。
-    private final class TransitionCoordinatorStub: NSObject, UIViewControllerTransitionCoordinator {
-        let containerView: UIView
-
-        init(containerView: UIView) {
-            self.containerView = containerView
-        }
-
-        var isAnimated: Bool { false }
-        var presentationStyle: UIModalPresentationStyle { .none }
-        var initiallyInteractive: Bool { false }
-        var isInterruptible: Bool { false }
-        var isInteractive: Bool { false }
-        var isCancelled: Bool { false }
-        var transitionDuration: TimeInterval { 0 }
-        var percentComplete: CGFloat { 0 }
-        var completionVelocity: CGFloat { 0 }
-        var completionCurve: UIView.AnimationCurve { .linear }
-        var targetTransform: CGAffineTransform { .identity }
-
-        func viewController(forKey key: UITransitionContextViewControllerKey) -> UIViewController? { nil }
-        func view(forKey key: UITransitionContextViewKey) -> UIView? { nil }
-
-        func animate(
-            alongsideTransition animation: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?,
-            completion: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?
-        ) -> Bool {
-            false
-        }
-
-        func animateAlongsideTransition(
-            in view: UIView?,
-            animation: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?,
-            completion: ((any UIViewControllerTransitionCoordinatorContext) -> Void)?
-        ) -> Bool {
-            false
-        }
-
-        func notifyWhenInteractionEnds(
-            _ handler: @escaping (any UIViewControllerTransitionCoordinatorContext) -> Void
-        ) {}
-
-        func notifyWhenInteractionChanges(
-            _ handler: @escaping (any UIViewControllerTransitionCoordinatorContext) -> Void
-        ) {}
     }
 
     private func tryUnwrapCell(
@@ -3260,17 +3227,14 @@ final class KsCollectionEngineTests: XCTestCase {
         in controller: KsCollectionViewController<Item>
     ) -> Int {
         controller.collectionView.visibleSupplementaryViews(
-            ofKind: UICollectionView.elementKindSectionHeader
+            ofKind: KsSupplementaryKind.rootHeader
         ).count
     }
 
     private func headerFrame(
         in controller: KsCollectionViewController<Item>
     ) -> CGRect? {
-        controller.collectionView.collectionViewLayout.layoutAttributesForSupplementaryView(
-            ofKind: UICollectionView.elementKindSectionHeader,
-            at: IndexPath(item: 0, section: 0)
-        )?.frame
+        supplementaryFrames(ofKind: KsSupplementaryKind.rootHeader, in: controller).first
     }
 
     private func visibleCellWidths(

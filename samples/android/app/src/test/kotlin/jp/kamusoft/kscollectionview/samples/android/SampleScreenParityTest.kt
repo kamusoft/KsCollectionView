@@ -24,6 +24,8 @@ class SampleScreenParityTest {
         "スペーシングと余白",
         "大量件数",
         "画像グリッド",
+        "グループ化",
+        "差分更新",
     )
 
     @Test
@@ -32,8 +34,38 @@ class SampleScreenParityTest {
     }
 
     @Test
-    fun `デモ画面は 10 ある`() {
-        assertEquals(10, SampleScreen.entries.size)
+    fun `デモ画面は 12 ある`() {
+        assertEquals(12, SampleScreen.entries.size)
+    }
+
+    /**
+     * 「グループ化」「差分更新」画面の操作と説明の文言が iOS Sample と一致する。
+     *
+     * 期待値は iOS Sample の `GroupingDemoView.swift` / `DiffUpdateDemoView.swift` /
+     * `DiffUpdateLayoutChoice.swift` / `DiffUpdatePosition.swift` / `GroupHeaderBand.swift` の文言を
+     * そのまま書き写したもの。
+     */
+    @Test
+    fun `グループ化と差分更新の文言が iOS と一致する`() {
+        assertEquals(
+            listOf("並び順を反転", "項目を別のグループへ", "10,000 件・縦 2 列 / 横 4 列・見出しは固定"),
+            listOf(GroupingDemoText.Reverse, GroupingDemoText.MoveItem, GroupingDemoText.Description),
+        )
+        assertEquals(listOf("リスト", "グリッド"), DiffUpdateLayoutChoice.entries.map { it.title })
+        assertEquals(listOf("先頭", "中ほど", "末尾"), DiffUpdatePosition.entries.map { it.title })
+        assertEquals(
+            listOf("グループ", "挿入", "削除", "更新", "移動", "反転", "シャッフル", "元に戻す"),
+            with(DiffUpdateDemoText) {
+                listOf(Grouped, Insert, Delete, Update, Move, Reverse, Shuffle, Reset)
+            },
+        )
+        // 見出しのグループ名と件数、更新した項目の印。
+        assertEquals("グループ 1", GroupingFixture.groupName(1))
+        assertEquals("グループ A", DiffUpdateModel.groupName(0))
+        assertEquals("1,200 件", groupItemCountText(1_200))
+        assertEquals("5 件", groupItemCountText(5))
+        assertEquals("Item 3 ★", DiffUpdateItem(id = 3, group = 0, revision = 1).row.title)
+        assertEquals("Item 3", DiffUpdateItem(id = 3, group = 0).row.title)
     }
 
     @Test
@@ -51,5 +83,12 @@ class SampleScreenParityTest {
         SampleScreen.entries.forEach { screen ->
             assertEquals("demo/${screen.name}", SampleRoutes.demo(screen))
         }
+    }
+
+    @Test
+    fun `グループ化と差分更新は開始ルートで開ける経路を持つ`() {
+        // 起動時の追加情報 ks_start_route に渡す経路。計測と検証はこの経路で画面を直接開く。
+        assertEquals("demo/Grouping", SampleRoutes.demo(SampleScreen.Grouping))
+        assertEquals("demo/DiffUpdate", SampleRoutes.demo(SampleScreen.DiffUpdate))
     }
 }

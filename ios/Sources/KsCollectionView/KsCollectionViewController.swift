@@ -28,9 +28,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var pendingCommands: [KsScrollCommand] = []
     private var appliedItems: [Item] = []
     private var appliedIdentifiers: [KsItemIdentifier] = []
+    // 控えた位置。`offsetFromTop` は表示範囲の上端 (固定中のグループの見出しが上端を覆っていれば
+    // その下端) からの距離で、`belowPinnedHeader` は控えたときに固定中の見出しが上端を覆っていたか。
     private var pendingAnchor: (
         identifier: AnyHashable,
         offsetFromTop: CGFloat,
+        belowPinnedHeader: Bool,
         previousOrder: [AnyHashable]
     )?
     // 控えた位置の世代。位置を控え直すたびに増える。遅らせた復元にはこの番号を持たせ、
@@ -51,8 +54,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var containerTransitionAnchor: (columnCount: Int, generation: Int)?
     // 適用済みの snapshot を組んだときの塊の件数。列数の変化で件数が変われば組み直す必要がある。
     private var appliedChunkSize = 0
-    // 適用済みの snapshot に載っている塊の数。塊の位置 (先頭・末尾) でレイアウトを切り替えるために読む。
-    private var appliedChunkCount = 0
+    // 適用済みの snapshot に載っている塊の表。塊のグループの中での位置 (先頭・末尾) で内側余白・
+    // 見出し・区切り線を切り替えるために、セクションの番号から引く。
+    private var appliedChunkTable = KsGroupChunkTable.empty
     // 塊の組み直しを次の実行機会へ予約したかどうか。レイアウトの途中で snapshot を適用しないため、
     // 発火は同じ実行を抜けてから行う。
     private var isChunkRebuildScheduled = false
@@ -70,6 +74,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // この値が動かないことで観測できる。計数そのものは構成を問わず持つ (`processedCommandCount`
     // と同じく、値の更新に費用が掛からず計測対象の挙動を変えないため)。
     private(set) var chunkRebuildCount = 0
+    // snapshot を適用した回数。グループの値の取り出し方だけが差し替わり、グループの値の並びが
+    // 変わらない更新で組み直さないことを、この値が動かないことで観測できる。
+    private(set) var snapshotApplyCount = 0
     // 表示の変化に備えて控えた位置を持っているかどうか。控えが捨てられる契機を観測するために読む。
     var hasPendingAnchor: Bool { pendingAnchor != nil }
     #if DEBUG
@@ -109,7 +116,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         dataSource.snapshot().itemIdentifiers.map(\.value)
     }
 
+    // 適用済みの snapshot に載っている塊の識別子 (載せた順)。グループと塊の区切り方を観測するために読む。
+    var appliedSectionIdentifiers: [KsSectionID] {
+        dataSource.snapshot().sectionIdentifiers
+    }
+
     init(configuration: KsCollectionConfiguration<Item>) {
+        var configuration = configuration
+        configuration.layout = Self.validatedLayout(configuration.layout)
         self.configuration = configuration
         super.init(collectionViewLayout: UICollectionViewFlowLayout())
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
@@ -126,6 +140,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     func update(configuration: KsCollectionConfiguration<Item>) {
+        var configuration = configuration
+        configuration.layout = Self.validatedLayout(configuration.layout)
         let previousLayout = self.configuration.layout
         let previousPadding = self.configuration.contentPadding
         let previousShowsSeparators = self.configuration.showsSeparators
@@ -139,6 +155,17 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let rebuildsVisibleCellContent = configuration.observedValue == nil || observedValueChanged
         let supplementaryStructureChanged = (self.configuration.header == nil) != (configuration.header == nil)
             || (self.configuration.footer == nil) != (configuration.footer == nil)
+        // グループの宣言の有無が変わると、配列が同じでも塊の区切り方が変わる。
+        let groupingDeclarationChanged = (self.configuration.grouping == nil) != (configuration.grouping == nil)
+        // グループの値の取り出し方が差し替わると、配列が同じでもグループの値の並びが変わりうる。
+        // 取り出し方が同じなら同じ配列から同じ並びが得られるため、ここでは求め直さない。
+        let groupValueSourceChanged = self.configuration.grouping != nil
+            && configuration.grouping != nil
+            && self.configuration.grouping?.valueSource != configuration.grouping?.valueSource
+        // 見出しの有無と固定の有無は、塊の区切り方は変えずにレイアウトだけを変える。
+        let groupHeaderLayoutChanged = (self.configuration.grouping?.header == nil)
+            != (configuration.grouping?.header == nil)
+            || self.configuration.grouping?.pinsHeaders != configuration.grouping?.pinsHeaders
         let layoutKindChanged = previousLayout.kind != configuration.layout.kind
         // 表示形態だけでなく行間・列間・内側余白の差し替えでも要素の位置が動くため、
         // layout 値と contentPadding のいずれかが変わったらアンカーを控える。
@@ -155,15 +182,32 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             configuration.scrollController?.attach(self)
         }
 
-        if layoutChanged || supplementaryStructureChanged {
+        // ルートのヘッダー / フッターと上下の内側余白はレイアウト全体の補助ビューに載るため、
+        // 有無や余白が変わったらレイアウト全体の構成を作り直す。
+        if supplementaryStructureChanged || previousPadding != configuration.contentPadding {
+            compositionalLayout?.configuration = makeLayoutConfiguration()
+        }
+        if layoutChanged || supplementaryStructureChanged || groupHeaderLayoutChanged || groupingDeclarationChanged {
             collectionView.collectionViewLayout.invalidateLayout()
         }
         if previousShowsSeparators != configuration.showsSeparators
             || previousSeparatorColor != configuration.separatorColor
-            || layoutKindChanged {
+            || layoutKindChanged
+            || groupHeaderLayoutChanged {
             updateVisibleCellSeparators()
         }
-        updateVisibleSupplementaryViews()
+        updateVisibleRootSupplementaryViews()
+        // グループの見出しは項目のテンプレートと同じ条件で内容を作り直す (ios/ADR-0006、ios/ADR-0008)。
+        // 配列が変わる更新では、差分の適用の完了時にも新しいグループの内容で作り直す。
+        // 取り出し方が差し替わった更新では、ここで作り直すと表示中の (古いグループの) 見出しに新しい
+        // 取り出し方の値が入り、消えていく間に新しいグループの名前が出る。このため差分の適用の側
+        // (適用の完了時、または適用しない場合はその場) で新しい構成に合わせて作り直す。
+        // 新しい構成に見出しの宣言がない更新では、表示中の見出しはすべて消えていくビューになる。
+        // ここで作り直すと中身が外れ、空のビューがフェードすることになるため、前の中身のまま残す。
+        let declaresGroupHeaders = configuration.grouping?.header != nil
+        if (rebuildsVisibleCellContent || groupHeaderLayoutChanged) && !groupValueSourceChanged && declaresGroupHeaders {
+            updateVisibleGroupHeaders()
+        }
 
         syncImagePrefetching()
         // 差し替え後の配列に無い項目は、システムから取り消し通知が来ないためここで取り消す。
@@ -175,7 +219,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             animatingDifferences: true,
             reconfiguringAllItems: layoutKindChanged,
             rebuildingVisibleCellContentOnEqualItems: rebuildsVisibleCellContent,
-            rebuildingSurvivingVisibleCellContent: observedValueChanged
+            rebuildingSurvivingVisibleCellContent: observedValueChanged,
+            regroupingSections: groupingDeclarationChanged || groupValueSourceChanged
         )
     }
 
@@ -206,6 +251,13 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // 持たないため super へは委ねない (実体の無い呼び出しになる)。
     override func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         discardPendingAnchor()
+    }
+
+    // 固定中のグループの見出しの位置は上端の安全領域に合わせるため、安全領域が変わったら置き直す。
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        guard pinsGroupHeaders else { return }
+        collectionView.collectionViewLayout.invalidateLayout()
     }
 
     override func viewDidLayoutSubviews() {
@@ -332,25 +384,36 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
 
         let headerRegistration = UICollectionView.SupplementaryRegistration<KsHostingSupplementaryView>(
-            elementKind: UICollectionView.elementKindSectionHeader
+            elementKind: KsSupplementaryKind.rootHeader
         ) { [weak self] view, _, _ in
             self?.configureHeader(view)
         }
         let footerRegistration = UICollectionView.SupplementaryRegistration<KsHostingSupplementaryView>(
-            elementKind: UICollectionView.elementKindSectionFooter
+            elementKind: KsSupplementaryKind.rootFooter
         ) { [weak self] view, _, _ in
             self?.configureFooter(view)
         }
+        let groupHeaderRegistration = UICollectionView.SupplementaryRegistration<KsHostingSupplementaryView>(
+            elementKind: KsSupplementaryKind.groupHeader
+        ) { [weak self] view, _, indexPath in
+            self?.configureGroupHeader(view, section: indexPath.section)
+        }
 
         dataSource.supplementaryViewProvider = { collectionView, kind, indexPath in
-            if kind == UICollectionView.elementKindSectionHeader {
+            switch kind {
+            case KsSupplementaryKind.rootHeader:
                 collectionView.dequeueConfiguredReusableSupplementary(
                     using: headerRegistration,
                     for: indexPath
                 )
-            } else {
+            case KsSupplementaryKind.rootFooter:
                 collectionView.dequeueConfiguredReusableSupplementary(
                     using: footerRegistration,
+                    for: indexPath
+                )
+            default:
+                collectionView.dequeueConfiguredReusableSupplementary(
+                    using: groupHeaderRegistration,
                     for: indexPath
                 )
             }
@@ -457,9 +520,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private func configure(cell: KsHostingCell, at indexPath: IndexPath) {
         let showsSeparators = showsListSeparators
         cell.configureSeparators(
-            // 上端の線は配列全体の先頭の項目にだけ出す。塊の境界では item が 0 に戻るため、
-            // 塊の順番も合わせて見ないと境界ごとに線が増える。
-            showsTop: showsSeparators && indexPath.item == 0 && indexPath.section == 0,
+            showsTop: showsSeparators && showsTopSeparator(at: indexPath),
             showsBottom: showsSeparators,
             color: configuration.separatorColor ?? KsHostingCell.defaultSeparatorColor
         )
@@ -469,29 +530,102 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
+    // 上端の区切り線を出す項目か。線はグループごとに先頭行の上端へ引く (core/ADR-0016)。
+    // 塊の境界では item が 0 に戻るため、グループの先頭の塊かどうかも合わせて見る。
+    // 見出しを宣言しないグループでは、境目で前のグループの下端の線と重なるため最初のグループにだけ出す。
+    private func showsTopSeparator(at indexPath: IndexPath) -> Bool {
+        guard indexPath.item == 0 else { return false }
+        guard let chunk = appliedChunkTable.chunk(at: indexPath.section) else {
+            return indexPath.section == 0
+        }
+        guard chunk.isFirstChunkInGroup else { return false }
+        return chunk.isFirstGroup || groupHasHeader(groupIndex: chunk.groupIndex)
+    }
+
+    // グループに見出しを表示するか。見出しの宣言があり、グループに項目があるときだけ表示する。
+    private func groupHasHeader(groupIndex: Int) -> Bool {
+        guard
+            configuration.grouping?.header != nil,
+            appliedChunkTable.groups.indices.contains(groupIndex)
+        else {
+            return false
+        }
+        return !appliedChunkTable.groups[groupIndex].itemRange.isEmpty
+    }
+
+    // ルートのヘッダー。上の内側余白は、ヘッダーもコンテンツの一部として、その上に入れる (core/ADR-0006)。
+    // ヘッダーが無いときは、上の内側余白の分の空白だけを置く。
     private func configureHeader(_ view: KsHostingSupplementaryView) {
         guard let content = configuration.header?() else {
             view.clear()
             return
         }
-        view.configure(using: UIHostingConfiguration { content }.margins(.all, 0))
+        let padding = configuration.contentPadding
+        view.configure(
+            using: UIHostingConfiguration { content }
+                .margins(.all, EdgeInsets(top: padding.top, leading: padding.leading, bottom: 0, trailing: padding.trailing))
+        )
     }
 
+    // ルートのフッター。下の内側余白はフッターの下に入れる。
     private func configureFooter(_ view: KsHostingSupplementaryView) {
         guard let content = configuration.footer?() else {
             view.clear()
             return
         }
+        let padding = configuration.contentPadding
+        view.configure(
+            using: UIHostingConfiguration { content }
+                .margins(.all, EdgeInsets(top: 0, leading: padding.leading, bottom: padding.bottom, trailing: padding.trailing))
+        )
+    }
+
+    // グループの見出しに、そのグループのグループの値と項目で内容を設定する。塊に割れたグループでは、
+    // どの塊の見出しにも同じ内容を設定する。
+    private func configureGroupHeader(_ view: KsHostingSupplementaryView, section: Int) {
+        guard
+            let header = configuration.grouping?.header,
+            let group = appliedChunkTable.group(containingSection: section),
+            !group.itemRange.isEmpty,
+            group.itemRange.upperBound <= appliedIdentifiers.count
+        else {
+            view.clear()
+            return
+        }
+        // グループ内の項目は、適用済みの並びの項目の位置の範囲から、見出しを組み立てるときにだけ引く。
+        // 配列全体の写しを持ち続けないため、見出しを宣言しない一覧では項目を複製しない。
+        let items = appliedIdentifiers[group.itemRange].compactMap { itemsByID[$0.value] }
+        guard let first = items.first else {
+            view.clear()
+            return
+        }
+        let content = header(first, items)
         view.configure(using: UIHostingConfiguration { content }.margins(.all, 0))
     }
 
-    private func updateVisibleSupplementaryViews() {
+    private func updateVisibleRootSupplementaryViews() {
         collectionView.visibleSupplementaryViews(
-            ofKind: UICollectionView.elementKindSectionHeader
+            ofKind: KsSupplementaryKind.rootHeader
         ).compactMap { $0 as? KsHostingSupplementaryView }.forEach(configureHeader)
         collectionView.visibleSupplementaryViews(
-            ofKind: UICollectionView.elementKindSectionFooter
+            ofKind: KsSupplementaryKind.rootFooter
         ).compactMap { $0 as? KsHostingSupplementaryView }.forEach(configureFooter)
+    }
+
+    // 表示中のグループの見出し (塊の見出しを含む) の内容を、現在の構成と塊の表で設定し直す。
+    // 見出しのビューは作り直さず、ホスティングの構成だけを差し替える。
+    private func updateVisibleGroupHeaders() {
+        for indexPath in collectionView.indexPathsForVisibleSupplementaryElements(
+            ofKind: KsSupplementaryKind.groupHeader
+        ) {
+            guard let view = collectionView.supplementaryView(
+                forElementKind: KsSupplementaryKind.groupHeader,
+                at: indexPath
+            ) as? KsHostingSupplementaryView else {
+                continue
+            }
+            configureGroupHeader(view, section: indexPath.section)
+        }
     }
 
     private func updateVisibleCellSeparators() {
@@ -532,7 +666,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         animatingDifferences: Bool,
         reconfiguringAllItems: Bool = false,
         rebuildingVisibleCellContentOnEqualItems: Bool = true,
-        rebuildingSurvivingVisibleCellContent: Bool = false
+        rebuildingSurvivingVisibleCellContent: Bool = false,
+        regroupingSections: Bool = false
     ) {
         // 塊の件数は現在の layout と解決済みの列数から決まる (ios/ADR-0009)。件数が変われば
         // 塊の切れ目が列の途中に落ちるため、配列が同値でも組み直す。
@@ -547,8 +682,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         if itemsAreEqual {
             reconfigureVisibleCells(rebuildingContent: rebuildingVisibleCellContentOnEqualItems)
         }
-        // 差分計算も snapshot 適用も要らない更新はここで終わる。
-        if itemsAreEqual, !chunkSizeChanged {
+        // 差分計算も snapshot 適用も要らない更新はここで終わる。グループの宣言の有無やグループの値の
+        // 取り出し方が変わった更新は、配列が同じでも塊の区切り方が変わりうるため先へ進む。新しい
+        // グループの値の並びが適用済みと同じなら、塊の表が一致して snapshot の適用には進まない。
+        if itemsAreEqual, !chunkSizeChanged, !regroupingSections {
             settleAnchorIfNeeded()
             if !isApplyingSnapshot {
                 flushPendingCommands()
@@ -583,6 +720,17 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         prepareRegistrations(for: Set(keysByID.values))
 
         let identifiers = plan.identifiers.map(KsItemIdentifier.init)
+        // 配列をグループごとに、その先頭から塊の件数ずつ区切る (ios/ADR-0010)。件数は列数の倍数
+        // なので、塊の境界は必ず行の切れ目に落ち、列数に満たない行は各グループの最終行にだけ現れる。
+        let chunkTable = KsGroupChunkTable.make(
+            groupValues: configuration.grouping.map { grouping in
+                plan.identifiers.compactMap { itemsByID[$0].map(grouping.value) }
+            },
+            itemCount: identifiers.count,
+            chunkSize: chunkSize
+        )
+        reportReappearingGroupValues(chunkTable.reappearingValues)
+        let sectionsChanged = chunkTable != appliedChunkTable
         let currentIdentifiers = dataSource.snapshot().itemIdentifiers
         let positionsChanged = identifiers != currentIdentifiers
         // 観測する値が変わった更新では、内容が同値のまま残る可視セルもテンプレートを呼び直す (ios/ADR-0008)。
@@ -602,12 +750,18 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         // 初回は section を載せるために必ず適用する (項目が空でも header / footer を表示するため)。
         let hasSnapshotChanges = !hasAppliedSnapshot
             || chunkSizeChanged
+            || sectionsChanged
             || positionsChanged
             || !plan.reconfigure.isEmpty
             || !plan.reload.isEmpty
             || reconfiguringAllItems
             || !survivingVisibleIdentifiers.isEmpty
         guard hasSnapshotChanges else {
+            // 組み直しを求められたが構成が変わらなかった場合は、見出しの内容だけを新しい宣言で
+            // 作り直す (区切りが同じなので、表示中の見出しと新しいグループの値は食い違わない)。
+            if regroupingSections {
+                updateVisibleGroupHeaders()
+            }
             settleAnchorIfNeeded()
             if !isApplyingSnapshot {
                 flushPendingCommands()
@@ -615,26 +769,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             return
         }
 
-        // 配列を先頭から塊の件数ずつ区切って、塊ごとのセクションへ載せる (ios/ADR-0009)。
-        // 件数は列数の倍数なので、塊の境界は必ず行の切れ目に落ちる。項目が空でも塊を 1 つ
-        // 載せて、ヘッダー / フッターを表示できるようにする。
+        // 塊ごとのセクションへ載せる。項目が空でも塊を 1 つ載せる。
         var snapshot = NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>()
-        let chunkCount = KsSectionChunking.chunkCount(
-            itemCount: identifiers.count,
-            chunkSize: chunkSize
-        )
-        snapshot.appendSections((0..<chunkCount).map(KsSectionID.init(chunkIndex:)))
-        for chunkIndex in 0..<chunkCount {
-            let start = chunkIndex * chunkSize
-            let end = min(start + chunkSize, identifiers.count)
-            guard start < end else { continue }
-            snapshot.appendItems(
-                Array(identifiers[start..<end]),
-                toSection: KsSectionID(chunkIndex: chunkIndex)
-            )
+        snapshot.appendSections(chunkTable.sectionIDs)
+        for (sectionID, range) in zip(chunkTable.sectionIDs, chunkTable.sectionItemRanges) where !range.isEmpty {
+            snapshot.appendItems(Array(identifiers[range]), toSection: sectionID)
         }
         appliedChunkSize = chunkSize
-        appliedChunkCount = chunkCount
+        appliedChunkTable = chunkTable
         let existingIdentifiers = Set(currentIdentifiers)
         let reloadIdentifiers = plan.reload.map(KsItemIdentifier.init).filter(existingIdentifiers.contains)
         let reloadedIdentifiers = Set(reloadIdentifiers)
@@ -656,6 +798,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         appliedIdentifiers = identifiers
         hasAppliedSnapshot = true
         applyingSnapshotCount += 1
+        snapshotApplyCount += 1
         // 塊の件数が変わる再適用は、それ自体は動かして見せる変化ではない。塊の件数が 1 件でも
         // 動けば先頭の塊を除くほぼ全項目が隣の塊へ移る差分になり、アニメーションを付けると
         // 位置の復元と重なって表示が乱れる。配列の増減が同時に届いていても、その増減だけを
@@ -667,11 +810,21 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         if chunkSizeChanged {
             anchorGenerationAwaitingApply = anchorGeneration
         }
+        // 端を表示中にその端へ項目が入る差し替えでは、差分のアニメーションの中で表示範囲をその端へ
+        // 留める。留めないと、末尾への挿入は表示範囲の下へ足されて見えない。レイアウトは差分の適用の
+        // 中で更新の後の表示位置を問い合わせるので、その間だけ留める端を渡す。
+        compositionalLayout?.edgeToKeepAfterUpdate = animates
+            ? edgeToKeep(previous: currentIdentifiers, next: identifiers)
+            : nil
+        defer { compositionalLayout?.edgeToKeepAfterUpdate = nil }
         dataSource.apply(snapshot, animatingDifferences: animates) { [weak self] in
             guard let self else { return }
             applyingSnapshotCount = max(0, applyingSnapshotCount - 1)
             updateVisibleCellSeparators()
-            updateVisibleSupplementaryViews()
+            updateVisibleRootSupplementaryViews()
+            // 見出しの識別はグループの値なので、項目の数や内容だけが変わったグループの見出しは
+            // 差分の適用では作り直されない。適用の完了時に新しいグループの内容を設定し直す。
+            updateVisibleGroupHeaders()
             // 保留中の命令は、重ねて適用された snapshot がすべて反映されてから実行する。
             guard applyingSnapshotCount == 0 else { return }
             collectionView.layoutIfNeeded()
@@ -691,6 +844,25 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             flushPendingCommands()
             scheduleChunkRebuildIfNeeded()
         }
+    }
+
+    // 差し替えの直前に表示範囲がコンテンツの先頭 / 末尾にあり (1pt 未満の差は一致とみなす)、
+    // 差し替えでその端に新しい項目が入るとき、表示範囲を留める端。どちらでもなければ nil で、
+    // 表示範囲はコンテンツの位置を保つ既定のままにする。先頭と末尾の両方に当たるときは先頭を採る。
+    private func edgeToKeep(previous: [KsItemIdentifier], next: [KsItemIdentifier]) -> KsContentEdge? {
+        guard hasAppliedSnapshot, !next.isEmpty else { return nil }
+        let insets = collectionView.adjustedContentInset
+        let offset = collectionView.contentOffset.y
+        let top = -insets.top
+        let bottom = max(top, collectionView.contentSize.height + insets.bottom - collectionView.bounds.height)
+        let previousIdentifiers = Set(previous)
+        if offset - top < 1, let first = next.first, !previousIdentifiers.contains(first) {
+            return .top
+        }
+        if bottom - offset < 1, let last = next.last, !previousIdentifiers.contains(last) {
+            return .bottom
+        }
+        return nil
     }
 
     // 塊の件数が現在の列数と合わなくなっていたら、次の実行機会に組み直しを予約する。
@@ -719,6 +891,27 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
+    // 同じグループの値が配列の離れた位置に再び現れる入力は不正入力 (core/ADR-0011、core/ADR-0015)。
+    // 表示は配列の順のまま別々のグループとして続け、並べ替えたり消したりしない。
+    private func reportReappearingGroupValues(_ values: [AnyHashable]) {
+        for value in values {
+            KsInvalidInput.report(
+                "同じグループの値 \(String(describing: value.base)) が配列の離れた位置に再び現れました。"
+                    + "同じグループの値を持つ項目は配列の中で続けて並べてください"
+            )
+        }
+    }
+
+    // layout 値の間隔の負の値は不正入力 (core/ADR-0011)。検知したら知らせ、0 として表示を続ける。
+    private static func validatedLayout(_ layout: KsCollectionLayout) -> KsCollectionLayout {
+        let names = layout.negativeSpacingNames
+        guard !names.isEmpty else { return layout }
+        KsInvalidInput.report(
+            "layout 値の \(names.joined(separator: ", ")) に負の値が指定されました。0 として表示します"
+        )
+        return layout.clampingNegativeSpacings()
+    }
+
     // 現在の layout と解決済みの列数から決まる、1 つの塊に載せる件数。
     private func currentChunkSize() -> Int {
         KsSectionChunking.chunkSize(
@@ -729,97 +922,265 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
-    private func makeLayout() -> UICollectionViewCompositionalLayout {
-        UICollectionViewCompositionalLayout { [weak self] sectionIndex, environment in
-            guard let self else { return nil }
-            // 配列は内部の塊へ分かれて載る。塊の境界が見た目に出ないよう、内側余白・行間・
-            // ヘッダー / フッターを塊の位置で切り替える (ios/ADR-0009)。
-            // 塊の数は snapshot を組んだ時点で決まる。まだ組んでいない間や記録より後ろの塊を
-            // 解いているときは、その塊を末尾として扱う。
-            let isFirstChunk = sectionIndex == 0
-            let isLastChunk = sectionIndex == max(appliedChunkCount, sectionIndex + 1) - 1
-            let padding = configuration.contentPadding
-            let horizontalPadding = padding.leading + padding.trailing
-            let columnCount: Int
-
-            switch configuration.layout.kind {
-            case .list:
-                columnCount = 1
-            case let .grid(columns):
-                columnCount = KsLayoutMetrics.columnCount(
-                    for: columns,
-                    containerSize: environment.container.effectiveContentSize,
-                    horizontalPadding: horizontalPadding,
-                    columnSpacing: configuration.layout.columnSpacing
-                )
-            }
-            resolvedColumnCount = columnCount
-
-            let itemSize = NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(1 / CGFloat(columnCount)),
-                heightDimension: .estimated(estimatedHeight.value)
-            )
-            let item = NSCollectionLayoutItem(layoutSize: itemSize)
-            let groupSize = NSCollectionLayoutSize(
-                widthDimension: .fractionalWidth(1),
-                heightDimension: .estimated(estimatedHeight.value)
-            )
-            let group = NSCollectionLayoutGroup.horizontal(
-                layoutSize: groupSize,
-                repeatingSubitem: item,
-                count: columnCount
-            )
-            group.interItemSpacing = .fixed(configuration.layout.columnSpacing)
-
-            let section = NSCollectionLayoutSection(group: group)
-            section.interGroupSpacing = configuration.layout.rowSpacing
-            section.contentInsets = NSDirectionalEdgeInsets(
-                // 内側余白は配列全体の上下にだけ付ける。塊と塊の間には行間を入れて、境界の
-                // 間隔を他の行間と同じにする (セクションの間には行間が入らないため)。
-                top: isFirstChunk ? padding.top : configuration.layout.rowSpacing,
-                leading: padding.leading,
-                bottom: isLastChunk ? padding.bottom : 0,
-                trailing: padding.trailing
-            )
-
-            var supplementaryItems: [NSCollectionLayoutBoundarySupplementaryItem] = []
-            // ヘッダーは配列全体の先頭に、フッターは末尾に 1 つずつだけ付ける。
-            if configuration.header != nil, isFirstChunk {
-                supplementaryItems.append(makeBoundaryItem(kind: UICollectionView.elementKindSectionHeader, alignment: .top))
-            }
-            if configuration.footer != nil, isLastChunk {
-                supplementaryItems.append(makeBoundaryItem(kind: UICollectionView.elementKindSectionFooter, alignment: .bottom))
-            }
-            section.boundarySupplementaryItems = supplementaryItems
-            return section
-        }
+    private var compositionalLayout: KsCompositionalLayout? {
+        collectionView.collectionViewLayout as? KsCompositionalLayout
     }
 
-    private func makeBoundaryItem(
+    private func makeLayout() -> KsCompositionalLayout {
+        let layout = KsCompositionalLayout(
+            sectionProvider: { [weak self] sectionIndex, environment in
+                self?.makeSection(at: sectionIndex, environment: environment)
+            },
+            configuration: makeLayoutConfiguration()
+        )
+        layout.groupHeaderPinning = { [weak self] in
+            self?.groupHeaderPinning()
+        }
+        return layout
+    }
+
+    // グループの見出しを固定する構成か。見出しの宣言があり、固定を外していないとき。
+    private var pinsGroupHeaders: Bool {
+        guard let grouping = configuration.grouping else { return false }
+        return grouping.header != nil && grouping.pinsHeaders
+    }
+
+    // 見出しを固定する構成のときに、レイアウトが見出しの属性を書き換える材料。
+    // 固定しないときは書き換えない (nil)。
+    private func groupHeaderPinning() -> KsGroupHeaderPinning? {
+        guard pinsGroupHeaders else { return nil }
+        return KsGroupHeaderPinning(
+            chunkTable: appliedChunkTable,
+            headerItemSpacing: configuration.layout.headerItemSpacing,
+            rowSpacing: configuration.layout.rowSpacing
+        )
+    }
+
+    // レイアウト全体の構成。ルートのヘッダー / フッターは塊ではなくレイアウト全体に 1 つずつ付け、
+    // 上下の内側余白をその外側 (ヘッダーの上・フッターの下) に置く (core/ADR-0006)。ヘッダー /
+    // フッターの前後には行間を入れない。ヘッダー / フッターが無くても余白があれば、余白の分だけの
+    // 空白を同じ位置に置く (グループの見出しの上に余白を置くため、塊の内側余白では代わりにならない)。
+    private func makeLayoutConfiguration() -> UICollectionViewCompositionalLayoutConfiguration {
+        let padding = configuration.contentPadding
+        var items: [NSCollectionLayoutBoundarySupplementaryItem] = []
+        if configuration.header != nil || padding.top > 0 {
+            items.append(
+                makeRootBoundaryItem(
+                    kind: KsSupplementaryKind.rootHeader,
+                    alignment: .top,
+                    height: configuration.header != nil
+                        ? .estimated(KsEstimatedHeight.defaultValue)
+                        : .absolute(padding.top)
+                )
+            )
+        }
+        if configuration.footer != nil || padding.bottom > 0 {
+            items.append(
+                makeRootBoundaryItem(
+                    kind: KsSupplementaryKind.rootFooter,
+                    alignment: .bottom,
+                    height: configuration.footer != nil
+                        ? .estimated(KsEstimatedHeight.defaultValue)
+                        : .absolute(padding.bottom)
+                )
+            )
+        }
+        let layoutConfiguration = UICollectionViewCompositionalLayoutConfiguration()
+        layoutConfiguration.boundarySupplementaryItems = items
+        return layoutConfiguration
+    }
+
+    private func makeSection(
+        at sectionIndex: Int,
+        environment: any NSCollectionLayoutEnvironment
+    ) -> NSCollectionLayoutSection {
+        // 配列はグループごとに内部の塊へ分かれて載る。塊の境界が見た目に出ないよう、内側余白・
+        // 行間・見出しを塊のグループの中での位置で切り替える (ios/ADR-0009、ios/ADR-0010)。
+        // 塊の表は snapshot を組んだ時点で決まる。まだ組んでいない間や表より後ろの塊を解いて
+        // いるときは、1 つのグループの末尾の塊として扱う。
+        let chunk = appliedChunkTable.chunk(at: sectionIndex) ?? KsChunkInfo(
+            groupIndex: 0,
+            chunkInGroup: sectionIndex,
+            chunkCountInGroup: sectionIndex + 1,
+            itemCount: 0,
+            isFirstGroup: true,
+            isLastGroup: true
+        )
+        let hasHeader = appliedChunkTable.chunk(at: sectionIndex) != nil
+            && groupHasHeader(groupIndex: chunk.groupIndex)
+        let layout = configuration.layout
+        let padding = configuration.contentPadding
+        let horizontalPadding = padding.leading + padding.trailing
+        let columnCount: Int
+
+        switch layout.kind {
+        case .list:
+            columnCount = 1
+        case let .grid(columns):
+            columnCount = KsLayoutMetrics.columnCount(
+                for: columns,
+                containerSize: environment.container.effectiveContentSize,
+                horizontalPadding: horizontalPadding,
+                columnSpacing: layout.columnSpacing
+            )
+        }
+        resolvedColumnCount = columnCount
+
+        let itemSize = NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1 / CGFloat(columnCount)),
+            heightDimension: .estimated(estimatedHeight.value)
+        )
+        let item = NSCollectionLayoutItem(layoutSize: itemSize)
+        let groupSize = NSCollectionLayoutSize(
+            widthDimension: .fractionalWidth(1),
+            heightDimension: .estimated(estimatedHeight.value)
+        )
+        let group = NSCollectionLayoutGroup.horizontal(
+            layoutSize: groupSize,
+            repeatingSubitem: item,
+            count: columnCount
+        )
+        group.interItemSpacing = .fixed(layout.columnSpacing)
+
+        let section = NSCollectionLayoutSection(group: group)
+        section.interGroupSpacing = layout.rowSpacing
+        // 行間は行と行の間にだけ入れ、見出しの前後には入れない (core/ADR-0015)。
+        // - グループの先頭の塊の上端: 見出しがあれば見出しの下の間隔 (見出しはこの余白の外側に置かれる)
+        // - グループの 2 つめ以降の塊の上端: 行間 (セクションの間には行間が入らないため、境界の間隔を他の行間と同じにする)
+        // - グループの末尾の塊の下端: 次のグループがあればグループ間の間隔
+        // 上下の内側余白はルートのヘッダー / フッターの位置に置くため、塊には付けない。
+        // 間隔を行や見出しの側に置くのは、固定中の見出しと一緒に空白が上端へ貼り付かないため。
+        let top: CGFloat
+        if chunk.isFirstChunkInGroup {
+            top = hasHeader ? layout.headerItemSpacing : 0
+        } else {
+            top = layout.rowSpacing
+        }
+        let bottom: CGFloat = chunk.isLastChunkInGroup && !chunk.isLastGroup
+            ? layout.groupSpacing
+            : 0
+        section.contentInsets = NSDirectionalEdgeInsets(
+            top: top,
+            leading: padding.leading,
+            bottom: bottom,
+            trailing: padding.trailing
+        )
+
+        // 見出しはグループの先頭の塊に場所を取る形で付ける。塊に割れたグループを固定するときは、
+        // 2 つめ以降の塊にも同じ見出しを場所を取らない形で付け、グループ全体で 1 つの見出しとして
+        // 固定する (ios/ADR-0010)。固定しないときは先頭の塊にだけ付ける。
+        if hasHeader {
+            let pinsHeaders = configuration.grouping?.pinsHeaders ?? false
+            if chunk.isFirstChunkInGroup {
+                section.boundarySupplementaryItems = [
+                    makeGroupHeaderItem(extendsBoundary: true, pinned: pinsHeaders),
+                ]
+            } else if pinsHeaders {
+                section.boundarySupplementaryItems = [
+                    makeGroupHeaderItem(extendsBoundary: false, pinned: true),
+                ]
+            }
+        }
+        return section
+    }
+
+    private func makeRootBoundaryItem(
         kind: String,
-        alignment: NSRectAlignment
+        alignment: NSRectAlignment,
+        height: NSCollectionLayoutDimension
     ) -> NSCollectionLayoutBoundarySupplementaryItem {
         NSCollectionLayoutBoundarySupplementaryItem(
             layoutSize: NSCollectionLayoutSize(
                 widthDimension: .fractionalWidth(1),
-                heightDimension: .estimated(KsEstimatedHeight.defaultValue)
+                heightDimension: height
             ),
             elementKind: kind,
             alignment: alignment
         )
     }
 
+    private func makeGroupHeaderItem(
+        extendsBoundary: Bool,
+        pinned: Bool
+    ) -> NSCollectionLayoutBoundarySupplementaryItem {
+        let item = NSCollectionLayoutBoundarySupplementaryItem(
+            layoutSize: NSCollectionLayoutSize(
+                widthDimension: .fractionalWidth(1),
+                heightDimension: .estimated(KsEstimatedHeight.defaultValue)
+            ),
+            elementKind: KsSupplementaryKind.groupHeader,
+            alignment: .top
+        )
+        item.extendsBoundary = extendsBoundary
+        item.pinToVisibleBounds = pinned
+        // 固定中の見出しが行の上に重なって描かれるよう、行より手前に置く。
+        item.zIndex = 2
+        return item
+    }
+
+    // 表示範囲。内容の原点 (contentOffset) から見た bounds をバー等の余白で狭めた矩形。
+    // 余白で潰れる構成では狭める前の bounds を使う。`configureCollectionView()` が
+    // `contentInsetAdjustmentBehavior = .never` を立てているためバー由来の値は入らず、
+    // ここで狭まるのは `contentInset` を自ら持つ構成だけである。一覧が上端の安全領域に重なって
+    // 置かれたときも、行は安全領域に被ったまま流れるため、表示範囲は安全領域の分を狭めない。
+    private var visibleRect: CGRect {
+        let bounds = collectionView.bounds
+        let insetBounds = bounds.inset(by: collectionView.adjustedContentInset)
+        return insetBounds.isEmpty ? bounds : insetBounds
+    }
+
+    // 固定中のグループの見出しを置く位置の、表示範囲の上端からの距離。一覧が上端の安全領域に
+    // 重なって置かれたときは、見出しを安全領域の境目 (バーのすぐ下) に固定するため、その重なりの分になる。
+    // 安全領域に重ならない置き方では 0。
+    private var pinnedGroupHeaderTopInset: CGFloat {
+        collectionView.safeAreaInsets.top
+    }
+
+    // 固定中のグループの見出しが表示範囲の上端から覆っている長さ。上端から、固定する位置にある
+    // 見出しの下端までで、上端の安全領域に重なる分を含む。固定中の見出しが無ければ 0。
+    // 透明にした塊の見出しは数えない。
+    private func pinnedGroupHeaderCoverage(in visibleRect: CGRect) -> CGFloat {
+        guard pinsGroupHeaders else { return 0 }
+        let attributes = collectionView.collectionViewLayout.layoutAttributesForElements(in: visibleRect) ?? []
+        let pinnedTop = visibleRect.minY + pinnedGroupHeaderTopInset
+        var coverage: CGFloat = 0
+        for header in attributes where header.representedElementKind == KsSupplementaryKind.groupHeader
+            && header.alpha > 0.01 {
+            let frame = header.frame
+            guard frame.minY <= pinnedTop + 0.5, frame.maxY > pinnedTop else { continue }
+            coverage = max(coverage, frame.maxY - visibleRect.minY)
+        }
+        return min(coverage, visibleRect.height)
+    }
+
+    // セクションの塊が属するグループの見出しを固定する場合の、その塊の項目の上に固定される見出しの高さ。
+    // 固定しないとき、グループに見出しが無いときは 0。固定するときは全塊に見出しが付き、上端がその塊に
+    // あるときはその塊の見出しを見せるため、その塊の見出しの書き換える前の属性から読む。見出しの高さは
+    // 表示されたときに中身から決まり、それまでは推定の値である。
+    private func pinnedGroupHeaderHeight(forSection section: Int) -> CGFloat {
+        guard
+            pinsGroupHeaders,
+            let chunk = appliedChunkTable.chunk(at: section),
+            groupHasHeader(groupIndex: chunk.groupIndex),
+            let header = compositionalLayout?.unadjustedGroupHeaderAttributes(section: section)
+        else {
+            return 0
+        }
+        return header.frame.height
+    }
+
     // 表示範囲と実際に重なっている項目のうち、全体の順番が最も先頭のものを返す。
     // 可視セルの一覧には、遠くへ送った直後に送る前のセルがまだ残っていることがあるため、
     // 一覧の先頭をそのまま採ると画面外の項目をアンカーにしてしまい、復元で先頭へ飛ぶ。
+    // 固定中のグループの見出しが上端を覆っている範囲は表示範囲から除く。見出しの裏に隠れた項目を
+    // 先頭として控えると、戻したときにも見出しの裏へ戻してしまう。
     private func leadingVisibleID() -> AnyHashable? {
-        let bounds = collectionView.bounds
-        // 表示範囲は、内容の原点 (contentOffset) から見た bounds をバー等の余白で狭めた矩形。
-        // 余白で潰れる構成では狭める前の bounds を使う。`configureCollectionView()` が
-        // `contentInsetAdjustmentBehavior = .never` を立てているためバー由来の値は入らず、
-        // ここで狭まるのは `contentInset` を自ら持つ構成だけである。
-        let insetBounds = bounds.inset(by: collectionView.adjustedContentInset)
-        let visibleRect = insetBounds.isEmpty ? bounds : insetBounds
+        var visibleRect = visibleRect
+        let coverage = pinnedGroupHeaderCoverage(in: visibleRect)
+        if coverage > 0, coverage < visibleRect.height {
+            visibleRect.origin.y += coverage
+            visibleRect.size.height -= coverage
+        }
         let indexPath = collectionView.indexPathsForVisibleItems.filter { indexPath in
             guard let attributes = collectionView.collectionViewLayout
                 .layoutAttributesForItem(at: indexPath) else {
@@ -832,6 +1193,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     // 表示範囲の先頭にある要素と、その要素の表示範囲上端からのオフセットを控える。
+    // 固定中のグループの見出しが上端を覆っているときは、オフセットを見出しの下端から測る。
     // 復元は新しい items の適用とレイアウトの確定が済んでから行う。
     // 旧順序は、アンカー自身が同時に削除されたときの近傍解決に使う。
     private func captureAnchor() {
@@ -842,9 +1204,11 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         else {
             return
         }
+        let coverage = pinnedGroupHeaderCoverage(in: visibleRect)
         pendingAnchor = (
             identifier,
-            attributes.frame.minY - collectionView.bounds.minY,
+            attributes.frame.minY - collectionView.bounds.minY - coverage,
+            coverage > 0,
             appliedIdentifiers.map(\.value)
         )
         anchorGeneration &+= 1
@@ -912,10 +1276,18 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         // 表示範囲の上端へ吸着させず、変更前と同じオフセットへ戻す。
         // 値を連続して変えても表示が跳ねないようにするため。
-        let offsetFromTop = clampedAnchorOffsetFromTop(
+        var offsetFromTop = clampedAnchorOffsetFromTop(
             anchor.offsetFromTop,
             anchorHeight: attributes.frame.height
         )
+        // 控えたときに固定中の見出しが上端を覆っていたなら、戻した位置でもそのグループの見出しが
+        // 上端に固定される。項目をその見出しのすぐ下へ置き、見出しの裏に隠さない。
+        if anchor.belowPinnedHeader {
+            let headerHeight = pinnedGroupHeaderHeight(forSection: indexPath.section)
+            if headerHeight > 0 {
+                offsetFromTop = max(0, offsetFromTop) + pinnedGroupHeaderTopInset + headerHeight
+            }
+        }
         collectionView.setContentOffset(
             CGPoint(
                 x: collectionView.contentOffset.x,
@@ -1003,11 +1375,16 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 return
             }
             lastScrollTargetIdentifier = identifier
-            collectionView.scrollToItem(
-                at: indexPath,
-                at: position.collectionViewPosition,
-                animated: animated
-            )
+            // 項目のグループの見出しが上端に固定される場合、先頭へ送る命令は項目を見出しのすぐ下に置く。
+            if position == .start, pinnedGroupHeaderHeight(forSection: indexPath.section) > 0 {
+                scrollBelowPinnedGroupHeader(to: indexPath, animated: animated)
+            } else {
+                collectionView.scrollToItem(
+                    at: indexPath,
+                    at: position.collectionViewPosition,
+                    animated: animated
+                )
+            }
         case let .start(animated):
             // 先頭へのスクロールは対象要素の解決を必要としないため、項目が空でも header の先頭へ戻す。
             lastScrollTargetIdentifier = nil
@@ -1023,6 +1400,32 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             }
             lastScrollTargetIdentifier = identifier.value
             collectionView.scrollToItem(at: indexPath, at: .bottom, animated: animated)
+        }
+    }
+
+    // 項目を、そのグループの固定中の見出しのすぐ下へ送る。行と見出しの高さは表示されたときに推定から
+    // 実測へ変わるため、アニメーションしないときは送った先でレイアウトを確定させて数回送り直す。
+    private func scrollBelowPinnedGroupHeader(to indexPath: IndexPath, animated: Bool) {
+        func targetOffset() -> CGFloat? {
+            guard let attributes = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath) else {
+                return nil
+            }
+            let headerHeight = pinnedGroupHeaderHeight(forSection: indexPath.section)
+            return clampedVerticalOffset(
+                attributes.frame.minY - headerHeight - pinnedGroupHeaderTopInset
+                    - collectionView.adjustedContentInset.top
+            )
+        }
+        collectionView.layoutIfNeeded()
+        guard let first = targetOffset() else { return }
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: first), animated: animated)
+        guard !animated else { return }
+        for _ in 0..<3 {
+            collectionView.layoutIfNeeded()
+            guard let next = targetOffset() else { return }
+            if abs(next - collectionView.contentOffset.y) >= 0.5 {
+                collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: next), animated: false)
+            }
         }
     }
 

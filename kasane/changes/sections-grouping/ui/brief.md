@@ -47,3 +47,18 @@ concepts/ に UI トークンは未登録。Sample は `SampleTheme` (iOS `Sampl
 - 見出しの帯: 画面の背景と同じ色、グループ名 (テキスト主・太字) と件数 (テキスト副) を左右に。固定中の見出しもこの帯のまま
 
 トークンは SampleTheme と同値 (accent #2F6FED / bg #F2F2F7 / cell #FFFFFF / text #111214 / text2 #6E7076 / separator #D9D9DE)。見出しの高さ・グループ間の間隔 (mock では 16)・見出しの下の間隔 (mock では行の間と同じ 1) は画面固有の定義に置く。
+
+## 照合結果
+
+- iOS: verification/ の `ios-grouping.png` / `ios-diff-update-list.png` / `ios-diff-update-grid.png` と approved.png を照合し 2026-09-25 最終承認。合意済み妥協は 3 件 (下記)
+- Android: verification/ の `android-grouping.png` / `android-diff-update-list.png` / `android-diff-update-grid.png` と approved.png・iOS の最終画像を照合し 2026-09-25 最終承認。合意済み妥協は iOS と同じ 3 件。ほかの差異は許容する差異 (OS 標準の chrome、Material のボタンの最小タッチ領域 48dp によるボタン行の間隔)
+
+## 合意済み妥協
+
+- グリッドのセル (「グループ化」「差分更新」): mock ではセルが行の高さいっぱいに白い、実装は同じ行の低い方のセルの下に画面の背景色がのぞく。理由: ライブラリがセルの中身を中身の高さで上に揃えるためで、既存の「大量件数」と同じ見え方。Sample 側では埋められない (2026-09-25 オーナー承認)
+- 固定中の見出しの帯 (「グループ化」): mock では固定中の帯の下にだけ線がある、実装は線なし。理由: 見出しの View からは固定中かどうかが分からず、「固定中の見出しもこの帯のまま」に沿う (2026-09-25 オーナー承認)
+- 更新した項目の印 (「差分更新」): 本文の「★ 更新済み」は案 A の mock の文言で、承認した案 B の mock は「Item n ★」。見た目の正である承認 mock に従い「Item n ★」とする (両プラットフォーム)
+
+## トークン候補
+
+- なし (この 2 画面だけの値は画面固有の定義 `GroupHeaderMetrics` に置いた: 見出しの帯の高さ 40・グループの間隔 16・グリッドの間隔 1)

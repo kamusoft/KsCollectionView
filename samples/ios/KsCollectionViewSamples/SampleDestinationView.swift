@@ -26,6 +26,10 @@ struct SampleDestinationView: View {
                 LargeDataDemoView()
             case .imageGrid:
                 ImageGridDemoView()
+            case .grouping:
+                GroupingDemoView()
+            case .diffUpdate:
+                DiffUpdateDemoView()
             }
         }
         .navigationTitle(screen.rawValue)

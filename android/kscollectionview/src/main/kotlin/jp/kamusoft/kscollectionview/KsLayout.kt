@@ -13,33 +13,64 @@ public sealed interface KsLayout {
     /**
      * 1 列のリストです。
      *
-     * 行間を空けない既定のリストは `KsLayout.List` と括弧なしでも宣言できます。
+     * 行間を空けない既定のリストは `KsLayout.List` と括弧なしでも宣言できます。間隔はいずれも
+     * 0 以上で指定します。負の値は誤りで、デバッグビルドでは停止して知らせ、リリースビルドでは
+     * 警告を記録して 0 として表示します。
      *
-     * @param rowSpacing 行と行の間隔
+     * @param rowSpacing 行と行の間隔。グループの見出しの前後とヘッダー / フッターの前後には入らない
+     * @param groupSpacing グループとグループの間の間隔。前のグループの最終行と次のグループの見出しの
+     *   間に入り、コンテンツ全体の先頭と末尾には入らない。グループを宣言しない場合は使われない
+     * @param headerItemSpacing グループの見出しと、そのグループの先頭行の間の間隔。見出しを宣言しない
+     *   場合は使われない
      */
-    public open class List(public val rowSpacing: Dp = 0.dp) : KsLayout {
-        /** 行間を空けないリストです。`KsLayout.List` と書いたときの値になります。 */
-        public companion object : List(0.dp)
+    public open class List(
+        public val rowSpacing: Dp = 0.dp,
+        public val groupSpacing: Dp = 0.dp,
+        public val headerItemSpacing: Dp = 0.dp,
+    ) : KsLayout {
+        /** 間隔を空けないリストです。`KsLayout.List` と書いたときの値になります。 */
+        public companion object : List()
 
         override fun equals(other: Any?): Boolean =
-            this === other || (other is List && rowSpacing == other.rowSpacing)
+            this === other || (
+                other is List &&
+                    rowSpacing == other.rowSpacing &&
+                    groupSpacing == other.groupSpacing &&
+                    headerItemSpacing == other.headerItemSpacing
+                )
 
-        override fun hashCode(): Int = rowSpacing.hashCode()
+        override fun hashCode(): Int {
+            var result = rowSpacing.hashCode()
+            result = 31 * result + groupSpacing.hashCode()
+            result = 31 * result + headerItemSpacing.hashCode()
+            return result
+        }
 
-        override fun toString(): String = "KsLayout.List(rowSpacing=$rowSpacing)"
+        override fun toString(): String =
+            "KsLayout.List(rowSpacing=$rowSpacing, groupSpacing=$groupSpacing, " +
+                "headerItemSpacing=$headerItemSpacing)"
     }
 
     /**
      * 多列のグリッドです。
      *
+     * 間隔はいずれも 0 以上で指定します。負の値は誤りで、デバッグビルドでは停止して知らせ、
+     * リリースビルドでは警告を記録して 0 として表示します。
+     *
      * @param columns 列数の決め方
-     * @param rowSpacing 行と行の間隔
+     * @param rowSpacing 行と行の間隔。グループの見出しの前後とヘッダー / フッターの前後には入らない
      * @param columnSpacing 列と列の間隔
+     * @param groupSpacing グループとグループの間の間隔。前のグループの最終行と次のグループの見出しの
+     *   間に入り、コンテンツ全体の先頭と末尾には入らない。グループを宣言しない場合は使われない
+     * @param headerItemSpacing グループの見出しと、そのグループの先頭行の間の間隔。見出しを宣言しない
+     *   場合は使われない
      */
     public data class Grid(
         val columns: KsColumns,
         val rowSpacing: Dp = 0.dp,
         val columnSpacing: Dp = 0.dp,
+        val groupSpacing: Dp = 0.dp,
+        val headerItemSpacing: Dp = 0.dp,
     ) : KsLayout
 }
 
@@ -87,6 +118,20 @@ internal val KsLayout.effectiveColumnSpacing: Dp
         is KsLayout.Grid -> columnSpacing.coerceAtLeast(0.dp)
     }
 
+/** グループ間の間隔として実際に使う値。負の指定は 0 として扱う。 */
+internal val KsLayout.effectiveGroupSpacing: Dp
+    get() = when (this) {
+        is KsLayout.List -> groupSpacing
+        is KsLayout.Grid -> groupSpacing
+    }.coerceAtLeast(0.dp)
+
+/** 見出しと先頭行の間の間隔として実際に使う値。負の指定は 0 として扱う。 */
+internal val KsLayout.effectiveHeaderItemSpacing: Dp
+    get() = when (this) {
+        is KsLayout.List -> headerItemSpacing
+        is KsLayout.Grid -> headerItemSpacing
+    }.coerceAtLeast(0.dp)
+
 /** list レイアウトかどうか (区切り線を描く条件)。 */
 internal val KsLayout.isList: Boolean
     get() = this is KsLayout.List
@@ -108,6 +153,16 @@ internal fun KsLayout.invalidValueMessages(): kotlin.collections.List<String> = 
         is KsLayout.Grid -> rowSpacing
     }
     if (rowSpacing < 0.dp) add("rowSpacing は 0 以上で指定してください: $rowSpacing")
+    val (groupSpacing, headerItemSpacing) = when (this@invalidValueMessages) {
+        is KsLayout.List -> groupSpacing to headerItemSpacing
+        is KsLayout.Grid -> groupSpacing to headerItemSpacing
+    }
+    if (groupSpacing < 0.dp) {
+        add("groupSpacing は 0 以上で指定してください: $groupSpacing。0 として表示を継続します")
+    }
+    if (headerItemSpacing < 0.dp) {
+        add("headerItemSpacing は 0 以上で指定してください: $headerItemSpacing。0 として表示を継続します")
+    }
 
     if (this@invalidValueMessages is KsLayout.Grid) {
         if (columnSpacing < 0.dp) add("columnSpacing は 0 以上で指定してください: $columnSpacing")

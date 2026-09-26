@@ -5,14 +5,18 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -54,6 +58,12 @@ object MeasurementRoutes {
 
     /** 素の LazyColumn で描く 1 列の比較対象。 */
     fun baselineLargeList(count: Int): String = "${Prefix}baseline-list/$count"
+
+    /** ライブラリで描く「グループ化」の土俵。 */
+    fun ksGrouping(): String = "${Prefix}grouping"
+
+    /** 素の LazyVerticalGrid で描く「グループ化」の比較対象。 */
+    fun baselineGrouping(): String = "${Prefix}baseline-grouping"
 
     /** メモリの定常判定のための自動往復。 */
     fun memoryRoundTrip(count: Int, maxRoundTrips: Int): String =
@@ -173,6 +183,24 @@ fun NavGraphBuilder.measurementDestinations(
             BaselineLargeDataList(
                 items = items,
                 modifier = Modifier.markMeasurementScreen(route),
+            )
+        }
+    }
+
+    composable(route = MeasurementRoutes.ksGrouping()) {
+        SampleScaffold(title = "計測: ライブラリ グループ化", onBack = onBack) {
+            GroupingCollection(
+                items = GroupingDemoData.items,
+                modifier = Modifier.markMeasurementScreen(MeasurementRoutes.ksGrouping()),
+            )
+        }
+    }
+
+    composable(route = MeasurementRoutes.baselineGrouping()) {
+        SampleScaffold(title = "計測: 比較対象 グループ化", onBack = onBack) {
+            BaselineGroupingGrid(
+                items = GroupingDemoData.items,
+                modifier = Modifier.markMeasurementScreen(MeasurementRoutes.baselineGrouping()),
             )
         }
     }
@@ -474,22 +502,37 @@ private fun Bundle?.readPrefetchChoice(): ImagePrefetchChoice {
  * 「大量件数」の土俵を、ライブラリを通さず素の LazyVerticalGrid で描く。
  *
  * ライブラリの上乗せ分が小さいことを、同じ土俵の測定値の差として確かめるための比較対象。
- * 件数・列数・行間 / 列間・行の見た目はライブラリ側と同一にする。
+ * 件数・列数・行間 / 列間・行の見た目はライブラリ側と同一にし、ライブラリの既定機能 (高さ変化の
+ * アニメーション・配置のアニメーション・縦スクロールインジケータ) を同じ位置に付ける。
  *
  * @param items 表示する要素
  */
 @Composable
 fun BaselineLargeDataGrid(items: List<DemoItem>, modifier: Modifier = Modifier) {
+    val state = rememberLazyGridState()
+    val indicator = rememberBaselineScrollIndicatorVisibility(state, state.interactionSource)
+    val columns = 2
     LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = modifier.fillMaxSize().background(SampleTheme.background),
+        columns = GridCells.Fixed(columns),
+        state = state,
+        modifier = modifier
+            .fillMaxSize()
+            .background(SampleTheme.background)
+            .baselineGroupedScrollIndicator(
+                state = state,
+                visibility = indicator,
+                totalRows = (items.size + columns - 1) / columns,
+                rowOfLazy = { it / columns },
+                isHeader = { false },
+            ),
         verticalArrangement = Arrangement.spacedBy(1.dp),
         horizontalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         items(items = items, key = { it.id }) { item ->
-            // ライブラリは項目の content を包む Box で高さの変化をアニメーションする。
-            // 比較対象にも同じ修飾を同じ位置に置き、既定機能の有無で条件がずれないようにする。
-            Box(Modifier.fillMaxWidth().animateContentSize()) {
+            // ライブラリは項目の入れ物のいちばん外側で配置の変化を、その内側で高さの変化を
+            // アニメーションする。比較対象にも同じ修飾を同じ順に置き、既定機能の有無で条件が
+            // ずれないようにする。
+            Box(Modifier.animateItem().fillMaxWidth().animateContentSize()) {
                 DemoListRow(item)
             }
         }
@@ -506,14 +549,122 @@ fun BaselineLargeDataGrid(items: List<DemoItem>, modifier: Modifier = Modifier) 
  */
 @Composable
 fun BaselineLargeDataList(items: List<DemoItem>, modifier: Modifier = Modifier) {
+    val state = rememberLazyListState()
+    val indicator = rememberBaselineScrollIndicatorVisibility(state, state.interactionSource)
     LazyColumn(
-        modifier = modifier.fillMaxSize().background(SampleTheme.background),
+        state = state,
+        modifier = modifier
+            .fillMaxSize()
+            .background(SampleTheme.background)
+            .baselineScrollIndicator(state, indicator),
         verticalArrangement = Arrangement.spacedBy(1.dp),
     ) {
         items(items = items, key = { it.id }) { item ->
             // 多列の比較対象と同じく、ライブラリの既定機能に条件をそろえる。
-            Box(Modifier.fillMaxWidth().animateContentSize()) {
+            Box(Modifier.animateItem().fillMaxWidth().animateContentSize()) {
                 DemoListRow(item)
+            }
+        }
+    }
+}
+
+/** 比較対象の見出しの再利用種別。 */
+private object BaselineHeaderContentType
+
+/** 比較対象の項目の再利用種別。 */
+private object BaselineItemContentType
+
+/**
+ * 「グループ化」の土俵を、ライブラリを通さず素の LazyVerticalGrid で描く。
+ *
+ * 件数・グループ分け・列数 (縦長 2 列 / 横長 4 列)・間隔・行と見出しの見た目・固定される見出しは
+ * ライブラリ側 ([GroupingCollection]) と同一にし、ライブラリの既定機能 (高さ変化のアニメーション・
+ * 配置のアニメーション・縦スクロールインジケータ) を同じ位置に付ける。行間・見出しの下の間隔・
+ * グループ間の間隔は、ライブラリと同じく項目の上下の余白として置く。
+ *
+ * @param items 表示する要素 (同じグループの項目が続いて並ぶ配列)
+ */
+@Composable
+fun BaselineGroupingGrid(items: List<GroupingDemoItem>, modifier: Modifier = Modifier) {
+    // 同じグループが続く範囲。並べ方と行の数え方の両方に使う。
+    val runs = remember(items) {
+        buildList {
+            var start = 0
+            for (index in 1..items.size) {
+                if (index == items.size || items[index].group != items[start].group) {
+                    add(start until index)
+                    start = index
+                }
+            }
+        }
+    }
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val columns = if (maxHeight > maxWidth) 2 else 4
+        val state = rememberLazyGridState()
+        val indicator = rememberBaselineScrollIndicatorVisibility(state, state.interactionSource)
+        // 見出しを 1 行と数えたときの、lazy の index から行の番号への対応。
+        val rowOfLazy = remember(runs, columns) {
+            val rows = IntArray(items.size + runs.size)
+            var lazy = 0
+            var row = 0
+            for (run in runs) {
+                rows[lazy++] = row++
+                for (position in 0 until run.count()) {
+                    rows[lazy++] = row + position / columns
+                }
+                row += (run.count() + columns - 1) / columns
+            }
+            rows to row
+        }
+        val spacing = GroupHeaderMetrics.gridSpacing
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(columns),
+            state = state,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(SampleTheme.background)
+                .baselineGroupedScrollIndicator(
+                    state = state,
+                    visibility = indicator,
+                    totalRows = rowOfLazy.second,
+                    rowOfLazy = { rowOfLazy.first.getOrElse(it) { 0 } },
+                    isHeader = { it === BaselineHeaderContentType },
+                ),
+            horizontalArrangement = Arrangement.spacedBy(spacing),
+        ) {
+            runs.forEachIndexed { runIndex, run ->
+                val group = items[run.first].group
+                val count = run.count()
+                stickyHeader(key = "header-$group", contentType = BaselineHeaderContentType) {
+                    Box(Modifier.animateItem().fillMaxWidth().animateContentSize()) {
+                        GroupHeaderBand(name = GroupingFixture.groupName(group), itemCount = count)
+                    }
+                }
+                val lastRow = (count - 1) / columns
+                val isLastGroup = runIndex == runs.lastIndex
+                items(
+                    count = count,
+                    key = { local -> items[run.first + local].id },
+                    contentType = { BaselineItemContentType },
+                ) { local ->
+                    val row = local / columns
+                    Box(
+                        Modifier
+                            .animateItem()
+                            .fillMaxWidth()
+                            .padding(
+                                top = spacing,
+                                bottom = if (row == lastRow && !isLastGroup) {
+                                    GroupHeaderMetrics.groupSpacing
+                                } else {
+                                    0.dp
+                                },
+                            )
+                            .animateContentSize(),
+                    ) {
+                        DemoListRow(items[run.first + local].row)
+                    }
+                }
             }
         }
     }

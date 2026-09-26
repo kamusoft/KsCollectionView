@@ -98,6 +98,9 @@ struct PerformanceVerificationView: View {
             // 件数・列数・間隔・外周の余白・セルはデモ画面と同じ宣言元 (ImageGridFixture) から
             // 取り、プリフェッチの形だけを外から選ぶ。
             ImageGridFixture.collection(prefetch: prefetch)
+        case .grouping:
+            // 配置・セル・見出しはデモ画面と同じ宣言元 (GroupingFixture) から取る。
+            GroupingFixture.collection(items: GroupingDemoData.items)
         }
     }
 

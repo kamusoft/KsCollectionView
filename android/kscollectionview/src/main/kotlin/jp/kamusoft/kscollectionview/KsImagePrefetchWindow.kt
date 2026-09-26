@@ -402,14 +402,14 @@ internal class KsImagePrefetchWindow(
  * 先読み窓を可視範囲へ追従させる副作用。プリフェッチの宣言があるときだけ組み立てる
  * (宣言が無いコレクションでは可視範囲の観測自体を起こさない)。
  *
- * @param leadingItemCount ヘッダーなど、アイテムより前に並ぶ lazy 側の項目数
+ * @param plan 配列のグループの構成。lazy の index からアイテム配列上の添字を引くのに使う
  */
 @Composable
 internal fun <Item> KsPrefetchWindowEffect(
     gridState: LazyGridState,
     items: List<Item>,
     key: (Item) -> Any,
-    leadingItemCount: Int,
+    plan: KsGroupPlan,
     resources: (Item) -> List<KsResource>,
     destination: KsPrefetchDestination,
     metrics: KsPrefetchMetrics,
@@ -435,10 +435,10 @@ internal fun <Item> KsPrefetchWindowEffect(
         onDispose { window.disposeAll() }
     }
 
-    LaunchedEffect(window, gridState, items, leadingItemCount) {
+    LaunchedEffect(window, gridState, items, plan) {
         // 可視範囲の添字だけを取り出して観測する。スクロール中は毎フレーム評価されるため、
         // 位置の細かな変化では流さず、可視範囲が動いたときだけ窓を作り直す。
-        snapshotFlow { gridState.layoutInfo.visibleItemRange(leadingItemCount, items.size) }
+        snapshotFlow { gridState.layoutInfo.visibleItemRange(plan::itemIndexOfLazy) }
             .collect { visible ->
                 window.update(
                     visible = visible,
@@ -453,14 +453,17 @@ internal fun <Item> KsPrefetchWindowEffect(
 }
 
 /**
- * 可視の lazy 項目からアイテム配列上の添字の範囲を作る。ヘッダー・フッターは範囲に含めない。
+ * 可視の lazy 項目からアイテム配列上の添字の範囲を作る。ヘッダー・フッター・グループの見出しは
+ * 範囲に含めない。
+ *
+ * @param itemIndexOfLazy lazy の index からアイテム配列上の添字を引く。アイテムでなければ負の値
  */
-internal fun LazyGridLayoutInfo.visibleItemRange(leadingItemCount: Int, itemCount: Int): IntRange {
+internal fun LazyGridLayoutInfo.visibleItemRange(itemIndexOfLazy: (Int) -> Int): IntRange {
     var first = Int.MAX_VALUE
     var last = Int.MIN_VALUE
     for (info in visibleItemsInfo) {
-        val index = info.index - leadingItemCount
-        if (index < 0 || index >= itemCount) continue
+        val index = itemIndexOfLazy(info.index)
+        if (index < 0) continue
         if (index < first) first = index
         if (index > last) last = index
     }

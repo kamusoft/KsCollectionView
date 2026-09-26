@@ -70,15 +70,37 @@ internal class KsScrollCommandReceiver(context: Context) {
 internal val KsScrollAlignmentTolerance: Dp = 4.dp
 
 /**
+ * 項目 1 件の lazy 上の置き場所。スクロール命令の解決と、列数の変化での位置の保持に使う。
+ *
+ * @param lazyIndex 項目の lazy の index
+ * @param leadingInsetPx 項目の上側に置いた間隔 (行間・見出しの下の間隔)。content はこの下から始まる
+ * @param trailingInsetPx 項目の下側に置いた間隔 (グループ間の間隔)
+ * @param pinnedHeaderKey 項目のグループの見出しが上端に固定される場合の、その見出しのキー
+ */
+internal class KsItemPlacement(
+    val lazyIndex: Int,
+    val leadingInsetPx: Int = 0,
+    val trailingInsetPx: Int = 0,
+    val pinnedHeaderKey: Any? = null,
+)
+
+/**
  * 命令の解決結果。lazy 側の index と、その index に対して要求された配置。
  *
  * @param contentType 対象の再利用種別。対象が可視でないときの高さの推定に使う
+ * @param leadingInsetPx 対象の上側の間隔。配置は間隔を除いた content の範囲で合わせる
+ * @param trailingInsetPx 対象の下側の間隔
+ * @param pinnedHeaderKey 対象のグループの見出しが上端に固定される場合の見出しのキー。先頭へ送る
+ *   命令は対象をこの見出しのすぐ下に置く
  */
 internal class KsScrollTarget(
     val index: Int,
     val position: KsScrollPosition,
     val animated: Boolean,
     val contentType: Any?,
+    val leadingInsetPx: Int = 0,
+    val trailingInsetPx: Int = 0,
+    val pinnedHeaderKey: Any? = null,
 )
 
 /**
@@ -88,13 +110,13 @@ internal class KsScrollTarget(
  * null を返し、呼び出し元は何もせず次の命令へ進む。
  *
  * @param indexOfId 安定 ID を表示中の配列での位置に変換する。見つからなければ負の値を返す
- * @param leadingItemCount 要素より前に置かれた lazy 項目の数 (ヘッダーがあれば 1)
- * @param totalLazyItemCount ヘッダー・フッターを含む lazy 項目の総数
+ * @param placementOfItem 配列での位置から lazy 上の置き場所を求める (ヘッダー・見出しの分のずれ込み)
+ * @param totalLazyItemCount ヘッダー・見出し・フッターを含む lazy 項目の総数
  */
 internal fun resolveScrollTarget(
     command: KsScrollCommand,
     indexOfId: (Any) -> Int,
-    leadingItemCount: Int,
+    placementOfItem: (Int) -> KsItemPlacement,
     totalLazyItemCount: Int,
     contentTypeAt: (Int) -> Any?,
     context: Context,
@@ -125,12 +147,15 @@ internal fun resolveScrollTarget(
                 }
                 null
             } else {
-                val lazyIndex = leadingItemCount + itemIndex
+                val placement = placementOfItem(itemIndex)
                 KsScrollTarget(
-                    index = lazyIndex,
+                    index = placement.lazyIndex,
                     position = command.position,
                     animated = command.animated,
-                    contentType = contentTypeAt(lazyIndex),
+                    contentType = contentTypeAt(placement.lazyIndex),
+                    leadingInsetPx = placement.leadingInsetPx,
+                    trailingInsetPx = placement.trailingInsetPx,
+                    pinnedHeaderKey = placement.pinnedHeaderKey,
                 )
             }
         }
@@ -152,9 +177,10 @@ internal fun resolveScrollTarget(
  * 範囲の端で止まるか、対象の先頭が表示範囲の先頭に合う位置で止まる。
  *
  * @param tolerancePx 位置合わせが済んだとみなす残差の大きさ
+ * @param safeTopPx 表示範囲の上端から、固定中の見出しを止める安全領域の境目までの長さ
  */
-internal suspend fun LazyGridState.performScroll(target: KsScrollTarget, tolerancePx: Int) {
-    val scrollOffset = initialScrollOffset(target)
+internal suspend fun LazyGridState.performScroll(target: KsScrollTarget, tolerancePx: Int, safeTopPx: () -> Int = { 0 }) {
+    val scrollOffset = initialScrollOffset(target, safeTopPx())
     // 進行方向はスクロールを始める前に決める。到着後の補正はこの向きにだけ掛ける。
     val isForward = isForwardScroll(target.index, scrollOffset)
 
@@ -163,9 +189,11 @@ internal suspend fun LazyGridState.performScroll(target: KsScrollTarget, toleran
     } else {
         scrollToItem(target.index, scrollOffset)
     }
-    if (target.position == KsScrollPosition.Start) return
+    // 先頭合わせは、固定される見出しの下へ置く場合だけ到着後の位置を確かめる (見出しの高さは
+    // 見出しが表示されるまで推定の値のため)。それ以外は index 指定のスクロールで位置が決まる。
+    if (target.position == KsScrollPosition.Start && target.pinnedHeaderKey == null) return
 
-    val residual = alignmentDelta(target.index, target.position) ?: return
+    val residual = alignmentDelta(target, safeTopPx()) ?: return
     if (residual == 0) return
     if (!target.animated) {
         // アニメーションしない命令に「戻り」は見えないため、残差はそのまま詰めて位置を合わせる。
@@ -180,23 +208,40 @@ internal suspend fun LazyGridState.performScroll(target: KsScrollTarget, toleran
 /**
  * 要求された配置にするために index 指定のスクロールへ渡すオフセットを求める。
  *
- * 戻り値は負またはゼロで、対象の先頭を表示範囲の先頭からどれだけ内側へ置くかを表す
- * (index 指定のスクロールは、オフセット 0 で対象の先頭を contentPadding の内側の先頭に合わせる)。
- * 対象が表示範囲より大きい場合は 0 とし、対象の先頭を表示範囲の先頭に合わせる。
+ * index 指定のスクロールは、オフセット 0 で対象の lazy 項目の先頭を contentPadding の内側の先頭に
+ * 合わせ、正のオフセットほど対象を上へ送る。配置は対象の上下の間隔を除いた content の範囲で合わせる
+ * ため、上側の間隔の分だけ上へ送る。対象の content が表示範囲より大きい場合は content の先頭を
+ * 表示範囲の先頭に合わせる。先頭合わせで対象のグループの見出しが上端に固定される場合は、content を
+ * 見出しの下端に置く (見出しの高さは表示中の見出しから見積もる)。安全領域に重なって置かれたときは、
+ * 見出しは安全領域の境目で止まるため、その分だけ下に置く。
  */
-private fun LazyGridState.initialScrollOffset(target: KsScrollTarget): Int {
-    if (target.position == KsScrollPosition.Start) return 0
+private fun LazyGridState.initialScrollOffset(target: KsScrollTarget, safeTopPx: Int): Int {
     val info = layoutInfo
+    if (target.position == KsScrollPosition.Start) {
+        val covered = target.pinnedHeaderKey?.let { estimateHeaderHeight(it) + safeTopPx } ?: 0
+        return target.leadingInsetPx - (covered - info.beforeContentPadding).coerceAtLeast(0)
+    }
     val innerSize = (info.viewportEndOffset - info.afterContentPadding) -
         (info.viewportStartOffset + info.beforeContentPadding)
-    if (innerSize <= 0) return 0
-    val itemSize = estimateItemHeight(target) ?: return 0
+    if (innerSize <= 0) return target.leadingInsetPx
+    val itemSize = estimateItemHeight(target) ?: return target.leadingInsetPx
+    val contentSize = (itemSize - target.leadingInsetPx - target.trailingInsetPx).coerceAtLeast(0)
     val leading = when (target.position) {
         KsScrollPosition.Start -> 0
-        KsScrollPosition.Center -> (innerSize - itemSize) / 2
-        KsScrollPosition.End -> innerSize - itemSize
+        KsScrollPosition.Center -> (innerSize - contentSize) / 2
+        KsScrollPosition.End -> innerSize - contentSize
     }
-    return -leading.coerceAtLeast(0)
+    return target.leadingInsetPx - leading.coerceAtLeast(0)
+}
+
+/**
+ * 固定される見出しの高さを見積もる。その見出しが表示中なら実測値を、無ければ表示中の別の見出しの
+ * 高さを使う。見出しが 1 つも表示されていなければ 0 (到着後に詰める)。
+ */
+private fun LazyGridState.estimateHeaderHeight(headerKey: Any): Int {
+    val visible = layoutInfo.visibleItemsInfo
+    visible.firstOrNull { it.key == headerKey }?.let { return it.size.height }
+    return visible.firstOrNull { it.contentType == KsGroupHeaderContentType }?.size?.height ?: 0
 }
 
 /**
@@ -235,19 +280,29 @@ internal fun LazyGridState.isForwardScroll(index: Int, scrollOffset: Int): Boole
 /**
  * 要求された配置にするために必要なスクロール量 (正で前方へ) を求める。
  *
- * 基準にする表示範囲は contentPadding の内側とする。対象が可視でなければ補正しない。
+ * 基準にする表示範囲は contentPadding の内側とし、対象は上下の間隔を除いた content の範囲で
+ * 合わせる。先頭合わせで対象のグループの見出しが上端を覆っているときは、見出しの下端を基準にする
+ * (安全領域に重なって置かれたときは、安全領域の境目で止めた見出しの下端)。
+ * 対象が可視でなければ補正しない。
  */
-private fun LazyGridState.alignmentDelta(index: Int, position: KsScrollPosition): Int? {
+private fun LazyGridState.alignmentDelta(target: KsScrollTarget, safeTopPx: Int): Int? {
     val info = layoutInfo
-    val item = info.visibleItemsInfo.firstOrNull { it.index == index } ?: return null
+    val item = info.visibleItemsInfo.firstOrNull { it.index == target.index } ?: return null
     val innerStart = info.viewportStartOffset + info.beforeContentPadding
     val innerEnd = info.viewportEndOffset - info.afterContentPadding
     val innerSize = innerEnd - innerStart
-    val itemStart = item.offset.y
-    val itemSize = item.size.height
-    return when (position) {
-        KsScrollPosition.Start -> 0
-        KsScrollPosition.Center -> (itemStart - innerStart) - (innerSize - itemSize) / 2
-        KsScrollPosition.End -> (itemStart + itemSize) - innerEnd
+    val contentStart = item.offset.y + target.leadingInsetPx
+    val contentSize = (item.size.height - target.leadingInsetPx - target.trailingInsetPx).coerceAtLeast(0)
+    return when (target.position) {
+        KsScrollPosition.Start -> {
+            val header = target.pinnedHeaderKey?.let { key ->
+                info.visibleItemsInfo.firstOrNull { it.key == key && it.offset.y < contentStart }
+            }
+            val coveredEnd = header?.let { info.ksPinnedHeaderOffset(it, safeTopPx) + it.size.height } ?: innerStart
+            contentStart - maxOf(innerStart, coveredEnd)
+        }
+
+        KsScrollPosition.Center -> (contentStart - innerStart) - (innerSize - contentSize) / 2
+        KsScrollPosition.End -> (contentStart + contentSize) - innerEnd
     }
 }

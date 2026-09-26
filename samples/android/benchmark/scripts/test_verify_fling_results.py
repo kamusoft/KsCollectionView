@@ -34,6 +34,9 @@ _SCROLL_CLASS = (
 _IMAGE_CLASS = (
     "jp.kamusoft.kscollectionview.samples.android.benchmark.ImageGridBenchmark"
 )
+_GROUPING_CLASS = (
+    "jp.kamusoft.kscollectionview.samples.android.benchmark.GroupingScrollBenchmark"
+)
 
 
 def make_context(model: str = "Pixel 4a", sdk: int = 33) -> dict[str, Any]:
@@ -477,6 +480,40 @@ class VerifyFlingResultsTest(unittest.TestCase):
         self.write_result(benchmarks)
         code, lines = verifier.run([self.root])
         self.assertEqual(verifier.EXIT_PASS, code, "\n".join(lines))
+
+    def grouping_pair(
+        self,
+        library_p99: float = 8.0,
+        baseline_p99: float = 8.0,
+    ) -> list[dict[str, Any]]:
+        """「グループ化」の両側の計測結果を作る。テスト名は大量件数と同じで、クラスで分かれる。"""
+        counts = [120, 118, 121]
+        return [
+            make_benchmark("ksCollectionView", 6.0, library_p99, counts, class_name=_GROUPING_CLASS),
+            make_benchmark(
+                "baselineLazyVerticalGrid", 6.0, baseline_p99, counts, class_name=_GROUPING_CLASS
+            ),
+        ]
+
+    def test_グループ化は大量件数と別の組として相対判定する(self) -> None:
+        # 大量件数は合格、グループ化は P99 が +12.5% で不合格。同じテスト名でも取り違えない。
+        self.write_result(self.scroll_pair() + self.grouping_pair(library_p99=9.0))
+        code, lines = verifier.run([self.root])
+        self.assertEqual(verifier.EXIT_FAIL, code, "\n".join(lines))
+        self.assertIn("[グループ化]", lines)
+        self.assertIn("[2 列グリッド]", lines)
+
+    def test_グループ化だけの結果でも判定できる(self) -> None:
+        self.write_result(self.grouping_pair())
+        code, lines = verifier.run([self.root])
+        self.assertEqual(verifier.EXIT_PASS, code, "\n".join(lines))
+        self.assertIn("[グループ化]", lines)
+
+    def test_グループ化の片側だけの結果は入力不正(self) -> None:
+        self.write_result(self.grouping_pair()[:1])
+        code, lines = verifier.run([self.root])
+        self.assertEqual(verifier.EXIT_INVALID_INPUT, code)
+        self.assertIn("グループ化 の片側", lines[0])
 
 
 if __name__ == "__main__":
