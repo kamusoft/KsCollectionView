@@ -26,6 +26,7 @@ struct HeightChangeVerificationView: View {
         VStack(spacing: SampleTheme.controlVerticalPadding) {
             Text("行の高さ変化検証")
                 .font(.headline)
+                .foregroundStyle(SampleTheme.text)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("heightChange.title")
 

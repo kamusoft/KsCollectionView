@@ -8,7 +8,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 
 /**
  * 択一の切り替え。iOS Sample の同じ操作を Material の見た目で出す。
@@ -33,7 +32,7 @@ fun SampleSegmentedControl(
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = SampleTheme.accent,
-                    activeContentColor = Color.White,
+                    activeContentColor = SampleTheme.onAccent,
                     activeBorderColor = SampleTheme.accent,
                     inactiveContainerColor = SampleTheme.cell,
                     inactiveContentColor = SampleTheme.accent,

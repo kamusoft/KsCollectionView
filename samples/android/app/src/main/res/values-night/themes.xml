@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- values/themes.xml と同じ名前の夜間の版。外観がダークのとき (「ダーク」を選んだとき、または
+         「システム」で端末がダークのとき)、ステータスバーや window の下地など OS が描く部分を
+         ダークにする。親だけをフレームワーク標準の暗いテーマに差し替え、色は宣言しない。 -->
+    <style name="Theme.KsCollectionViewSamples" parent="android:Theme.Material.NoActionBar" />
+</resources>

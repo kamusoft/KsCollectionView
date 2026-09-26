@@ -14,13 +14,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 /**
- * ルートメニュー。デモ画面と、それとは区分を分けた検証画面を並べる。
+ * ルートメニュー。先頭に外観の項目群を置き、その下にデモ画面と、それとは区分を分けた検証画面を並べる。
  *
+ * @param appearance 選択中として示す外観
+ * @param onSelectAppearance 外観の項目が選ばれたときの処理
  * @param onSelectDemo デモ画面が選ばれたときの処理
  * @param onSelectVerification 検証画面が選ばれたときの処理
  */
 @Composable
 fun RootMenuScreen(
+    appearance: SampleAppearance,
+    onSelectAppearance: (SampleAppearance) -> Unit,
     onSelectDemo: (SampleScreen) -> Unit,
     onSelectVerification: (VerificationScreen) -> Unit,
 ) {
@@ -29,7 +33,17 @@ fun RootMenuScreen(
             .fillMaxSize()
             .background(SampleTheme.background),
     ) {
-        // 先頭の行の上端にも区切り線を置き、最終行の下端まで同じ間隔で並ぶようにする。
+        item(key = "appearance-heading") { SampleMenuHeading(title = SampleAppearance.SectionTitle) }
+        // 各項目群の先頭の行の上端にも区切り線を置き、最終行の下端まで同じ間隔で並ぶようにする。
+        item(key = "appearance-leading-separator") { HorizontalDivider(color = SampleTheme.separator) }
+        items(items = SampleAppearance.entries, key = { "appearance-${it.name}" }) { entry ->
+            SampleAppearanceRow(
+                appearance = entry,
+                isSelected = entry == appearance,
+                onClick = { onSelectAppearance(entry) },
+            )
+        }
+        item(key = "gap") { SampleMenuGap() }
         item(key = "leading-separator") { HorizontalDivider(color = SampleTheme.separator) }
         items(items = SampleScreen.entries, key = { "demo-${it.name}" }) { screen ->
             MenuRow(title = screen.title, onClick = { onSelectDemo(screen) })

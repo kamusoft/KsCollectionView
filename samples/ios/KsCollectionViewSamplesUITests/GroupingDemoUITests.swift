@@ -12,6 +12,13 @@ final class GroupingDemoUITests: XCTestCase {
 
         let titles = ["画像グリッド", "グループ化", "差分更新"]
         let items = titles.map { app.buttons[$0] }
+        // メニューの先頭に「外観」の項目群があり、後ろの項目は最初の画面に収まらないことがある。
+        // 最後の項目が出るまで送る。
+        let menu = app.collectionViews.firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 30), "メニューが表示されていません")
+        for _ in 0..<3 where !(items[2].exists && items[2].isHittable) {
+            menu.swipeUp()
+        }
         for (title, item) in zip(titles, items) {
             XCTAssertTrue(item.waitForExistence(timeout: 30), "メニューに「\(title)」がありません")
         }

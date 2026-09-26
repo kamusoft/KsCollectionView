@@ -8,6 +8,7 @@ struct FixedGridDemoView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("レイアウト")
+                    .foregroundStyle(SampleTheme.text)
                 Spacer()
                 Picker("レイアウト", selection: $choice) {
                     ForEach(FixedGridLayoutChoice.allCases) { choice in

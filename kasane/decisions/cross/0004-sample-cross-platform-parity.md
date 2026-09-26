@@ -43,3 +43,4 @@ Sample を「プラットフォーム間パリティの検証装置」と位置�
 - 負: 検証は人の目に依存し、一致の判定を自動化する手段は本決定には含まれない。
 
 出典: ../KsSettingsView/kasane/decisions/cross/0016-sample-cross-platform-parity.md (Context / Decision / Alternatives) / kasane/changes/kasane-initial-assets/exploration.md (Sample の導入時期・却下案) / kasane/roadmaps/v1-foundation/roadmap.md (前提 / 制約: 収束ゲート)
+関連: cross/ADR-0007 (規約本文の「dark mode 追随より一致を優先」を、2 組の同値の配色と同じ切り替えによるライト / ダーク対応を許す文面に改めた決定)

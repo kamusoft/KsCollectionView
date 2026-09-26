@@ -1,21 +1,53 @@
 package jp.kamusoft.kscollectionview.samples.android
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
+ * 描かれる場所で使う配色の組。[SampleAppTheme] が外観に応じた組を与える。
+ *
+ * 与えられていない場所 (画面単体の Composable を直接描くテスト等) ではライトの組になる。
+ */
+val LocalSamplePalette = staticCompositionLocalOf { SamplePalette.Light }
+
+/**
  * Sample 共通の配色と寸法。
  *
- * 実値がプラットフォーム間でずれる OS の semantic color は使わず、iOS Sample の同名定義と
- * 同じ RGBA・同じ寸法をここに置く。
+ * 色は [SamplePalette] のライト / ダークの 2 組から、描かれる場所の外観 (ルートメニューで選んだ
+ * 外観を Activity の表示モードに上書きしたもの。「システム」なら端末の表示モード) に応じた組の
+ * 値を取る。寸法は外観に関わらず同じで、iOS Sample の同名定義と同じ値を置く。
  */
 object SampleTheme {
-    val accent = Color(0xFF2F6FED)
-    val background = Color(0xFFF2F2F7)
-    val cell = Color(0xFFFFFFFF)
-    val text = Color(0xFF111214)
-    val secondaryText = Color(0xFF6E7076)
-    val separator = Color(0xFFD9D9DE)
+    /** 選択の印・戻る・操作の文言など、強調に使う色。 */
+    val accent: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.accent
+
+    /** 画面の下地。 */
+    val background: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.background
+
+    /** 行・セル・操作の帯の面。 */
+    val cell: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.cell
+
+    /** 主な文字。 */
+    val text: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.text
+
+    /** 補助の文字。 */
+    val secondaryText: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.secondaryText
+
+    /** 区切りの線。 */
+    val separator: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.separator
+
+    /** アクセントで塗った面の上に載せる文字・印・つまみ。 */
+    val onAccent: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.onAccent
 
     val horizontalPadding = 16.dp
     val rowVerticalPadding = 12.dp
@@ -23,8 +55,9 @@ object SampleTheme {
     val swatchSize = 44.dp
     val gridMinimumHeight = 106.dp
 
+    /** 色見本。項目の内容を表す色のため、ライト / ダークで同じ値を使う (先頭はライトのアクセントと同じ値)。 */
     val swatches = listOf(
-        accent,
+        SamplePalette.Light.accent,
         Color(0xFFE8604C),
         Color(0xFF3BA55D),
         Color(0xFFE5A50A),

@@ -3,7 +3,12 @@ import SwiftUI
 
 @main
 struct KsCollectionViewSamplesApp: App {
+    /// 外観の選択。ルートメニューが同じキーに書き込む。
+    @AppStorage(SampleAppearance.storageKey) private var appearance = SampleAppearance.initial
+
     init() {
+        // 保存した外観を読む前に消す (UI テストが保存の無い状態から始めるため)。
+        SampleAppearance.resetIfRequested()
         // 画像のディスクキャッシュは明示的に有効化したときだけ働き、表示を始めた後に
         // 呼んでも既存のコレクションには反映されない。起動時に一度だけ呼ぶ。
         KsImagePipeline.enableSharedDiskCache()
@@ -16,7 +21,9 @@ struct KsCollectionViewSamplesApp: App {
 
     var body: some Scene {
         WindowGroup {
+            // 起動の分岐より上で掛け、起動引数で直接開く画面にも選んだ外観を効かせる。
             SampleLaunchView()
+                .sampleAppearanceWindowStyle(appearance)
         }
     }
 }

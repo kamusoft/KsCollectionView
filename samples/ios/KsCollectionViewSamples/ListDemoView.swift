@@ -9,6 +9,7 @@ struct ListDemoView: View {
         VStack(spacing: 0) {
             HStack {
                 Text("区切り線")
+                    .foregroundStyle(SampleTheme.text)
                 Spacer()
                 Picker("区切り線", selection: $separatorChoice) {
                     ForEach(ListSeparatorChoice.allCases) { choice in

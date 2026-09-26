@@ -17,6 +17,7 @@ struct SpacingPaddingDemoView: View {
                         .frame(maxWidth: 180)
                 }
             }
+            .foregroundStyle(SampleTheme.text)
             .padding(.horizontal, SampleTheme.horizontalPadding)
             .padding(.vertical, SampleTheme.controlVerticalPadding)
             .background(SampleTheme.cell)

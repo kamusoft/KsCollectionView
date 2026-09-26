@@ -19,7 +19,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import jp.kamusoft.kscollectionview.KsCollectionView
@@ -159,7 +158,7 @@ private fun GroupedToggle(checked: Boolean, onCheckedChange: (Boolean) -> Unit) 
             // 切り替えは行全体で受ける (文言を押しても切り替わる)。
             onCheckedChange = null,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
+                checkedThumbColor = SampleTheme.onAccent,
                 checkedTrackColor = SampleTheme.accent,
                 checkedBorderColor = SampleTheme.accent,
             ),
