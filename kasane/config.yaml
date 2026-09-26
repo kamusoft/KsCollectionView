@@ -45,6 +45,7 @@ workers:
   scout: host
   extract: host
   live: host           # UI 調整でも counterpart 可 (結果確認はユーザーの目で行うため)
+  advise: host         # 相談役 (ksn-advise)。host = 自プラットフォームの最上位モデル / counterpart = 相方 CLI の最上位モデル (メインが最上位モデルならモデル差は counterpart でのみ出る)
 
 # クロスモデル・セカンドオピニオン (ksn-second-opinion / ksn-counterpart が参照)
 second-opinion:
