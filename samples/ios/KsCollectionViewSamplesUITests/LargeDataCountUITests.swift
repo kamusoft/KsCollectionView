@@ -126,8 +126,13 @@ final class LargeDataCountUITests: XCTestCase {
 
     /// 指定した件数で起動を試み、起動しないことを確かめます。
     ///
-    /// 起動が止まると app の異常終了として失敗が記録されるため、その失敗が**記録されること**を
-    /// 期待する形で書きます。起動できてしまうと期待した失敗が記録されず、このテストが落ちます。
+    /// 起動しなかったことは、起動を試みた後の app の状態で判定します。起動できてしまうと
+    /// 状態の検査が落ち、その失敗は期待した失敗として吸収されません。
+    ///
+    /// 起動が止まったときの異常終了は、Simulator のクラッシュレポートが届いたときにだけ失敗として
+    /// 記録され、届くかどうかは実行環境によって揺れます。そのため記録は、届けば期待した失敗として
+    /// 吸収し、届かなくても失敗にしません。記録が届かない環境では、XCTest が起動の完了を待ち切る
+    /// まで 1 本あたり 80 秒ほどかかります。
     ///
     /// - Parameter count: 件数として渡す文字列
     @MainActor
@@ -142,6 +147,7 @@ final class LargeDataCountUITests: XCTestCase {
                 || description.contains("Failed to launch")
                 || description.contains("terminated")
         }
+        options.isStrict = false
         XCTExpectFailure("受け取れない件数では起動が止まる", options: options)
 
         let app = XCUIApplication()
