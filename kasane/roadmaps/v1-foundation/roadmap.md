@@ -54,6 +54,6 @@ graph LR
 | phase-3-android-wrapper-foundation | completed | change | [agenda](phases/phase-3-android-wrapper-foundation/agenda.md) | [android-wrapper-foundation](../../changes/archive/2026-09-05-android-wrapper-foundation/proposal.md) |
 | phase-8-image-loading | completed | change | [agenda](phases/phase-8-image-loading/agenda.md) | [image-loading](../../changes/archive/2026-09-24-image-loading/proposal.md) / [prefetch-display-size](../../changes/archive/2026-09-24-prefetch-display-size/proposal.md) |
 | phase-4-sections-grouping | completed | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | [sections-grouping](../../changes/archive/2026-09-26-sections-grouping/proposal.md) |
-| phase-5-paging-state-machine | pending | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | — |
+| phase-5-paging-state-machine | in-progress | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | [paging-state-machine](../../changes/paging-state-machine/proposal.md) |
 | phase-6-drag-reorder | pending | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | — |
 | phase-7-samples-distribution | pending | change | [agenda](phases/phase-7-samples-distribution/agenda.md) | — |
