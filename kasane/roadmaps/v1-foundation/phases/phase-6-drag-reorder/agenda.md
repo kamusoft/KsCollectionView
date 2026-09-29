@@ -69,4 +69,4 @@ ksn-propose で設計・確認すること (議論で「提案で決める」と
 - [x] `sh.calvin.reorderable` の依存・取り込みの見積もり → [artifacts/reorderable-oss-assessment-2026-09-29.md](artifacts/reorderable-oss-assessment-2026-09-29.md)
 - [x] グループ間の移動の ADR を、行き先の表し方が決まったら起票する (core/ADR-0028・0029)
 - [x] 開始の操作の ADR を、既存の長押しとの関係が決まったら起票する (core/ADR-0031)
-- [ ] ksn-propose で変更提案を起こす
+- [x] ksn-propose で変更提案を起こす → [drag-reorder](../../../../changes/drag-reorder/proposal.md) (L 級。提案の自己レビューで core/ADR-0020 との衝突を検出し core/ADR-0034 を起票)
