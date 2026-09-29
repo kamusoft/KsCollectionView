@@ -3,6 +3,7 @@ id: 0018
 title: 端を表示中の端への挿入は、挿入のアニメーションと同時に表示範囲を端に留めて見せる
 status: accepted
 date: 2026-09-24
+amended-by: 0021
 ---
 
 ## Context

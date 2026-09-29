@@ -3,6 +3,7 @@ id: 0005
 title: ページング契約の外形 — 利用者所有の5状態 enum + コールバック、ライブラリはトリガーと標準フッター
 status: accepted
 date: 2026-09-01
+amended-by: 0024
 ---
 
 ## Context
@@ -29,3 +30,4 @@ date: 2026-09-01
 - 未決: `failed` にエラー内容を持たせるかは phase-5 またはサンプル作成時に確定する
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: ページング契約の外形) / core/ADR-0002
+関連: core/ADR-0019 (失敗の状態は中身を持たず、エラーを出す場所と再試行の行き先を決めた)

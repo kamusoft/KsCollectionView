@@ -47,6 +47,10 @@ class MainActivity : ComponentActivity() {
         val requestedPrefetch = ImagePrefetchChoice.fromArgument(
             intent?.getStringExtra(SampleRoutes.PrefetchExtra),
         )
+        // 遅延の指定が受け取れないときは、既定の遅延へ黙って戻さずに起動を止める。
+        val pagingDelayMilliseconds = PagingDelay.millisecondsOrFail(
+            PagingDelay.resolve(readExtra(SampleRoutes.PagingDelayExtra)),
+        )
         // 選択が変わるのは作り直しを挟むときだけなので、作るたびに 1 回読めばよい。
         val appearance = SampleAppearanceStore.load(this)
         setContent {
@@ -54,12 +58,20 @@ class MainActivity : ComponentActivity() {
                 SampleNavHost(
                     startRoute = startRoute,
                     requestedPrefetch = requestedPrefetch,
+                    pagingDelayMilliseconds = pagingDelayMilliseconds,
                     appearance = appearance,
                     onSelectAppearance = ::selectAppearance,
                 )
             }
         }
     }
+
+    /**
+     * 起動の追加情報の値を型によらずに読む。整数 (`--ei`) と文字列 (`-e`) のどちらの指定も受け取るため、
+     * 型を決めて読む取り出し方は使わない。
+     */
+    @Suppress("DEPRECATION")
+    private fun readExtra(key: String): Any? = intent?.extras?.get(key)
 
     /** 外観を選び直す。同じ外観なら何もしない (作り直すと画面の状態を無駄に作り直すため)。 */
     private fun selectAppearance(appearance: SampleAppearance) {

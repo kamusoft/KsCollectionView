@@ -20,4 +20,5 @@ enum class SampleScreen(val title: String) {
     ImageGrid("画像グリッド"),
     Grouping("グループ化"),
     DiffUpdate("差分更新"),
+    Paging("ページング"),
 }

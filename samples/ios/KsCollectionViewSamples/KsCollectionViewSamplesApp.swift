@@ -17,6 +17,7 @@ struct KsCollectionViewSamplesApp: App {
         // 件数の指定が受け取れないときは、既定件数へ黙って戻さずに起動を止める。
         LargeDataCount.failIfInvalid()
         ImageGridCount.failIfInvalid()
+        PagingDelay.failIfInvalid()
     }
 
     var body: some Scene {

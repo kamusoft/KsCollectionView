@@ -1,6 +1,9 @@
 package jp.kamusoft.kscollectionview.samples.android
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -12,6 +15,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 
 /**
@@ -22,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
  *
  * @param title 上部バーに出すタイトル
  * @param onBack 戻る導線を出す場合の処理。null ならルート画面として扱い戻る導線を出さない
+ * @param extendsBehindBottomBar 内容を画面の下端 (ナビゲーションバーの裏) まで広げるか。広げた内容は
+ *   下端の安全領域の分を自分で空ける
  * @param content 上部バーの下に敷く内容
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 fun SampleScaffold(
     title: String,
     onBack: (() -> Unit)? = null,
+    extendsBehindBottomBar: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     Scaffold(
@@ -63,7 +70,17 @@ fun SampleScaffold(
             )
         },
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        val layoutDirection = LocalLayoutDirection.current
+        val contentPadding = if (extendsBehindBottomBar) {
+            PaddingValues(
+                start = innerPadding.calculateStartPadding(layoutDirection),
+                top = innerPadding.calculateTopPadding(),
+                end = innerPadding.calculateEndPadding(layoutDirection),
+            )
+        } else {
+            innerPadding
+        }
+        Box(modifier = Modifier.fillMaxSize().padding(contentPadding)) {
             content()
         }
     }

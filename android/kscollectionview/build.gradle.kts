@@ -96,6 +96,10 @@ dependencies {
     // Compose Animation Core。行の高さ変化の補間 (`Animatable`) に使う。
     implementation(libs.compose.animation.core)
 
+    // Compose Animation。次のページの読み込み中の表示の出入りのフェード (`AnimatedVisibility`) に使う。
+    // Compose Foundation が推移で持ち込んでいる版と同じもの (BOM が決める) を明示依存にする。
+    implementation(libs.compose.animation)
+
     // Material 3。タップフィードバックの既定を標準 ripple にするために使う。
     implementation(libs.compose.material3)
 

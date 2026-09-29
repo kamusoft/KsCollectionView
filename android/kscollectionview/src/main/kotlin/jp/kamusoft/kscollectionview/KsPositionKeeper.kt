@@ -25,12 +25,22 @@ import androidx.compose.runtime.setValue
  *   列数が変わるとその項目が先頭に保たれ、見出しの下に見えていた項目が動く。列数が変わったときは、
  *   見出しのすぐ下に見えていた項目を見出しのすぐ下に戻す
  *
+ * - ページングを付けた一覧では、差し替えの直前のページングの状態で置き方を変える (core/ADR-0021)。
+ *   直前が取り直し中なら、位置によらず表示範囲をコンテンツの先頭にする。直前が終端以外なら、末尾を
+ *   表示中の末尾への挿入でも末尾へ送らない。直前が終端なら上の規則のまま。0 件から項目が届いたときは
+ *   先頭のままにする。直前の状態は、前回の反映時に渡されたページングの状態 (ページングを付けていなかった
+ *   なら無し) とする
+ * - Pull to Refresh で始めた取り直しの間 (取り直しの処理を呼んでから、インジケータを出し終えるまで) に
+ *   届いた差し替えは、直前の状態とページングの有無によらず、表示範囲をコンテンツの先頭にする。取得が
+ *   すぐ終わり、取り直し中と差し替えが 1 回の反映にまとまっても先頭にするため
+ *
  * 判定には差し替え・変化の直前の配置 ([LazyGridState.layoutInfo]) を使うため、新しい配置を測る
  * 前 (コンポジションの反映時) に呼ぶ。位置の要求は同じフレームの配置に反映される。
  */
 internal class KsPositionKeeper<Item> {
     private var items: List<Item>? = null
     private var columns: Int = 0
+    private var pagingState: KsPagingState? = null
 
     /** 末尾への挿入で、最初に配置されたときにフェードで出す項目・見出しのキー。 */
     val appearing = KsAppearingItems()
@@ -48,6 +58,8 @@ internal class KsPositionKeeper<Item> {
      *
      * @param placementOf 配列での位置から、新しい配列と列数での lazy 上の置き場所を求める
      * @param safeTopPx 表示範囲の上端から、固定中の見出しを止める安全領域の境目までの長さ
+     * @param pagingState ページングの状態。ページングを付けていなければ null
+     * @param isPullRefreshing Pull to Refresh で始めた取り直しのインジケータを出している間か
      */
     fun onUpdate(
         state: LazyGridState,
@@ -57,13 +69,18 @@ internal class KsPositionKeeper<Item> {
         columns: Int,
         placementOf: (Int) -> KsItemPlacement,
         safeTopPx: Int = 0,
+        pagingState: KsPagingState? = null,
+        isPullRefreshing: Boolean = false,
     ) {
         val previousItems = this.items
         val previousColumns = this.columns
+        // 直前の状態は、ページングを付けているときだけ使う (途中から付けたときは無しとする)。
+        val precedingPagingState = if (pagingState != null) this.pagingState else null
         this.items = items
         this.columns = columns
+        this.pagingState = pagingState
         if (previousItems == null) return
-        if (previousItems !== items && keepEdge(state, previousItems, items, key, plan)) return
+        if (previousItems !== items && keepEdge(state, previousItems, items, key, plan, precedingPagingState, isPullRefreshing)) return
         if (previousColumns != columns && plan.pinsHeaders) {
             keepBelowPinnedHeader(state, items, key, placementOf, safeTopPx)
         }
@@ -74,6 +91,11 @@ internal class KsPositionKeeper<Item> {
      *
      * 挿入は「新しい端の項目の ID が差し替え前の配列に無い」ことで判定する。端の項目の入れ替え
      * (移動・削除) は挿入ではないため、既定の位置の保ち方のままにする。
+     *
+     * ページングを付けた一覧で直前の状態が取り直し中なら、位置によらず先頭にする (core/ADR-0021)。
+     *
+     * @param precedingPagingState 差し替えの直前のページングの状態。ページングを付けていなければ null
+     * @param isPullRefreshing Pull to Refresh で始めた取り直しの間か。その間の差し替えは先頭にする
      */
     private fun keepEdge(
         state: LazyGridState,
@@ -81,8 +103,22 @@ internal class KsPositionKeeper<Item> {
         items: List<Item>,
         key: (Item) -> Any,
         plan: KsGroupPlan,
+        precedingPagingState: KsPagingState?,
+        isPullRefreshing: Boolean,
     ): Boolean {
-        if (previousItems.isEmpty() || items.isEmpty()) return false
+        if (items.isEmpty()) return false
+        if (isPullRefreshing || precedingPagingState == KsPagingState.Refreshing) {
+            state.requestScrollToItem(0)
+            return true
+        }
+        if (previousItems.isEmpty()) {
+            // ページングを付けた一覧は 0 件でもフッターの枠を置くため、既定の位置の保ち方では表示範囲の
+            // 先頭にあった枠を保とうとして、届いた最初のページの末尾に着地する。0 件の一覧は先頭を表示して
+            // いるので、項目が届いたときも先頭のままにする。
+            if (precedingPagingState == null) return false
+            state.requestScrollToItem(0)
+            return true
+        }
         val atStart = !state.canScrollBackward
         val atEnd = !state.canScrollForward
         if (atStart && isInsertion(key(items.first()), key(previousItems.first()), previousItems, key)) {
@@ -90,6 +126,8 @@ internal class KsPositionKeeper<Item> {
             return true
         }
         if (atEnd && isInsertion(key(items.last()), key(previousItems.last()), previousItems, key)) {
+            // ページングを付けた一覧では、終端になるまでは末尾に留めない (届いたページは今の位置の下に現れる)。
+            if (precedingPagingState != null && precedingPagingState != KsPagingState.EndReached) return false
             // ここでは位置を要求しない。index を変える位置の要求は配置のアニメーションを打ち切り、
             // 表示範囲が一瞬で末尾へ飛ぶため。既定の位置の保ち方 (見えている先頭の項目を保つ) のまま
             // 挿入を反映させ、次のフレームから末尾までなめらかに送る。

@@ -6,6 +6,7 @@
 |---|---|---|
 | [ソースコメント規約](comment-policy.md) | 常時 — ソースにコメントを書く・書き換えるとき | rule |
 | [Sample のプラットフォーム間一致](sample-parity.md) | `samples/` を触るとき — Sample のデモ画面・文言を追加・変更するとき | rule |
+| [Sample の操作は本体の表示を変えない](sample-debug-controls.md) | `samples/` を触るとき — Sample のデモ画面に操作 (パネル・切り替え・ボタン) を置く・変えるとき、Sample の画面の brief・mock を書くとき | rule |
 | [テスト実行規約](test-execution.md) | テストを実行するとき・テスト結果を報告するとき | rule |
 | [実行時挙動の検証規約](runtime-behavior-verification.md) | 実行時挙動の不具合を調査するとき・不具合修正の完了を判定するとき | rule |
 | [スクロール性能の体感ゲート](scroll-performance-gate.md) | スクロール性能の完了を判定するとき・手動フリック計測を行うとき・性能の証跡を書くとき | rule |

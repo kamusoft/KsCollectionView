@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -110,6 +111,30 @@ internal class KsScrollIndicatorTest {
 
         advanceTimeBy(KsScrollIndicatorDefaults.FADE_OUT_MILLIS.toLong())
         assertEquals("フェードの後は描かれない", 0f, indicatorAlpha(), AlphaTolerance)
+    }
+
+    /**
+     * 次のページの読み込み中の表示を差し替えた一覧で、その表示の範囲から始めたドラッグでも、一覧の範囲から
+     * 始めたドラッグと同じくバーを完全な濃さで描く。
+     */
+    @Test
+    fun indicatorIsShownWhileDraggingFromSubstitutedAppendingIndicator() {
+        setScrollableContent(
+            itemCount = 30,
+            paging = KsPaging(
+                state = KsPagingState.Appending,
+                onLoadMore = {},
+                appendingIndicator = { Box(Modifier.size(120.dp, 30.dp).testTag(AppendingIndicatorTag)) },
+            ),
+        )
+        composeTestRule.mainClock.autoAdvance = false
+        // 出るフェードを終わらせる。
+        advanceTimeBy(500)
+
+        dragWithoutRelease(from = AppendingIndicatorTag)
+
+        assertEquals(1f, indicatorAlpha(), AlphaTolerance)
+        releaseWithoutFling(from = AppendingIndicatorTag)
     }
 
     /** 消えるのを待つ間に再びドラッグすると、消えずに表示し直す。 */
@@ -475,6 +500,7 @@ internal class KsScrollIndicatorTest {
         layout: KsLayout = KsLayout.List,
         headerHeight: Dp? = null,
         groups: KsGroups<TestItem, *>? = null,
+        paging: KsPaging? = null,
     ) {
         composeTestRule.setContent {
             TestContainer(width = containerWidth, height = containerHeight) {
@@ -488,6 +514,7 @@ internal class KsScrollIndicatorTest {
                     layout = layout,
                     header = headerHeight?.let { height -> { Box(Modifier.fillMaxWidth().height(height)) } },
                     groups = groups,
+                    paging = paging,
                 ) {
                     template { item -> Box(Modifier.fillMaxWidth().height(itemHeight).testTag(item.id)) }
                 }
@@ -496,10 +523,14 @@ internal class KsScrollIndicatorTest {
         composeTestRule.waitForIdle()
     }
 
-    /** 指を置いたまま上へドラッグする (コンテンツは下へ進む)。負の距離では下へドラッグする。 */
-    private fun dragWithoutRelease(distance: Dp = 150.dp) {
+    /**
+     * 指を置いたまま上へドラッグする (コンテンツは下へ進む)。負の距離では下へドラッグする。
+     *
+     * @param from 指を置く節点のタグ。その節点の真ん中から始める
+     */
+    private fun dragWithoutRelease(distance: Dp = 150.dp, from: String = CollectionTag) {
         val distancePx = with(composeTestRule.density) { distance.toPx() }
-        composeTestRule.onNodeWithTag(CollectionTag).performTouchInput {
+        composeTestRule.onNodeWithTag(from).performTouchInput {
             down(center)
             repeat(DragSteps) { moveBy(Offset(0f, -distancePx / DragSteps), delayMillis = 16) }
         }
@@ -508,8 +539,8 @@ internal class KsScrollIndicatorTest {
     }
 
     /** 指を止めてから離し、慣性スクロールを起こさずにスクロールを終える。 */
-    private fun releaseWithoutFling() {
-        composeTestRule.onNodeWithTag(CollectionTag).performTouchInput {
+    private fun releaseWithoutFling(from: String = CollectionTag) {
+        composeTestRule.onNodeWithTag(from).performTouchInput {
             // 速度の見積もりから動いていた区間を外すため、同じ位置に留まってから離す。
             repeat(10) { moveBy(Offset.Zero, delayMillis = 16) }
             up()
@@ -564,6 +595,7 @@ internal class KsScrollIndicatorTest {
 
     private companion object {
         const val CollectionTag = "collection"
+        const val AppendingIndicatorTag = "appending-indicator"
         const val DragSteps = 10
 
         /** 画素の量子化と色空間の丸めを吸収する許容差。 */

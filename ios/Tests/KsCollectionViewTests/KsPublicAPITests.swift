@@ -297,4 +297,85 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertTrue(clamped.negativeSpacingNames.isEmpty)
         XCTAssertTrue(KsCollectionLayout.list(rowSpacing: 8).negativeSpacingNames.isEmpty)
     }
+
+    // MARK: - ページング
+
+    func testページングの状態は付属値のない5つの値を持つ() {
+        let states: Set<KsPagingState> = [.idle, .refreshing, .appending, .failed, .endReached]
+        XCTAssertEqual(states.count, 5)
+        // Sendable として非同期の処理へ渡せる。
+        let sendable: any Sendable = KsPagingState.failed
+        XCTAssertEqual(sendable as? KsPagingState, .failed)
+    }
+
+    func testページングの設定を状態と非同期の次ページ要求で組み立てしきい値の既定は1になる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        .paging(.idle) {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(view.configuration.paging?.state, .idle)
+        XCTAssertEqual(view.configuration.paging?.threshold, 1)
+    }
+
+    func testページングのしきい値を指定できる() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        .paging(.appending, threshold: 2.5, onLoadMore: {})
+
+        XCTAssertEqual(view.configuration.paging?.state, .appending)
+        XCTAssertEqual(view.configuration.paging?.threshold, 2.5)
+    }
+
+    func testページングを付けなければ構成にページングは無い() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+
+        XCTAssertNil(view.configuration.paging)
+        XCTAssertNil(view.configuration.refresh)
+        XCTAssertNil(view.configuration.pagingDisplays.appendingIndicator)
+    }
+
+    func test6つのページングの表示をpagingの前後どちらでも差し替えられる() {
+        let base = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        // 表示の modifier を先に付ける形。
+        let before = base
+            .pagingAppendingIndicator { Text("読み込み中") }
+            .pagingFailedFooter { retry in Button("再試行", action: retry) }
+            .pagingEndReachedFooter { Text("終端") }
+            .paging(.idle) {}
+        // 表示の modifier を後に付ける形。
+        let after = base
+            .paging(.idle) {}
+            .pagingLoadingPlaceholder { Text("最初の読み込み中") }
+            .pagingFailedPlaceholder { retry in Button("再試行", action: retry) }
+            .pagingEmptyPlaceholder { Text("空") }
+
+        XCTAssertNotNil(before.configuration.paging)
+        XCTAssertNotNil(before.configuration.pagingDisplays.appendingIndicator)
+        XCTAssertNotNil(before.configuration.pagingDisplays.failedFooter)
+        XCTAssertNotNil(before.configuration.pagingDisplays.endReachedFooter)
+        XCTAssertNil(before.configuration.pagingDisplays.loadingPlaceholder)
+        XCTAssertNotNil(after.configuration.paging)
+        XCTAssertNotNil(after.configuration.pagingDisplays.loadingPlaceholder)
+        XCTAssertNotNil(after.configuration.pagingDisplays.failedPlaceholder)
+        XCTAssertNotNil(after.configuration.pagingDisplays.emptyPlaceholder)
+        XCTAssertNil(after.configuration.pagingDisplays.appendingIndicator)
+    }
+
+    func test差し替えていない読み込み中は既定の表示で失敗と終端と空は何も出さない() {
+        let displays = KsPagingDisplays()
+        XCTAssertNotNil(displays.content(for: .appendingIndicator, retry: {}))
+        XCTAssertNotNil(displays.content(for: .loadingPlaceholder, retry: {}))
+        XCTAssertNil(displays.content(for: .failedFooter, retry: {}))
+        XCTAssertNil(displays.content(for: .endReachedFooter, retry: {}))
+        XCTAssertNil(displays.content(for: .failedPlaceholder, retry: {}))
+        XCTAssertNil(displays.content(for: .emptyPlaceholder, retry: {}))
+    }
 }

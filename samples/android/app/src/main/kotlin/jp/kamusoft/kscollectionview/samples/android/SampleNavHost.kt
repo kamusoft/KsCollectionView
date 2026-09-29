@@ -22,6 +22,7 @@ private const val ScreenArgument = "screen"
  * @param startRoute 起動直後に開く経路。null ならルートメニューだけを出す
  * @param requestedPrefetch 起動時に指定された「画像グリッド」のプリフェッチの形。null なら画面の
  *   初期選択
+ * @param pagingDelayMilliseconds 「ページング」画面の偽の取得元が 1 回の取得に置く遅延 (ミリ秒)
  * @param appearance ルートメニューで選択中として示す外観
  * @param onSelectAppearance ルートメニューで外観の項目が選ばれたときの処理
  */
@@ -29,6 +30,7 @@ private const val ScreenArgument = "screen"
 fun SampleNavHost(
     startRoute: String? = null,
     requestedPrefetch: ImagePrefetchChoice? = null,
+    pagingDelayMilliseconds: Int = PagingDelay.DefaultMilliseconds,
     appearance: SampleAppearance = SampleAppearance.Initial,
     onSelectAppearance: (SampleAppearance) -> Unit = {},
 ) {
@@ -57,7 +59,12 @@ fun SampleNavHost(
             arguments = listOf(navArgument(ScreenArgument) { type = NavType.StringType }),
         ) { entry ->
             val screen = SampleScreen.valueOf(entry.arguments.readScreenName())
-            SampleScaffold(title = screen.title, onBack = { navController.popBackStack() }) {
+            SampleScaffold(
+                title = screen.title,
+                onBack = { navController.popBackStack() },
+                // 「ページング」は一覧を下端のナビゲーションバーの裏まで広げ、操作のパネル越しに透かす。
+                extendsBehindBottomBar = screen == SampleScreen.Paging,
+            ) {
                 when (screen) {
                     SampleScreen.List -> ListDemoScreen()
                     SampleScreen.FixedGrid -> FixedGridDemoScreen()
@@ -73,6 +80,7 @@ fun SampleNavHost(
                     )
                     SampleScreen.Grouping -> GroupingDemoScreen()
                     SampleScreen.DiffUpdate -> DiffUpdateDemoScreen()
+                    SampleScreen.Paging -> PagingDemoScreen(delayMilliseconds = pagingDelayMilliseconds)
                 }
             }
         }

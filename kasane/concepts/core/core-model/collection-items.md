@@ -3,7 +3,7 @@ type: concept
 title: コレクションの項目モデルと差分更新
 description: KsCollectionView が受け取るプレーンな配列・安定 ID・テンプレートキー・グループの値の契約と、配列を差し替えたときに何が再描画・アニメーションされるか、親の状態をテンプレートで読む条件 (iOS / Android 共通)
 tags: [core-model, diffable, template, groups]
-timestamp: 2026-09-26
+timestamp: 2026-09-29
 ---
 
 # コレクションの項目モデルと差分更新
@@ -129,6 +129,8 @@ iOS で何が再構成されるかは、観測する値の有無と更新の種�
 
 端を見ている利用者にとって、端への挿入が表示範囲の外にひっそり足されるのは不具合に見えるためである。端を表示していない状態での挿入の見え方は契約に含めず、各プラットフォームの既定の位置の保ち方 (iOS はコンテンツの位置、Android は見えている先頭の項目) のままになる。
 
+ページングを付けた一覧だけは、末尾側の規則を差し替えの直前のページングの状態で置き換える。末尾に留めるのは直前の状態が終端のときだけで、直前が取り直し中なら位置によらず先頭を表示する (core/ADR-0021。規則の全体は [collection-paging](collection-paging.md))。
+
 ### なぜ ID を identity にするか
 
 要素全体を identity にすると、内容変更と「削除 + 挿入」の区別がつかず、変わっていない要素まで作り直される。ID を identity にすることで、同じ ID の要素は内容が変わっても同じセルのまま再構成され、差分アニメーションが挿入・削除・移動だけに限られる (出典: kasane/changes/archive/2026-09-04-ios-engine-foundation/design.md Decision 2)。
@@ -156,7 +158,8 @@ iOS で何が再構成されるかは、観測する値の有無と更新の種�
 
 - [collection-layout](../styling/collection-layout.md) — `layout` 値・スペーシング・区切り線・ヘッダー/フッター・グループの見出しと固定
 - [collection-interaction](collection-interaction.md) — タップ・長押し・スクロール制御
+- [collection-paging](collection-paging.md) — ページングを付けた一覧での差し替え時の表示範囲の置き方 (端への挿入の例外)
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — この契約を UICollectionView でどう実現しているか
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — この契約を Compose Lazy 系でどう実現しているか
-- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、core/ADR-0015 (グループの値によるグループの宣言)、core/ADR-0018 (端を表示中の端への挿入)
+- core/ADR-0003 (プレーンな配列 + 安定 ID)、core/ADR-0004 (値キーテンプレート)、core/ADR-0011 (不正入力の release 挙動)、core/ADR-0015 (グループの値によるグループの宣言)、core/ADR-0018 (端を表示中の端への挿入。ページングを付けた一覧は core/ADR-0021 が一部改訂)
 - ios/ADR-0002、ios/ADR-0004、ios/ADR-0006、ios/ADR-0008 (観測する値)、android/ADR-0001、android/ADR-0006 (差分の移動・挿入・削除のアニメーション)

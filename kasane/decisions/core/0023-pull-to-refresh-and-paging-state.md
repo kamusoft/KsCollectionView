@@ -1,7 +1,7 @@
 ---
 id: 0023
 title: Pull to Refresh は引っ張って始めた取り直しの間だけインジケータを出し、追加読み込みの間は受け付けない
-status: proposed
+status: accepted
 date: 2026-09-27
 ---
 
@@ -42,5 +42,5 @@ Pull to Refresh はライブラリが一覧に接続し、ページングの取�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-27: 多重発火と連鎖の抑止 — 取り直しと追加読み込みの競合 / Pull to Refresh の接続 — 引っ張っていない取り直しのインジケータ) / kasane/changes/paging-state-machine/second-opinion-spec-001.md (引っ張りを止める条件の隙間の指摘と反映) / kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/agenda.md (Pull to Refresh — 外形だけ確認して phase-5 に申し送り)
+出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-27: 多重発火と連鎖の抑止 — 取り直しと追加読み込みの競合 / Pull to Refresh の接続 — 引っ張っていない取り直しのインジケータ) / kasane/changes/archive/2026-09-29-paging-state-machine/second-opinion-spec-001.md (引っ張りを止める条件の隙間の指摘と反映) / kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/agenda.md (Pull to Refresh — 外形だけ確認して phase-5 に申し送り)
 関連: core/ADR-0022 (追加読み込みは待機のときだけ頼み、実行中の処理をライブラリがつかむ) / core/ADR-0002 (記法・非同期は各プラットフォームの流儀)

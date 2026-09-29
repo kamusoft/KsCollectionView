@@ -39,6 +39,14 @@ object SampleRoutes {
      */
     const val PrefetchExtra = "ks_prefetch"
 
+    /**
+     * 「ページング」画面の偽の取得元が 1 回の取得に置く遅延 (ミリ秒) を指定する Intent の追加情報のキー。
+     *
+     * 値は 0 以上の整数 (`--ei` の整数でも `-e` の文字列でもよい)。指定が無ければ [PagingDelay.DefaultMilliseconds]。
+     * 受け取れない値では起動を止める ([PagingDelay.resolve])。iOS の起動引数 `--paging-delay-ms` と対称。
+     */
+    const val PagingDelayExtra = "ks_paging_delay_ms"
+
     /** デモ画面の経路。 */
     fun demo(screen: SampleScreen): String = "demo/${screen.name}"
 

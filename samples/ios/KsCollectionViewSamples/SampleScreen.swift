@@ -11,6 +11,7 @@ enum SampleScreen: String, CaseIterable, Hashable, Identifiable {
     case imageGrid = "画像グリッド"
     case grouping = "グループ化"
     case diffUpdate = "差分更新"
+    case paging = "ページング"
 
     var id: Self { self }
 }

@@ -1,14 +1,14 @@
 ---
 type: concept
 title: iOS コレクションエンジン
-description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・グループ・レイアウト・操作契約の実現方法と、その中で守っている仕組み
+description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・グループ・レイアウト・操作契約の実現方法と、その中で守っている仕組み (ページングと Pull to Refresh は paging-engine.md)
 tags: [ios, engine, uicollectionview, hosting]
-timestamp: 2026-09-26
+timestamp: 2026-09-29
 ---
 
 # iOS コレクションエンジン
 
-この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。画像の先読みと `KsImage` の iOS 側の実現は [iOS 画像の先読みと KsImage の実現](image-pipeline.md) にある。
+この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。画像の先読みと `KsImage` の iOS 側の実現は [iOS 画像の先読みと KsImage の実現](image-pipeline.md)、ページングと Pull to Refresh の実現は [iOS ページングと Pull to Refresh の実現](paging-engine.md) にある。
 
 ## 全体像
 
@@ -26,6 +26,7 @@ KsCollectionView (SwiftUI, 値型 + modifier で KsCollectionConfiguration を�
            │                            塊の表を実行時参照し、固定中の見出しの属性の書き換えと端への挿入の位置を足す
            ├ KsEstimatedHeight        … 自己サイズの実測から推定高さを決める
            ├ KsImagePrefetcher        … 画像の先読みの台帳 (image-pipeline.md)
+           ├ KsPagingRequester ほか   … ページングと Pull to Refresh の部品 (paging-engine.md)
            ├ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
            └ KsHostingSupplementaryView … グループの見出しとルートのヘッダー / フッターの UIHostingConfiguration
 ```
@@ -47,6 +48,7 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 | `KsRowContentPlacement` | セル content を包む `Layout`。行の高さの遅れによる中央配置はみ出しを防ぐ (後述) |
 | `KsEstimatedHeight` | 自己サイズの実測から推定高さを決める値型 (後述) |
 | `KsScrollController` | 命令を受け取り VC へ転送する。未接続のときは何もしない。複数のコレクションに接続されたときは、最後に接続したコレクションだけへ転送する |
+| ページングと Pull to Refresh の部品 (`KsPagingRequester` / `KsRefreshControl` / 重ねる表示の入れ物 / `KsPagingFooterStack`) | 次ページ要求の判定と待ち方、6 つの表示の置き場、引っ張りの部品の位置。詳細は [iOS ページングと Pull to Refresh の実現](paging-engine.md) |
 | `KsLayoutDiagnostics` / `KsItemOffsetLookup` | 計測のための入口 (`@_spi(KsMeasurement)` を付けて読み込んだときだけ見える。利用者向け API ではない)。前者は Debug 構成だけに載る「自己サイズを返したセル数と、推定と不一致だった回数」の計数、後者は Release にも載る「画面の indexPath を配列全体の通し番号へ変換する」入口 |
 
 ## 保証すること (実測で確かめた罠対策)
@@ -131,17 +133,25 @@ diffable の差分は項目の identity と再構成だけを扱い、supplement
 
 識別子を変えて作り直させる形は採らない。見出しの作り直しで固定中の見出しが一瞬消え、差分の移動アニメーションも崩れるためである。見出しを組み立てるときにだけ、適用済みの識別子の範囲から項目を引く (配列全体の写しを持たない)。
 
+### 補助ビューは名指しで測り直させる
+
+ルートのヘッダー / フッターの枠は中身から高さを決める補助ビューだが、中身が変わっても自分では測り直されず、`UIHostingConfiguration` の中身の差し替えも次の描画まで大きさに反映されない。そのままでは、末尾 (または先頭) を表示したまま上下の `contentPadding` を変えると前の高さのまま空白が残る (大きくしたときは伸びない)。ページングを付けた一覧では、状態だけが変わったときにもフッターの枠が前の高さのまま残る ([iOS ページングと Pull to Refresh の実現](paging-engine.md))。
+
+`rebuildVisibleRootSupplementaryViews` は見えている枠の中身を一度外して (`clear()`) から組み直し、`UICollectionViewLayoutInvalidationContext` で枠を名指しして無効化する。見えていない枠も名指しし、次に見えたときに測り直させる。作り直すのは、上下の `contentPadding` が変わったときと、フッターの枠に出すページングの表示が変わったとき (状態だけの変化を含む) に限る。回数は `rootSupplementaryRebuildCount` で観測でき、余白が変わらない更新で作り直さないことを試験で確かめている。
+
 ### 端を表示中の端への挿入 (core/ADR-0018)
 
 先頭を表示中の先頭への挿入は、UIKit の既定 (コンテンツの位置を保つ) のままで先頭に留まる。末尾を表示中の末尾への挿入は既定では下に外れるため、`KsCompositionalLayout` が `finalizeCollectionViewUpdates()` の中でコンテンツの高さの変化分だけ表示位置を下げ、挿入のアニメーションと同じアニメーションで表示範囲を末尾に留める。
 
-更新の後の位置を問い合わせる `targetContentOffset(forProposedContentOffset:)` で返す形は採れない。差分の適用ではこの戻り値が使われないことを確かめた。端にいるかの判定は差し替えの直前に行い、1pt 未満の差は一致とみなす。
+どの端に留めるかは、差し替えの直前に controller の `edgeToKeep` が決めてレイアウトに渡す。端にいるかの判定は差し替えの直前に行い、1pt 未満の差は一致とみなす。ページングを付けた一覧では `edgeToKeep` が差し替えの直前の状態も読む ([iOS ページングと Pull to Refresh の実現](paging-engine.md))。更新の後の位置を問い合わせる `targetContentOffset(forProposedContentOffset:)` で返す形は採れない。差分の適用ではこの戻り値が使われないことを確かめた。
 
-### 安全領域は固定中の見出しにだけ合わせる (core/ADR-0017)
+### 一覧の中身のうち安全領域に合わせるのは固定中の見出しだけ (core/ADR-0017)
 
 `UIHostingConfiguration` は、一番外側の画面として載せたセル・補助ビューの中身を、上端の安全領域に重なった分だけ押し下げて高さを増やす。`KsHostingCell` と `KsHostingSupplementaryView` は上下の安全領域を中身へ渡さない (左右は従来どおり渡す)。コレクションの `contentInsetAdjustmentBehavior = .never` は変えていないので、安全領域は `adjustedContentInset` に入らず `safeAreaInsets` からだけ得られる。
 
 固定中の見出しの上端は「表示範囲の上端 + 上端の安全領域」とし、押し上げ・固定中の見出しに覆われた範囲・位置の復元・スクロール命令も同じ境目を基準にする。安全領域に重ならない置き方ではこれらの追加の値がすべて 0 で、見え方は変わらない。
+
+ライブラリが一覧に重ねる表示 (Pull to Refresh のインジケータ・ページングの表示) は中身ではないため、別に安全領域に合わせる (core/ADR-0025。[iOS ページングと Pull to Refresh の実現](paging-engine.md))。
 
 ### 表示位置の控えと復元
 
@@ -228,6 +238,7 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 - テンプレートのクロージャの中で UI state を持たせる設計に寄せない。再利用でホスティングを作り直す (ios/ADR-0002)。
 - 観測する値が同じ同値配列の更新で、位置依存の表示とタッチ feedback 色の追随まで止めない (上記)。
 - 可視セル再構成に `withTransaction` を渡して中身をアニメーションさせようとしない。効果が無いことは確認済み (上記)。
+- ルートのヘッダー / フッターの中身をかけ直しただけで、枠の高さが変わると期待しない。名指しで無効化する (上記)。
 
 ## 性能
 
@@ -275,5 +286,6 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 - ios/ADR-0001〜0010 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊、0010: 塊とグループ・見出しの固定)
 - core/ADR-0010 (区切り線の既定外観)、core/ADR-0015・0016 (グループの宣言・グループごとの区切り線)、cross/ADR-0006 (性能の完了判定)
 - core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)
+- [iOS ページングと Pull to Refresh の実現](paging-engine.md) — ページングと Pull to Refresh の部品と罠対策 (契約は [ページングと Pull to Refresh](../../core/core-model/collection-paging.md))
 - handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
 - 翻案元: `../KsSettingsView/ios/Sources/KsSettingsViewUI/` (`FullSnapshotContentTargets` / `KsCellRegistry` / `CustomCellRowPlacement` / `SectionBoxLayout`)

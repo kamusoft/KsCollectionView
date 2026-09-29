@@ -20,6 +20,10 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     // 次の更新の後に表示範囲を留める端。差分を適用する間だけ設定する。
     var edgeToKeepAfterUpdate: KsContentEdge?
 
+    // 引っ張って始めた取り直しの間に、一覧が上端へ足している余白 (上端の安全領域の分)。固定する位置は
+    // この余白の分だけ下がった表示範囲の上端を基準にするため、安全領域と二重に数えないよう差し引く。
+    var refreshExtraTopInset: CGFloat = 0
+
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
         let attributes = super.layoutAttributesForElements(in: rect)
         guard let attributes, let pinning = groupHeaderPinning?() else { return attributes }
@@ -68,7 +72,7 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     func pinnedGroupHeaderTop(in collectionView: UICollectionView) -> CGFloat {
         collectionView.contentOffset.y
             + collectionView.adjustedContentInset.top
-            + collectionView.safeAreaInsets.top
+            + max(0, collectionView.safeAreaInsets.top - refreshExtraTopInset)
     }
 
     // 書き換える前の見出しの属性。固定したときの位置の計算と、固定中の見出しの高さを知るために使う。

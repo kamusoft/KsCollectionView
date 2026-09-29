@@ -77,6 +77,44 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // snapshot を適用した回数。グループの値の取り出し方だけが差し替わり、グループの値の並びが
     // 変わらない更新で組み直さないことを、この値が動かないことで観測できる。
     private(set) var snapshotApplyCount = 0
+    // 次ページ要求の判定と待ち方 (core/ADR-0020、core/ADR-0022)。ページングを付けていない間は使わない。
+    let pagingRequester = KsPagingRequester()
+    // 配列の版。ページングを付けた一覧で、配列の中身が変わるたびに進む。頼んだ後の待ち方に使う。
+    private(set) var itemsVersion = 0
+    // 最後にレイアウトへ測らせたときの、最後の項目の後ろのページングの表示。変わったらフッターの枠の
+    // 高さを測り直させる。
+    private var displayedPagingFooter: KsPagingDisplay?
+    // 次のページの読み込み中の表示を載せる入れ物。初めて要るときに作る。
+    private(set) var pagingIndicatorView: KsPagingIndicatorView?
+    // 次のページの読み込み中の表示を出しているか (消えるフェードの途中は false)。
+    private(set) var isPagingIndicatorShown = false
+    // 0 件の入れ物に出しているページングの表示。
+    private var displayedPagingPlaceholder: KsPagingDisplay?
+    // 項目が 0 件のときのページングの表示を載せる入れ物。初めて要るときに作る。
+    private(set) var pagingPlaceholderView: KsPagingPlaceholderView?
+    // Pull to Refresh の部品。取り直しの処理が渡されている間だけ一覧に付ける。
+    private(set) lazy var pullRefreshControl: KsRefreshControl = {
+        let control = KsRefreshControl()
+        control.addTarget(self, action: #selector(handlePullRefresh), for: .valueChanged)
+        return control
+    }()
+    // 引っ張って始めた取り直しのインジケータを出しているか (core/ADR-0023)。
+    private(set) var isPullRefreshing = false
+    // 引っ張って始めた取り直しの処理を実行中か。
+    private var isRefreshActionRunning = false
+    private var refreshTask: Task<Void, Never>?
+    // 取り直し中に、コンテンツを引っ張りの部品の下で止めるために上端に足している余白 (上端の安全領域の分)。
+    private(set) var refreshExtraTopInset: CGFloat = 0
+    // 見えているルートのヘッダー / フッターの中身を作り直した回数 (内側余白の変化と、最後の項目の後ろの
+    // ページングの表示の切り替わり)。余白が変わらない更新で作り直さないことを、この値が動かないことで観測できる。
+    private(set) var rootSupplementaryRebuildCount = 0
+    // 引っ張って取り直しの処理を呼んだ回数。
+    private(set) var pullRefreshCount = 0
+    // 引っ張って始めた今回の取り直しの間に、差し替えと同時に先頭を表示したか。表示していなければ、取り直しを
+    // 終えるときに先頭を表示する (結果が前と同じ配列で、差し替えが起きなかった場合)。
+    private var pullRefreshShowedContentTop = false
+    // 一覧が参照しているページングの状態。一覧が状態を書き換えないことを観測するために読む。
+    var pagingState: KsPagingState? { configuration.paging?.state }
     // 表示の変化に備えて控えた位置を持っているかどうか。控えが捨てられる契機を観測するために読む。
     var hasPendingAnchor: Bool { pendingAnchor != nil }
     #if DEBUG
@@ -132,6 +170,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         syncImagePrefetching()
         apply(items: configuration.items, animatingDifferences: false)
         configuration.scrollController?.attach(self)
+        pagingRequester.onFinish = { [weak self] in
+            self?.pagingRequestDidFinish()
+        }
+        reportInvalidPagingThresholdIfNeeded(previous: nil)
+        displayedPagingFooter = currentPagingFooterDisplay
+        updatePagingPlaceholder()
+        updatePagingIndicator()
+        syncPullRefreshControl()
     }
 
     @available(*, unavailable)
@@ -148,6 +194,16 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let previousSeparatorColor = self.configuration.separatorColor
         let previousController = self.configuration.scrollController
         let previousObservedValue = self.configuration.observedValue
+        let previousPaging = self.configuration.paging
+        // 頼んだ後の待ち方は「配列の中身が変わったか」で解く。ページングを付けた一覧でだけ比べる。
+        if configuration.paging != nil, configuration.items != self.configuration.items {
+            itemsVersion &+= 1
+        }
+        // 状態と配列の版は、判定をしない間 (差分の適用中・画面に載っていない間) も毎回知らせる。知らせないと、
+        // その間の状態の往復 (待機 → 追加読み込み中 → 待機) を見逃して待ち方の控えが残り、次を頼まなくなる。
+        if let paging = configuration.paging {
+            pagingRequester.observe(state: paging.state, itemsVersion: itemsVersion)
+        }
         // 観測する値が宣言されているときは、その値が変わった更新でだけテンプレートを呼び直す (ios/ADR-0008)。
         // 宣言が無いときは配列が同値の更新が届くたびに呼び直す (ios/ADR-0006)。
         let observedValueChanged = configuration.observedValue != nil
@@ -155,6 +211,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let rebuildsVisibleCellContent = configuration.observedValue == nil || observedValueChanged
         let supplementaryStructureChanged = (self.configuration.header == nil) != (configuration.header == nil)
             || (self.configuration.footer == nil) != (configuration.footer == nil)
+            || (self.configuration.paging == nil) != (configuration.paging == nil)
         // グループの宣言の有無が変わると、配列が同じでも塊の区切り方が変わる。
         let groupingDeclarationChanged = (self.configuration.grouping == nil) != (configuration.grouping == nil)
         // グループの値の取り出し方が差し替わると、配列が同じでもグループの値の並びが変わりうる。
@@ -210,6 +267,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
 
         syncImagePrefetching()
+        reportInvalidPagingThresholdIfNeeded(previous: previousPaging?.threshold)
         // 差し替え後の配列に無い項目は、システムから取り消し通知が来ないためここで取り消す。
         // ID が同じまま画像が差し替わった項目も、ここで新しい URL へ切り替える。
         imagePrefetcher?.retain(items: configuration.items)
@@ -220,8 +278,20 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             reconfiguringAllItems: layoutKindChanged,
             rebuildingVisibleCellContentOnEqualItems: rebuildsVisibleCellContent,
             rebuildingSurvivingVisibleCellContent: observedValueChanged,
-            regroupingSections: groupingDeclarationChanged || groupValueSourceChanged
+            regroupingSections: groupingDeclarationChanged || groupValueSourceChanged,
+            precedingPagingState: configuration.paging != nil ? previousPaging?.state : nil
         )
+        // 上下の内側余白はルートのヘッダー / フッターの枠の中に入る。余白が変わったら、見えている枠を新しい余白で
+        // 測り直させる。変わらない更新では作り直さない。
+        if previousPadding != configuration.contentPadding {
+            rebuildVisibleRootSupplementaryViews(ofKinds: [KsSupplementaryKind.rootHeader, KsSupplementaryKind.rootFooter])
+        }
+        invalidatePagingFooterIfNeeded()
+        updatePagingPlaceholder()
+        updatePagingIndicator()
+        endPullRefreshIfFinished()
+        syncPullRefreshControl()
+        evaluatePaging()
     }
 
     // 表示領域の大きさが変わる直前。ここでは contentOffset もレイアウト属性もまだ変化前の値で
@@ -256,8 +326,27 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // 固定中のグループの見出しの位置は上端の安全領域に合わせるため、安全領域が変わったら置き直す。
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
+        // 0 件のときのページングの表示は、上下の安全領域を除いた範囲の真ん中に置く (core/ADR-0025)。
+        updatePagingPlaceholderArea()
+        updatePagingIndicatorPosition()
         guard pinsGroupHeaders else { return }
         collectionView.collectionViewLayout.invalidateLayout()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        evaluatePaging()
+    }
+
+    // スクロールのたびに引っ張りの部品を描く位置を合わせ、次ページ要求を判定し直す。この時点の可視セルは
+    // 新しい位置のレイアウトより前のものであるため、判定はレイアウトの確定後 (`viewDidLayoutSubviews`) にも行う。
+    // これは UIScrollViewDelegate の任意メソッドで、UICollectionViewController 自身は実装を
+    // 持たないため super へは委ねない。
+    override func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        if collectionView.refreshControl != nil {
+            pullRefreshControl.updateDrawingOffset()
+        }
+        evaluatePaging()
     }
 
     override func viewDidLayoutSubviews() {
@@ -276,6 +365,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         // 一度も変わらない画面でも不完全な行が残らない。
         scheduleChunkRebuildIfNeeded()
         restoreAnchorAfterColumnCountChangeIfNeeded()
+        // 次ページ要求はレイアウトが確定した位置で判定する。スクロール中も毎フレームここを通るため、
+        // スクロール・一覧の大きさの変化 (回転を含む)・自己サイズの解き直しのどれで画面に出る項目が
+        // 変わっても、そのフレームの可視セルで数え直せる (core/ADR-0020)。
+        evaluatePaging()
+        updatePagingPlaceholderArea()
+        updatePagingIndicatorPosition()
         let containerSize = collectionView.bounds.size
         guard containerSize != lastContainerSize else { return }
         lastContainerSize = containerSize
@@ -286,6 +381,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         configuration.scrollController?.detach(self)
         // 画面から消えたときは未完了の取得をすべて取り消す。
         imagePrefetcher?.cancelAll()
+        // 一覧が破棄されたら、一覧の表示の中で実行している次ページ要求と取り直しの処理を取り消す
+        // (core/ADR-0022)。
+        pagingRequester.cancel()
+        refreshTask?.cancel()
+        refreshTask = nil
+        isRefreshActionRunning = false
     }
 
     // プリフェッチ宣言の有無に合わせて URL 解決層を組み立て直す。宣言が続いている間は同じ
@@ -568,7 +669,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     // ルートのフッター。下の内側余白はフッターの下に入れる。
+    // ページングを付けた一覧では、同じ枠の中でページングの表示をフッターの上に置く。
     private func configureFooter(_ view: KsHostingSupplementaryView) {
+        if configuration.paging != nil {
+            configurePagingFooter(view)
+            return
+        }
         guard let content = configuration.footer?() else {
             view.clear()
             return
@@ -667,7 +773,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         reconfiguringAllItems: Bool = false,
         rebuildingVisibleCellContentOnEqualItems: Bool = true,
         rebuildingSurvivingVisibleCellContent: Bool = false,
-        regroupingSections: Bool = false
+        regroupingSections: Bool = false,
+        precedingPagingState: KsPagingState? = nil
     ) {
         // 塊の件数は現在の layout と解決済みの列数から決まる (ios/ADR-0009)。件数が変われば
         // 塊の切れ目が列の途中に落ちるため、配列が同値でも組み直す。
@@ -687,6 +794,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         // グループの値の並びが適用済みと同じなら、塊の表が一致して snapshot の適用には進まない。
         if itemsAreEqual, !chunkSizeChanged, !regroupingSections {
             settleAnchorIfNeeded()
+            showContentTopIfRefreshEnded(precedingPagingState: precedingPagingState)
             if !isApplyingSnapshot {
                 flushPendingCommands()
             }
@@ -763,6 +871,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 updateVisibleGroupHeaders()
             }
             settleAnchorIfNeeded()
+            showContentTopIfRefreshEnded(precedingPagingState: precedingPagingState)
             if !isApplyingSnapshot {
                 flushPendingCommands()
             }
@@ -814,9 +923,12 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         // 留める。留めないと、末尾への挿入は表示範囲の下へ足されて見えない。レイアウトは差分の適用の
         // 中で更新の後の表示位置を問い合わせるので、その間だけ留める端を渡す。
         compositionalLayout?.edgeToKeepAfterUpdate = animates
-            ? edgeToKeep(previous: currentIdentifiers, next: identifiers)
+            ? edgeToKeep(previous: currentIdentifiers, next: identifiers, precedingPagingState: precedingPagingState)
             : nil
         defer { compositionalLayout?.edgeToKeepAfterUpdate = nil }
+        // 取り直しの結果は差し替えと同時に先頭から表示する (core/ADR-0021)。アニメーションを切る差し替え
+        // (塊の件数が変わる適用) では差分の適用の中で位置を動かせないため、適用の直後に先頭へ合わせる。
+        let showsTopAfterApply = !animates && showsTopOnReplacement(precedingPagingState: precedingPagingState)
         dataSource.apply(snapshot, animatingDifferences: animates) { [weak self] in
             guard let self else { return }
             applyingSnapshotCount = max(0, applyingSnapshotCount - 1)
@@ -828,7 +940,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             // 保留中の命令は、重ねて適用された snapshot がすべて反映されてから実行する。
             guard applyingSnapshotCount == 0 else { return }
             collectionView.layoutIfNeeded()
-            if let requestedGeneration = anchorGenerationAwaitingApply {
+            if showsTopAfterApply {
+                anchorGenerationAwaitingApply = nil
+                scrollToContentTopAfterReplacement()
+            } else if let requestedGeneration = anchorGenerationAwaitingApply {
                 anchorGenerationAwaitingApply = nil
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
@@ -843,14 +958,28 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             }
             flushPendingCommands()
             scheduleChunkRebuildIfNeeded()
+            evaluatePaging()
         }
     }
 
     // 差し替えの直前に表示範囲がコンテンツの先頭 / 末尾にあり (1pt 未満の差は一致とみなす)、
     // 差し替えでその端に新しい項目が入るとき、表示範囲を留める端。どちらでもなければ nil で、
     // 表示範囲はコンテンツの位置を保つ既定のままにする。先頭と末尾の両方に当たるときは先頭を採る。
-    private func edgeToKeep(previous: [KsItemIdentifier], next: [KsItemIdentifier]) -> KsContentEdge? {
+    //
+    // ページングを付けた一覧では、差し替えの直前のページングの状態で置き方を変える (core/ADR-0021)。
+    // 直前が取り直し中なら位置によらず先頭を留め、直前が終端以外なら末尾には留めない。
+    private func edgeToKeep(
+        previous: [KsItemIdentifier],
+        next: [KsItemIdentifier],
+        precedingPagingState: KsPagingState?
+    ) -> KsContentEdge? {
         guard hasAppliedSnapshot, !next.isEmpty else { return nil }
+        if showsTopOnReplacement(precedingPagingState: precedingPagingState) {
+            if isPullRefreshing {
+                pullRefreshShowedContentTop = true
+            }
+            return .top
+        }
         let insets = collectionView.adjustedContentInset
         let offset = collectionView.contentOffset.y
         let top = -insets.top
@@ -860,9 +989,48 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             return .top
         }
         if bottom - offset < 1, let last = next.last, !previousIdentifiers.contains(last) {
+            if let precedingPagingState, precedingPagingState != .endReached {
+                return nil
+            }
             return .bottom
         }
         return nil
+    }
+
+    // 差し替えと同時にコンテンツの先頭を表示する差し替えか (core/ADR-0021)。
+    // - 引っ張って始めた取り直しの間 (取り直しの処理を呼んでから、インジケータを出し終えるまで) の差し替えは、
+    //   差し替えの直前の状態によらない。ページングを付けない一覧でも同じ。取得がすぐ終わり、取り直し中の
+    //   状態と差し替えが 1 回の更新にまとまっても効く
+    // - それ以外は、ページングを付けた一覧で差し替えの直前の状態が取り直し中のとき (利用者が自分で始めた取り直し)
+    private func showsTopOnReplacement(precedingPagingState: KsPagingState?) -> Bool {
+        isPullRefreshing || (configuration.paging != nil && precedingPagingState == .refreshing)
+    }
+
+    // 取り直しの結果が前と同じ配列で、差分を適用しない更新でも、状態が取り直し中から抜ける回を取り直しの
+    // 結果が届いた回として先頭を表示する (core/ADR-0021)。取り直し中のままの描き直しでは動かさない。
+    // 引っ張って始めた取り直しで配列が変わらなかった場合は、取り直しを終えるときに先頭を表示する
+    // (`finishPullRefresh`)。同じ配列の更新は描き直しと見分けられないため、その場では動かさない。
+    private func showContentTopIfRefreshEnded(precedingPagingState: KsPagingState?) {
+        guard
+            configuration.paging != nil,
+            precedingPagingState == .refreshing,
+            configuration.paging?.state != .refreshing
+        else {
+            return
+        }
+        scrollToContentTopAfterReplacement()
+    }
+
+    // 差分の適用の後に表示範囲をコンテンツの先頭へ合わせる。控えていた位置は戻さない。
+    private func scrollToContentTopAfterReplacement() {
+        if isPullRefreshing {
+            pullRefreshShowedContentTop = true
+        }
+        discardPendingAnchor()
+        collectionView.setContentOffset(
+            CGPoint(x: collectionView.contentOffset.x, y: -collectionView.adjustedContentInset.top),
+            animated: false
+        )
     }
 
     // 塊の件数が現在の列数と合わなくなっていたら、次の実行機会に組み直しを予約する。
@@ -974,12 +1142,15 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 )
             )
         }
-        if configuration.footer != nil || padding.bottom > 0 {
+        // ページングを付けた一覧では、ページングの表示を載せるためにフッターの枠を常に置く。
+        // 表示もフッターも余白も無いときは高さを持たない。
+        let hostsFooterContent = configuration.footer != nil || configuration.paging != nil
+        if hostsFooterContent || padding.bottom > 0 {
             items.append(
                 makeRootBoundaryItem(
                     kind: KsSupplementaryKind.rootFooter,
                     alignment: .bottom,
-                    height: configuration.footer != nil
+                    height: hostsFooterContent
                         ? .estimated(KsEstimatedHeight.defaultValue)
                         : .absolute(padding.bottom)
                 )
@@ -1132,8 +1303,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // 固定中のグループの見出しを置く位置の、表示範囲の上端からの距離。一覧が上端の安全領域に
     // 重なって置かれたときは、見出しを安全領域の境目 (バーのすぐ下) に固定するため、その重なりの分になる。
     // 安全領域に重ならない置き方では 0。
+    // 取り直し中は、上端に足した余白 (安全領域の分) で表示範囲の上端が下がっているため、その分を差し引く。
     private var pinnedGroupHeaderTopInset: CGFloat {
-        collectionView.safeAreaInsets.top
+        max(0, collectionView.safeAreaInsets.top - refreshExtraTopInset)
     }
 
     // 固定中のグループの見出しが表示範囲の上端から覆っている長さ。上端から、固定する位置にある
@@ -1335,6 +1507,390 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             return following
         }
         return previousOrder[..<index].last(where: surviving.contains)
+    }
+
+    // MARK: - ページング
+
+    // 最後の項目の後ろに出すページングの表示。項目が 0 件のときと、出す表示が無い状態では nil。
+    private var currentPagingFooterDisplay: KsPagingDisplay? {
+        guard let paging = configuration.paging else { return nil }
+        let display = KsPagingDisplay.resolve(state: paging.state, isEmpty: configuration.items.isEmpty)
+        guard let display, display.placement == .footer else { return nil }
+        return display
+    }
+
+    // ページングを付けた一覧のフッターの枠。ページングの表示を上、利用者のフッターを下に縦に並べ、
+    // 下の内側余白をその下に入れる。ページングの表示も利用者のフッターと同じく左右の内側余白の内側に
+    // 置き、その幅の中で横方向の中央に揃える (core/ADR-0024)。表示もフッターも無いときは余白の分の
+    // 高さだけになる。
+    private func configurePagingFooter(_ view: KsHostingSupplementaryView) {
+        let display = currentPagingFooterDisplay
+        let pagingContent = display.flatMap {
+            configuration.pagingDisplays.content(for: $0, retry: pagingRetryAction)
+        }
+        let footer = configuration.footer?()
+        let padding = configuration.contentPadding
+        view.configure(
+            using: UIHostingConfiguration {
+                KsPagingFooterStack(paging: pagingContent, footer: footer, padding: padding)
+            }
+            .margins(.all, 0)
+        )
+    }
+
+    // 最後の項目の後ろに出す表示が変わったら (状態だけが変わった更新を含む)、見えているフッターの
+    // 中身をかけ直し、フッターの枠の高さをレイアウトに測り直させる。
+    private func invalidatePagingFooterIfNeeded() {
+        guard currentPagingFooterDisplay != displayedPagingFooter else { return }
+        displayedPagingFooter = currentPagingFooterDisplay
+        rebuildVisibleRootSupplementaryViews(ofKinds: [KsSupplementaryKind.rootFooter])
+    }
+
+    // ルートのヘッダー / フッターの中身を作り直し、その枠を名指しで測り直させる。補助ビューは中身が変わっても
+    // 自分では測り直されず、ホスティングの中身の差し替えも次の描画まで大きさに反映されないため、見えている
+    // 枠の中身を一度外してから作り直す。見えていない枠も、次に見えたときに測り直されるよう名指しする。
+    // レイアウト全体の補助ビューは 1 要素の位置で指す。
+    private func rebuildVisibleRootSupplementaryViews(ofKinds kinds: [String]) {
+        rootSupplementaryRebuildCount += 1
+        let context = UICollectionViewLayoutInvalidationContext()
+        for kind in kinds {
+            for view in collectionView.visibleSupplementaryViews(ofKind: kind) {
+                guard let view = view as? KsHostingSupplementaryView else { continue }
+                view.clear()
+                if kind == KsSupplementaryKind.rootHeader {
+                    configureHeader(view)
+                } else {
+                    configureFooter(view)
+                }
+            }
+            context.invalidateSupplementaryElements(ofKind: kind, at: [IndexPath(index: 0)])
+        }
+        collectionView.collectionViewLayout.invalidateLayout(with: context)
+    }
+
+    // 項目が 0 件のときのページングの表示を、状態に合わせて出す / 消す。
+    private func updatePagingPlaceholder() {
+        let display: KsPagingDisplay? = {
+            guard let paging = configuration.paging, configuration.items.isEmpty else { return nil }
+            guard
+                let display = KsPagingDisplay.resolve(state: paging.state, isEmpty: true),
+                display.placement == .center
+            else {
+                return nil
+            }
+            return display
+        }()
+        guard
+            let display,
+            let content = configuration.pagingDisplays.content(for: display, retry: pagingRetryAction)
+        else {
+            displayedPagingPlaceholder = nil
+            pagingPlaceholderView?.clear()
+            pagingPlaceholderView?.isHidden = true
+            return
+        }
+        let placeholder = pagingPlaceholderView ?? makePagingPlaceholderView()
+        placeholder.isHidden = false
+        // ホスティングの中身の差し替えは次の描画まで大きさに反映されず、前の中身の大きさのまま描かれて
+        // 切れる。別の表示に切り替わったときは中身を作り直して、新しい中身の大きさで置く。
+        if displayedPagingPlaceholder != display {
+            placeholder.clear()
+            displayedPagingPlaceholder = display
+        }
+        placeholder.configure(using: UIHostingConfiguration { content }.margins(.all, 0))
+        updatePagingPlaceholderArea()
+    }
+
+    // 入れ物は一覧の表示範囲 (frameLayoutGuide) に固定し、スクロールしても動かさない。
+    private func makePagingPlaceholderView() -> KsPagingPlaceholderView {
+        let placeholder = KsPagingPlaceholderView()
+        placeholder.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.addSubview(placeholder)
+        let frame = collectionView.frameLayoutGuide
+        NSLayoutConstraint.activate([
+            placeholder.topAnchor.constraint(equalTo: frame.topAnchor),
+            placeholder.bottomAnchor.constraint(equalTo: frame.bottomAnchor),
+            placeholder.leadingAnchor.constraint(equalTo: frame.leadingAnchor),
+            placeholder.trailingAnchor.constraint(equalTo: frame.trailingAnchor),
+        ])
+        pagingPlaceholderView = placeholder
+        return placeholder
+    }
+
+    private func updatePagingPlaceholderArea() {
+        guard let placeholder = pagingPlaceholderView, !placeholder.isHidden else { return }
+        let safeArea = collectionView.safeAreaInsets
+        placeholder.setExcludedVerticalInsets(top: safeArea.top, bottom: safeArea.bottom)
+    }
+
+    // 次のページの読み込み中の表示の下端と、一覧の見えている範囲の下端 (下端の安全領域の上) の間隔。
+    static var pagingIndicatorBottomSpacing: CGFloat { 8 }
+
+    // 次のページの読み込み中の表示を、状態に合わせて出す / 消す。項目があり、状態が追加読み込み中の間だけ、
+    // 一覧の見えている範囲の下端に止めて重ねる。出る・消えるときは短くフェードする。
+    private func updatePagingIndicator() {
+        let content: AnyView? = {
+            guard
+                let paging = configuration.paging,
+                let display = KsPagingDisplay.resolve(state: paging.state, isEmpty: configuration.items.isEmpty),
+                display.placement == .bottomOverlay
+            else {
+                return nil
+            }
+            return configuration.pagingDisplays.content(for: display, retry: pagingRetryAction)
+        }()
+        guard let content else {
+            hidePagingIndicator()
+            return
+        }
+        let indicator = pagingIndicatorView ?? makePagingIndicatorView()
+        indicator.configure(
+            using: UIHostingConfiguration { content }.margins(.all, 0),
+            receivesTouches: configuration.pagingDisplays.isReplaced(.appendingIndicator)
+        )
+        updatePagingIndicatorPosition()
+        guard !isPagingIndicatorShown else { return }
+        isPagingIndicatorShown = true
+        indicator.layer.removeAllAnimations()
+        indicator.isHidden = false
+        indicator.alpha = 0
+        UIView.animate(withDuration: KsPagingIndicatorView.fadeDuration) {
+            indicator.alpha = 1
+        }
+    }
+
+    private func hidePagingIndicator() {
+        guard isPagingIndicatorShown, let indicator = pagingIndicatorView else { return }
+        isPagingIndicatorShown = false
+        UIView.animate(withDuration: KsPagingIndicatorView.fadeDuration) {
+            indicator.alpha = 0
+        } completion: { [weak self] _ in
+            // フェードの間にまた出すことになっていれば、消さない。
+            guard let self, !isPagingIndicatorShown else { return }
+            indicator.isHidden = true
+            indicator.clear()
+        }
+    }
+
+    // 入れ物は一覧の表示範囲 (frameLayoutGuide) に固定し、スクロールしても動かさない。
+    private func makePagingIndicatorView() -> KsPagingIndicatorView {
+        let indicator = KsPagingIndicatorView()
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.isHidden = true
+        collectionView.addSubview(indicator)
+        let frame = collectionView.frameLayoutGuide
+        NSLayoutConstraint.activate([
+            indicator.topAnchor.constraint(equalTo: frame.topAnchor),
+            indicator.bottomAnchor.constraint(equalTo: frame.bottomAnchor),
+            indicator.leadingAnchor.constraint(equalTo: frame.leadingAnchor),
+            indicator.trailingAnchor.constraint(equalTo: frame.trailingAnchor),
+        ])
+        pagingIndicatorView = indicator
+        return indicator
+    }
+
+    // 表示の下端を、一覧の見えている範囲の下端から「下端の安全領域 + 間隔」だけ上に合わせる。
+    // 下の内側余白 (contentPadding) は中身の周りの余白で、中身の外に重ねるこの表示の置き場には使わない。
+    private func updatePagingIndicatorPosition() {
+        guard let indicator = pagingIndicatorView else { return }
+        indicator.setBottomDistance(collectionView.safeAreaInsets.bottom + Self.pagingIndicatorBottomSpacing)
+    }
+
+    // 失敗の表示に渡す再試行の操作。
+    private var pagingRetryAction: KsPagingDisplays.Retry {
+        { [weak self] in
+            self?.retryPaging()
+        }
+    }
+
+    // 再試行: 状態が失敗なら、項目が 0 件かどうかと Pull to Refresh の有無によらず次ページ要求を呼ぶ
+    // (core/ADR-0019)。
+    func retryPaging() {
+        guard let paging = configuration.paging else { return }
+        if pagingRequester.retry(state: paging.state, itemsVersion: itemsVersion, action: paging.onLoadMore) {
+            syncPullRefreshControl()
+        }
+    }
+
+    private func pagingRequestDidFinish() {
+        syncPullRefreshControl()
+        evaluatePaging()
+    }
+
+    // 次ページ要求を判定し、条件を満たせば頼む (core/ADR-0020)。ページングを付けていない一覧、画面に
+    // 載る前、差分の適用中は判定しない (適用の完了時に判定し直す)。
+    private func evaluatePaging() {
+        guard
+            let paging = configuration.paging,
+            hasAppliedSnapshot,
+            !isApplyingSnapshot,
+            collectionView.window != nil
+        else {
+            return
+        }
+        let visible = visiblePagingItems()
+        let requested = pagingRequester.requestIfNeeded(
+            state: paging.state,
+            itemsVersion: itemsVersion,
+            itemCount: appliedIdentifiers.count,
+            visibleItemCount: visible.count,
+            lastVisibleIndex: visible.lastIndex,
+            threshold: paging.threshold,
+            action: paging.onLoadMore
+        )
+        if requested {
+            syncPullRefreshControl()
+        }
+    }
+
+    // 画面に出ている項目の数と、その中でいちばん後ろの項目の配列上の位置。画面に出ているのは一覧の
+    // 表示範囲 (バーの裏を含む bounds 全体) と少しでも重なる項目で、見出し・ヘッダー / フッターは数えない。
+    // 可視セルの一覧には表示範囲の外のセルが残りうるため、レイアウトの位置で絞る。
+    func visiblePagingItems() -> (count: Int, lastIndex: Int?) {
+        let bounds = collectionView.bounds
+        let layout = collectionView.collectionViewLayout
+        let ranges = appliedChunkTable.sectionItemRanges
+        var count = 0
+        var lastIndex: Int?
+        for indexPath in collectionView.indexPathsForVisibleItems {
+            guard
+                ranges.indices.contains(indexPath.section),
+                let attributes = layout.layoutAttributesForItem(at: indexPath),
+                attributes.frame.intersects(bounds)
+            else {
+                continue
+            }
+            let index = ranges[indexPath.section].lowerBound + indexPath.item
+            guard index < appliedIdentifiers.count else { continue }
+            count += 1
+            lastIndex = max(lastIndex ?? index, index)
+        }
+        return (count, lastIndex)
+    }
+
+    // しきい値の負の数・有限でない数は不正入力 (core/ADR-0011)。値が変わった回に知らせ、0 として扱う。
+    private func reportInvalidPagingThresholdIfNeeded(previous: Double?) {
+        guard let threshold = configuration.paging?.threshold else { return }
+        if let previous, previous.bitPattern == threshold.bitPattern {
+            return
+        }
+        guard !KsPagingRequester.isValidThreshold(threshold) else { return }
+        KsInvalidInput.report(
+            "ページングのしきい値に \(threshold) が指定されました。しきい値は 0 以上の有限の数で指定してください。0 として扱います"
+        )
+    }
+
+    // MARK: - Pull to Refresh
+
+    // 引っ張りの部品を付け外しする (core/ADR-0023)。取り直しの処理が無ければ外す。ページングの状態が
+    // 追加読み込み中の間と、次ページ要求の処理の実行中は、引っ張って始めた取り直しのインジケータを
+    // 出していなければ外して引っ張れなくする。
+    private func syncPullRefreshControl() {
+        pullRefreshControl.emptyTopSpace = configuration.contentPadding.top
+        guard configuration.refresh != nil else {
+            if collectionView.refreshControl != nil {
+                finishPullRefresh()
+                collectionView.refreshControl = nil
+            }
+            return
+        }
+        let blocksPull = configuration.paging?.state == .appending || pagingRequester.isRunning
+        if blocksPull, !isPullRefreshing {
+            if collectionView.refreshControl != nil {
+                collectionView.refreshControl = nil
+            }
+        } else if collectionView.refreshControl !== pullRefreshControl {
+            collectionView.refreshControl = pullRefreshControl
+        }
+    }
+
+    // 引っ張って取り直しが始まった。取り直しの処理を一覧の表示の中で実行する。
+    @objc
+    private func handlePullRefresh() {
+        guard let refresh = configuration.refresh, !isPullRefreshing else { return }
+        isPullRefreshing = true
+        pullRefreshShowedContentTop = false
+        isRefreshActionRunning = true
+        pullRefreshCount += 1
+        addRefreshExtraTopInset()
+        refreshTask = Task { @MainActor [weak self] in
+            await refresh()
+            guard let self, !Task.isCancelled else { return }
+            refreshTask = nil
+            isRefreshActionRunning = false
+            endPullRefreshIfFinished()
+            syncPullRefreshControl()
+        }
+    }
+
+    // 引っ張って始めた取り直しのインジケータは、処理が終わるまで出し、終わった後は状態が取り直し中の
+    // 間だけ出し続ける (core/ADR-0023)。
+    private func endPullRefreshIfFinished() {
+        guard isPullRefreshing, !isRefreshActionRunning, configuration.paging?.state != .refreshing else {
+            return
+        }
+        finishPullRefresh()
+    }
+
+    private func finishPullRefresh() {
+        guard isPullRefreshing else { return }
+        isPullRefreshing = false
+        pullRefreshControl.endRefreshing()
+        // 取り直しの間に先頭を表示していなければ (取り直しの結果の配列が同値だった等)、ここで取り直しの結果として
+        // 先頭を表示する (core/ADR-0021)。表示していれば、上端に空白を残さない戻しだけを行う。
+        removeRefreshExtraTopInset(showsContentTop: !pullRefreshShowedContentTop)
+        pullRefreshShowedContentTop = false
+    }
+
+    // 取り直しの間に足した上端の余白 (部品の高さと安全領域の分) を外しても、表示範囲は元の位置に残る。
+    // 標準の部品は、取り直しの間に表示範囲が動かされていると (結果の差し替えで先頭を表示した等) 自分の
+    // 余白の分を戻さず、止まっている間に取り直しが終わると上端に空白が残る。利用者が動かしていなければ、
+    // 余白を外した先頭まで一緒に戻す。
+    // showsContentTop が true なら、下へスクロールしていても先頭まで戻す。
+    private func returnToContentTopAfterRefresh(showsContentTop: Bool) {
+        let collectionView = collectionView!
+        let top = -collectionView.adjustedContentInset.top
+        guard !collectionView.isDragging else { return }
+        let isAboveTop = collectionView.contentOffset.y < top - 0.5
+        let isBelowTop = collectionView.contentOffset.y > top + 0.5
+        guard isAboveTop || (showsContentTop && isBelowTop) else { return }
+        if showsContentTop {
+            discardPendingAnchor()
+        }
+        // 上端の空白を閉じる戻しは余白を外す動きと一緒に動かす。下から先頭へ送るときは、途中の行を
+        // 組み立てながら流さないよう動かさずに置く (差し替えと同時に先頭を表示するのと同じ置き方)。
+        guard isAboveTop else {
+            collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: top), animated: false)
+            return
+        }
+        UIView.animate(withDuration: 0.3) {
+            collectionView.contentOffset.y = top
+        }
+    }
+
+    // 取り直し中は、標準の部品が自分の高さの分だけ上端に余白を足してコンテンツを部品の下で止める。
+    // 一覧は安全領域の分を空けていないため、部品を安全領域の下に出すと、その余白だけではコンテンツが
+    // 部品に被る。取り直しの間だけ、安全領域のうち上の内側余白で覆えない分の余白を足す (core/ADR-0025)。
+    // 上の内側余白に安全領域の分を入れた一覧では、部品はその余白の中に描くため足さない (足すと部品の下に
+    // 空白が二重にできる)。取り直しが終われば外し、行がバーの裏を流れる作り (core/ADR-0017) に戻す。
+    private func addRefreshExtraTopInset() {
+        let extra = max(0, collectionView.safeAreaInsets.top - configuration.contentPadding.top)
+        guard extra > 0, refreshExtraTopInset == 0 else { return }
+        refreshExtraTopInset = extra
+        compositionalLayout?.refreshExtraTopInset = extra
+        collectionView.contentInset.top += extra
+    }
+
+    private func removeRefreshExtraTopInset(showsContentTop: Bool) {
+        let extra = refreshExtraTopInset
+        defer { returnToContentTopAfterRefresh(showsContentTop: showsContentTop) }
+        guard extra > 0 else { return }
+        refreshExtraTopInset = 0
+        compositionalLayout?.refreshExtraTopInset = 0
+        let collectionView = collectionView!
+        UIView.animate(withDuration: 0.3) {
+            collectionView.contentInset.top -= extra
+        }
     }
 
     @objc

@@ -1,10 +1,20 @@
 package jp.kamusoft.kscollectionview
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Indication
+import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberOverscrollEffect
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,15 +23,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridItemScope
+import androidx.compose.foundation.lazy.grid.LazyGridLayoutInfo
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -29,16 +44,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -64,6 +82,12 @@ internal object KsGroupHeaderContentType
 /** テストから、グループの構成を新しく適用した回数を観測するための計数。 */
 internal object KsGroupingProbe {
     internal var appliedPlanCount = 0
+}
+
+/** テストから、次ページ要求の判定に使った画面に出ている項目の材料を観測するための控え。 */
+internal object KsPagingProbe {
+    internal var visibleItemCount = -1
+    internal var lastVisibleIndex: Int? = null
 }
 
 /** テストからタップのフィードバックの発火を観測するための差し替え口。 */
@@ -113,6 +137,15 @@ internal object KsTapFeedback {
  *   表示中に差し替えない前提の宣言で、差し替えた場合は以後に始まる取得にだけ反映される
  * @param prefetchDestination 先読みした画像をどこまで用意しておくか。[KsPrefetchDestination.Memory]
  *   を指定すると、ディスクへの保存に加えてデコード済みの画像をメモリにも載せる
+ * @param paging ページング (無限スクロール) の設定。状態・次のページを読み込む処理・しきい値と、
+ *   読み込み中・失敗・終端・空の表示を渡す。省略すると次のページを頼まず、ページングの表示も出さない。
+ *   詳しくは [KsPaging] を参照
+ * @param onRefresh Pull to Refresh で呼ぶ取り直しの処理。渡すと、一覧の先頭で引っ張って取り直せる
+ *   (項目が 0 件でも引っ張れる)。インジケータは引っ張ってから処理が終わるまで出し、処理が終わった後は
+ *   ページングの状態が [KsPagingState.Refreshing] の間だけ出し続ける。ページングの状態が
+ *   [KsPagingState.Appending] の間と、次のページを読み込む処理の実行中は引っ張れない。引っ張ってから
+ *   インジケータが消えるまでの間に届いた配列の差し替えは、ページングの有無によらず先頭から表示する。
+ *   省略すると引っ張れない
  * @param content テンプレートを宣言するブロック
  */
 @Composable
@@ -134,6 +167,8 @@ public fun <Item> KsCollectionView(
     scrollController: KsScrollController? = null,
     prefetchResources: ((Item) -> List<KsResource>)? = null,
     prefetchDestination: KsPrefetchDestination = KsPrefetchDestination.Disk,
+    paging: KsPaging? = null,
+    onRefresh: (suspend () -> Unit)? = null,
     content: KsCollectionViewScope<Item>.() -> Unit,
 ) {
     val context = LocalContext.current
@@ -148,6 +183,9 @@ public fun <Item> KsCollectionView(
     val plan = remember(items) { resolveItems(items, key, template, context) }
     val displayedItems = plan.items
 
+    // ページングを付けた一覧では、ページングの表示を載せるためにルートのフッターの枠を常に置く。
+    val hasFooterSlot = footer != null || paging != null
+
     // グループの構成は、配列・宣言の有無・グループの値のラムダのいずれかが変わったときに求め直す
     // (宣言の型 `KsGroups` は呼び出しのたびに作られるため、ラムダそのものの同一性で比べる)。
     // ラムダが差し替わっても、求め直したグループの構成が適用中と等しければ適用中の構成をそのまま使い、
@@ -161,7 +199,7 @@ public fun <Item> KsCollectionView(
         hasGroupHeaders,
         pinsGroupHeaders,
         header != null,
-        footer != null,
+        hasFooterSlot,
     ) {
         resolveGroups(
             items = displayedItems,
@@ -169,7 +207,7 @@ public fun <Item> KsCollectionView(
             hasHeaders = hasGroupHeaders,
             pinsHeaders = pinsGroupHeaders,
             hasRootHeader = header != null,
-            hasRootFooter = footer != null,
+            hasRootFooter = hasFooterSlot,
         )
     }
     // 構成が等しい間は、最初に求めた構成を保ち続ける (キーの比較は構成の等しさで行う)。行の数え方・
@@ -195,6 +233,8 @@ public fun <Item> KsCollectionView(
         addAll(layout.invalidValueMessages())
         addAll(plan.diagnostics)
         addAll(resolvedGrouping.diagnostics)
+        // しきい値の誤りは、値が変わったときにだけ警告ログへ出る (文言に値を含めるため)。
+        paging?.invalidThresholdMessage()?.let { add(it) }
         val missingKeys = plan.templateKeys.filterNot { templates.containsKey(it) }
         if (missingKeys.isNotEmpty()) {
             add("テンプレートが宣言されていないキーがあります: $missingKeys。空の項目を表示して継続します")
@@ -295,12 +335,108 @@ public fun <Item> KsCollectionView(
     val tapIndication = KsTapFeedback.indicationOverride ?: defaultIndication
 
     // 縦スクロールインジケータ。表示の濃さとスクロール位置は描画フェーズでだけ読む。
-    val scrollIndicatorVisibility = rememberKsScrollIndicatorVisibility(gridState)
+    // 一覧に重ねた表示 (差し替えた次のページの読み込み中) から始めたドラッグも、一覧のスクロールとして
+    // インジケータに知らせるための知らせの経路。一覧自身のドラッグの知らせは一覧の内部にあり渡せないため分ける。
+    val overlayDragInteractions = remember { MutableInteractionSource() }
+    val scrollIndicatorVisibility = rememberKsScrollIndicatorVisibility(gridState, overlayDragInteractions)
+    // 端で伸びる効果 (オーバースクロール)。一覧と、一覧に重ねた表示から始めたドラッグで同じ実体を使う。
+    val overscrollEffect = rememberOverscrollEffect()
     val scrollIndicatorColor = KsScrollIndicatorDefaults.color(isSystemInDarkTheme())
 
     val positionKeeper = remember { KsPositionKeeper<Item>() }
     val appearing = positionKeeper.appearing
     val heightTracker = remember { KsHeightAnimationTracker() }
+
+    // ---- ページングと Pull to Refresh ----
+    // 次ページ要求と取り直しの処理は、一覧のコンポジションに結びついたスコープで実行する。一覧が
+    // コンポジションを離れると、実行中の処理はスコープごと取り消される (core/ADR-0022)。
+    val actionScope = rememberCoroutineScope()
+    val pagingRequester = remember { KsPagingRequester() }
+    val itemsVersionTracker = remember { KsPagingItemsVersion() }
+    val itemsVersion = if (paging != null) {
+        itemsVersionTracker.versionOf(displayedItems)
+    } else {
+        itemsVersionTracker.reset()
+        0
+    }
+    val latestPaging by rememberUpdatedState(paging)
+    val latestItemsVersion by rememberUpdatedState(itemsVersion)
+    // 失敗の表示に渡す再試行の操作。状態が失敗なら、項目が 0 件かどうかと Pull to Refresh の有無によらず
+    // 次ページ要求を呼ぶ (core/ADR-0019)。
+    val retryPaging: () -> Unit = remember(pagingRequester, actionScope) {
+        {
+            latestPaging?.let { current ->
+                pagingRequester.retry(actionScope, current.state, latestItemsVersion, current.onLoadMore)
+            }
+        }
+    }
+    // 頼んだ時点からの状態と配列の版の変化は、判定を飛ばす間 (配置がまだ測られていない間など) にも
+    // 見落とさないよう、判定とは別に反映のたびに知らせる (core/ADR-0022)。
+    if (paging != null) {
+        val observedState = paging.state
+        SideEffect { pagingRequester.observe(observedState, itemsVersion) }
+    }
+    // 一覧が破棄されたら、実行中の次ページ要求の処理を取り消す (core/ADR-0022)。処理を起動したスコープも
+    // 同時に取り消されるが、取り消しを二度行っても害は無い。
+    DisposableEffect(pagingRequester) {
+        onDispose { pagingRequester.cancel() }
+    }
+    if (paging != null) {
+        LaunchedEffect(gridState, pagingRequester) {
+            // スクロール・配列の差し替え・状態やしきい値の変化・一覧の大きさの変化・処理の終わりのどれでも
+            // 判定の材料が変わるため、材料をまとめて観測して判定し直す (core/ADR-0020)。
+            snapshotFlow {
+                pagingInput(
+                    info = gridState.layoutInfo,
+                    plan = latestPlan,
+                    paging = latestPaging,
+                    itemsVersion = latestItemsVersion,
+                    isRunning = pagingRequester.isRunning,
+                )
+            }.collect { input ->
+                val current = latestPaging ?: return@collect
+                if (input == null) return@collect
+                KsPagingProbe.visibleItemCount = input.visibleItemCount
+                KsPagingProbe.lastVisibleIndex = input.lastVisibleIndex
+                pagingRequester.requestIfNeeded(
+                    scope = actionScope,
+                    state = input.state,
+                    itemsVersion = input.itemsVersion,
+                    itemCount = input.itemCount,
+                    visibleItemCount = input.visibleItemCount,
+                    lastVisibleIndex = input.lastVisibleIndex,
+                    threshold = input.threshold,
+                    action = current.onLoadMore,
+                )
+            }
+        }
+    }
+
+    val pullRefresh = remember { KsPullRefresh() }
+    val pullToRefreshState = rememberPullToRefreshState()
+    val latestOnRefresh by rememberUpdatedState(onRefresh)
+    val pagingState = paging?.state
+    val showsRefreshIndicator = onRefresh != null && pullRefresh.isIndicatorShown(pagingState)
+    // 引っ張って始めた取り直しの間か。インジケータを消す判定 (下の SideEffect) より前の、このコンポジションの
+    // 値を控え、この間に届いた差し替えを先頭から表示する位置の保持に渡す。
+    val isPullRefreshing = onRefresh != null && pullRefresh.isPullRefreshing
+    // 追加読み込みの間 (状態が追加読み込み中の間と、次ページ要求の処理の実行中) は引っ張れない (core/ADR-0023)。
+    val acceptsPull = !(pagingState == KsPagingState.Appending || pagingRequester.isRunning)
+    SideEffect {
+        if (onRefresh == null) pullRefresh.detach() else pullRefresh.finishIfDone(pagingState)
+    }
+    val pullToRefreshModifier = if (onRefresh != null) {
+        Modifier.pullToRefresh(
+            isRefreshing = showsRefreshIndicator,
+            state = pullToRefreshState,
+            enabled = acceptsPull,
+            onRefresh = {
+                latestOnRefresh?.let { action -> pullRefresh.start(actionScope, action) }
+            },
+        )
+    } else {
+        Modifier
+    }
 
     // 末尾を表示中の末尾への挿入で、挿入を反映した次のフレームから表示範囲を末尾まで送る。
     // 続けて挿入されたときは、送っている途中から新しい末尾へ送り直す。
@@ -315,7 +451,8 @@ public fun <Item> KsCollectionView(
         }
     }
 
-    BoxWithConstraints(modifier = modifier.then(topSafeArea.modifier)) {
+    // Pull to Refresh の土台の修飾は安全領域の測り方の後ろに付け、一覧の根の位置と大きさを変えない。
+    BoxWithConstraints(modifier = modifier.then(topSafeArea.modifier).then(pullToRefreshModifier)) {
         // 向きの判定はコンポーネント自身のコンテナの縦横比で行う (端末の物理向きでは判定しない)。
         val isPortrait = maxHeight > maxWidth
         val cells = resolveGridCells(layout, isPortrait)
@@ -336,6 +473,8 @@ public fun <Item> KsCollectionView(
                 columns = columns,
                 placementOf = { itemIndex -> placementOfItem(groupPlan, itemIndex, columns, spacing, density) },
                 safeTopPx = topSafeArea.overlapPx(),
+                pagingState = paging?.state,
+                isPullRefreshing = isPullRefreshing,
             )
         }
 
@@ -376,6 +515,7 @@ public fun <Item> KsCollectionView(
         LazyVerticalGrid(
             columns = cells,
             state = gridState,
+            overscrollEffect = overscrollEffect,
             modifier = Modifier
                 .fillMaxSize()
                 .ksScrollIndicator(gridState, scrollIndicatorVisibility, scrollIndicatorColor, rows),
@@ -518,7 +658,17 @@ public fun <Item> KsCollectionView(
                 }
             }
 
-            if (footer != null) {
+            if (hasFooterSlot) {
+                // 項目があるときの失敗と終端の表示は、フッターの枠の中でフッターの上に置く (最後の項目の
+                // 後ろ・ルートのフッターの前)。次のページの読み込み中は枠に置かず、見えている範囲の下端に
+                // 重ねる (下)。項目が 0 件のときは枠のページングの部分には何も出さない。
+                val pagingFooter = if (paging != null && displayedItems.isNotEmpty()) {
+                    KsPagingDisplay.resolve(paging.state, isEmpty = false)
+                        ?.takeIf { it.isFooter }
+                        ?.let { paging.content(it, retryPaging) }
+                } else {
+                    null
+                }
                 // フッターも項目と一緒に動かす。項目だけが配置のアニメーションで動くと、項目の挿入・
                 // 削除の間にフッターが先に飛び、項目と重なったり隙間が空いたりする。
                 item(
@@ -526,12 +676,174 @@ public fun <Item> KsCollectionView(
                     span = { GridItemSpan(maxLineSpan) },
                     contentType = KsFooterContentType,
                 ) {
-                    KsFullSpanBox(heightTracker, animatesPlacement = true) { footer() }
+                    KsFullSpanBox(heightTracker, animatesPlacement = true) {
+                        if (paging != null) KsPagingFooterStack(pagingFooter, footer) else footer?.invoke()
+                    }
                 }
             }
         }
+
+        // 項目が 0 件のときのページングの表示は、項目の代わりに見えている範囲 (上下の安全領域を除く) の
+        // 真ん中に、ルートのヘッダー / フッターより手前に重ねる (core/ADR-0025)。入れ物自体はタッチを
+        // 受けないため、表示の外の操作 (ヘッダー / フッター・引っ張り) は下の一覧へ通る。
+        val placeholder = if (paging != null && displayedItems.isEmpty()) {
+            KsPagingDisplay.resolve(paging.state, isEmpty = true)?.let { paging.content(it, retryPaging) }
+        } else {
+            null
+        }
+        if (placeholder != null) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .zIndex(1f)
+                    .ksExcludingVerticalSafeArea(topSafeArea),
+                contentAlignment = Alignment.Center,
+            ) {
+                placeholder()
+            }
+        }
+
+        // 項目があるときの次のページの読み込み中は、見えている範囲の下端 (下端のシステムバーとの重なりの
+        // 分だけ上) の中央に止めて重ね、項目はその裏を流れる。スクロールに合わせて流れてくると読み込み中だと
+        // 分かりにくいため。下の余白 (contentPadding) は中身の周りの余白で、中身の外に重ねるこの表示の置き場は
+        // 変えない。入れ物はタッチを受けず、表示の外のタッチは下の項目へ通す。
+        val appendingIndicator = if (paging != null && displayedItems.isNotEmpty()) {
+            paging.content(KsPagingDisplay.AppendingIndicator, retryPaging)
+        } else {
+            null
+        }
+        val latestAppendingIndicator by rememberUpdatedState(appendingIndicator)
+        // 利用者が差し替えた表示は、押せる部品を持たなくてもその範囲のタッチを止める。既定の表示は止めない。
+        val blocksIndicatorTouches = paging?.appendingIndicator != null
+        AnimatedVisibility(
+            visible = appendingIndicator != null && paging?.state == KsPagingState.Appending,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .zIndex(1f)
+                .offset {
+                    val bottom = topSafeArea.bottomOverlapPx() + KsAppendingIndicatorMargin.roundToPx()
+                    IntOffset(0, -bottom)
+                },
+            enter = fadeIn(tween(KsAppendingIndicatorFadeMillis)),
+            exit = fadeOut(tween(KsAppendingIndicatorFadeMillis)),
+        ) {
+            // 状態が追加読み込み中でなくなって消えるフェードの間も、同じ表示を描き続ける。
+            if (blocksIndicatorTouches) {
+                Box(Modifier.ksBlockingTouches(gridState, layoutDirection, overscrollEffect, overlayDragInteractions)) { latestAppendingIndicator?.invoke() }
+            } else {
+                latestAppendingIndicator?.invoke()
+            }
+        }
+
+        if (onRefresh != null) {
+            // インジケータは上端の安全領域の境目の下から出す。行はバーの裏を流れたまま、インジケータだけを
+            // 境目まで下げる (core/ADR-0025)。インジケータは自分の上端より上を描かないため、引っ張り始めは
+            // 境目の下に上から現れる。
+            PullToRefreshDefaults.Indicator(
+                state = pullToRefreshState,
+                isRefreshing = showsRefreshIndicator,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(2f)
+                    .offset { IntOffset(0, topSafeArea.overlapPx()) },
+            )
+        }
     }
 }
+
+/** 次のページの読み込み中の表示と、見えている範囲の下端 (下端のシステムバーの上) の間の間隔。 */
+private val KsAppendingIndicatorMargin = 8.dp
+
+/** 次のページの読み込み中の表示が出る・消えるときのフェードの長さ (ミリ秒)。 */
+private const val KsAppendingIndicatorFadeMillis = 200
+
+/**
+ * この範囲のタッチを受け止め、重なって下にある兄弟 (一覧の項目) へ通さない。中の部品 (ボタンなど) は
+ * そのままタッチを受け取れる。この範囲から始めた縦のドラッグは、一覧 ([gridState]) のスクロールに渡す。
+ * 一覧自身のスクロールと同じ向き・慣性・端で伸びる効果 ([overscrollEffect]) にし、ドラッグの知らせは
+ * [dragInteractions] へ出してスクロールインジケータに届ける。止めるのは下の項目へのタップだけにするため。
+ */
+private fun Modifier.ksBlockingTouches(
+    gridState: LazyGridState,
+    layoutDirection: LayoutDirection,
+    overscrollEffect: OverscrollEffect?,
+    dragInteractions: MutableInteractionSource,
+): Modifier =
+    scrollable(
+        state = gridState,
+        orientation = Orientation.Vertical,
+        overscrollEffect = overscrollEffect,
+        reverseDirection = ScrollableDefaults.reverseDirection(layoutDirection, Orientation.Vertical, false),
+        interactionSource = dragInteractions,
+    ).pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent()
+            }
+        }
+    }
+
+/** 次ページ要求の判定の材料。 */
+private data class KsPagingInput(
+    val state: KsPagingState,
+    val threshold: Float,
+    val itemsVersion: Int,
+    val itemCount: Int,
+    val visibleItemCount: Int,
+    val lastVisibleIndex: Int?,
+    val isRunning: Boolean,
+)
+
+/**
+ * 配置から次ページ要求の判定の材料を集める。ページングを付けていないとき、一覧がまだ配置されていない
+ * とき、新しい配列の配置がまだ測られていないとき (配置と構成の件数が食い違うとき) は null。
+ *
+ * 画面に出ている項目は、表示範囲 (バーの裏を含む一覧の全体) と少しでも重なる項目で、グループの見出し・
+ * ルートのヘッダー / フッター (ページングの表示を含む) は数えない。グリッドでも行ではなく項目で数える。
+ */
+private fun pagingInput(
+    info: LazyGridLayoutInfo,
+    plan: KsGroupPlan,
+    paging: KsPaging?,
+    itemsVersion: Int,
+    isRunning: Boolean,
+): KsPagingInput? {
+    if (paging == null) return null
+    if (info.viewportSize.height <= 0 || info.totalItemsCount != plan.totalLazyCount) return null
+    var count = 0
+    var last = -1
+    for (item in info.visibleItemsInfo) {
+        val index = plan.itemIndexOfLazy(item.index)
+        if (index < 0) continue
+        val top = item.offset.y
+        if (top >= info.viewportEndOffset || top + item.size.height <= info.viewportStartOffset) continue
+        count += 1
+        if (index > last) last = index
+    }
+    return KsPagingInput(
+        state = paging.state,
+        threshold = paging.threshold,
+        itemsVersion = itemsVersion,
+        itemCount = plan.itemCount,
+        visibleItemCount = count,
+        lastVisibleIndex = if (count > 0) last else null,
+        isRunning = isRunning,
+    )
+}
+
+/**
+ * 上下の安全領域に重なった分を除いた範囲に中身を置く。重なりは配置の中で読み、値が変わったら置き直す。
+ */
+private fun Modifier.ksExcludingVerticalSafeArea(safeArea: KsTopSafeArea): Modifier =
+    layout { measurable, constraints ->
+        val top = safeArea.overlapPx()
+        val bottom = safeArea.bottomOverlapPx()
+        val height = (constraints.maxHeight - top - bottom).coerceAtLeast(0)
+        val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, height))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            placeable.place(0, top)
+        }
+    }
 
 /**
  * 全幅の項目 (ルートのヘッダー / フッター・グループの見出し) の入れ物。

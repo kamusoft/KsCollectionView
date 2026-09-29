@@ -1,18 +1,18 @@
 ---
 type: concept
 title: Android Compose ラッパー
-description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・グループ・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策
+description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・グループ・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策 (ページングと Pull to Refresh は paging-wrapper.md)
 tags: [architecture, compose, lazy-grid]
-timestamp: 2026-09-26
+timestamp: 2026-09-29
 ---
 
 # Android Compose ラッパー
 
-この文書を読むと、Android の `KsCollectionView` が Compose の Lazy 系にどう載っていて、core の契約 ([collection-items](../../core/core-model/collection-items.md) / [collection-layout](../../core/styling/collection-layout.md) / [collection-interaction](../../core/core-model/collection-interaction.md)) のどの部分をどの部品が担い、Compose のどの挙動を回避しているかが分かる。core の 3 文書を先に読むと分かりやすい。iOS の対応物は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)。画像の先読みと `KsImage` の Android 側の実現は [Android 画像の先読みと KsImage の実現](image-pipeline.md) にある。
+この文書を読むと、Android の `KsCollectionView` が Compose の Lazy 系にどう載っていて、core の契約 ([collection-items](../../core/core-model/collection-items.md) / [collection-layout](../../core/styling/collection-layout.md) / [collection-interaction](../../core/core-model/collection-interaction.md)) のどの部分をどの部品が担い、Compose のどの挙動を回避しているかが分かる。core の 3 文書を先に読むと分かりやすい。iOS の対応物は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)。画像の先読みと `KsImage` の Android 側の実現は [Android 画像の先読みと KsImage の実現](image-pipeline.md)、ページングと Pull to Refresh の実現は [Android ページングと Pull to Refresh の実現](paging-wrapper.md) にある。
 
 ## 目的
 
-Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化・グループの並べ方と間隔・端への挿入) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ね、配置の変化は `animateItem` で見せる (android/ADR-0006)。テンプレートのラムダは item の合成の中で実行されるため、そこで読んだ親の State は自動で購読され、iOS の `observedValue(_:)` に当たる指定は無い (ios/ADR-0008)。
+Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化・グループの並べ方と間隔・端への挿入・スクロールインジケータ) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ね、配置の変化は `animateItem` で見せる (android/ADR-0006)。テンプレートのラムダは item の合成の中で実行されるため、そこで読んだ親の State は自動で購読され、iOS の `observedValue(_:)` に当たる指定は無い (ios/ADR-0008)。
 
 ## 構成
 
@@ -37,6 +37,7 @@ flowchart TD
     TAP["combinedClickable + ripple<br/>ハンドラ宣言時のみ"]
     BOX["Box(propagateMinConstraints = true) + ksAnimatedHeight<br/>行の高さを補間し、補間中の高さを根まで制約として届ける"]
     TPL["テンプレート (利用者の Composable)"]
+    PAGE["ページングと Pull to Refresh の部品<br/>(paging-wrapper.md)"]
 
     KCV --> SCOPE
     KCV --> PLAN --> DIAG
@@ -50,6 +51,7 @@ flowchart TD
     GRID --> GHDR
     GRID --> ITEMS
     ITEMS -- 項目ラッパー: 外側から内側へ --> ANIM --> SPACE --> SEP --> TAP --> BOX --> TPL
+    KCV --> PAGE -- layoutInfo を読み、前面に表示を重ねる --> GRID
 ```
 
 list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed(1)` の 1 列グリッドである (android/ADR-0001)。`LazyColumn` は使わない。グループを宣言しない場合も、配列全体を値なしの 1 つのグループとして同じ並べ方に乗せる (見出しは並べない)。
@@ -70,8 +72,9 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
 | `ksAnimateItem` / `KsAnimatedItemBox` / `KsFullSpanBox` | 項目・グループの見出し・ルートのヘッダー / フッターに `animateItem` を付け、配列の差し替えによる移動と出入りをアニメーションで見せる (android/ADR-0006。後述) |
 | `KsPositionKeeper` / `KsAppearingItems` (`KsAppearingItems.kt`) | 配列の差し替えと列数の変化の直前の配置から、端を表示中の端への挿入と、固定中の見出しの下の項目の位置を補う。末尾への挿入で表示範囲の外に足された項目は、最初に配置されたときにフェードさせる (後述) |
-| `KsTopSafeArea` / `ksPinnedHeaderSafeArea` (`KsTopSafeArea.kt`) | コレクションの上端が上端の安全領域に重なる長さを求め、固定中の見出しをその境目で止める (後述) |
+| `KsTopSafeArea` / `ksPinnedHeaderSafeArea` (`KsTopSafeArea.kt`) | コレクションの上端・下端が安全領域に重なる長さ (`overlapPx` / `bottomOverlapPx`) を求め、固定中の見出しをその境目で止める (後述)。一覧に重ねる表示の位置にも使う |
 | `ksScrollIndicator` / `rememberKsScrollIndicatorVisibility` (`KsScrollIndicator.kt`) | `LazyVerticalGrid` の前面 (`drawWithContent`) に縦のインジケータを描く。見た目と時間は `KsScrollIndicatorDefaults` の定数 (iOS の既定の実測値)。表示の濃さは利用者のドラッグで始まったスクロール (慣性を含む) の間だけ 1 にし、止まって 1 秒後に 250 ms でフェードする。位置と長さは `LazyGridState.scrollIndicatorState` を `ksGroupedScrollIndicatorMetrics` で数え直して求める |
+| ページングと Pull to Refresh の部品 (`KsPagingRequester` / `KsPaging` / `KsPullRefresh` / `ksBlockingTouches`) | 次ページ要求の判定と待ち方、6 つの表示の置き場、引っ張りの受け付けとインジケータ。詳細は [Android ページングと Pull to Refresh の実現](paging-wrapper.md) |
 | `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID を項目の位置にし、`KsGroupPlan` の写像で lazy 上の置き場所 (index・上下の余白・固定される見出しのキー) へ解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
 
 ## 保証すること (実測で確かめた罠対策)
@@ -120,7 +123,7 @@ Compose で配置の変化 (移動・挿入・削除) を見せる手段は `ani
 
 ### 端を表示中の端への挿入は位置を補う (core/ADR-0018)
 
-`LazyGridState` は見えている先頭の項目のキーで位置を保つため、そのままでは先頭を表示中の先頭への挿入が上に、末尾を表示中の末尾への挿入が下に外れて見えない。`KsPositionKeeper` は差し替えの直前の配置から「端を表示していたか」と「新しい端の項目が差し替え前に無かったか」を判定して補う。
+`LazyGridState` は見えている先頭の項目のキーで位置を保つため、そのままでは先頭を表示中の先頭への挿入が上に、末尾を表示中の末尾への挿入が下に外れて見えない。`KsPositionKeeper` は配列の参照が変わった回に `keepEdge` で、差し替えの直前の配置から「端を表示していたか」と「新しい端の項目が差し替え前に無かったか」を判定して補う。
 
 | 端 | 補い方 |
 |---|---|
@@ -129,11 +132,13 @@ Compose で配置の変化 (移動・挿入・削除) を見せる手段は `ani
 
 末尾で同じフレームに位置を要求しないのは、index を変える位置の要求が配置と出現のアニメーションをすべて捨て、1 フレームで末尾へ飛ぶためである (オーナーの目視で「即反映に見える」と指摘された原因)。列数が変わったときは、固定中の見出しの下に見えていた項目を新しい列数でも見出しのすぐ下に戻す (既定では見出しの裏に隠れた項目が先頭に保たれる)。
 
-### 固定中の見出しは安全領域の境目で止める (core/ADR-0017)
+### 固定中の見出しは上端の安全領域の境目で止める (core/ADR-0017)
 
 一覧を edge-to-edge で画面上端まで広げると、Compose の固定見出しはステータスバーの裏に固定される。`KsTopSafeArea` は `WindowInsets.systemBars ∪ displayCutout` から祖先が消費済みの分を除き、コレクションの実際の位置と重なっている長さだけを使う (insets を消費しないまま安全領域の外に置かれた一覧では 0 で、見え方は変わらない)。IME の insets は読まない。
 
 `ksPinnedHeaderSafeArea` は固定中の見出しをその境目まで下げ、押し上げは次の見出し (境目より上なら境目で止めた位置) から測る。iOS は次の見出しの本来の位置から測るため、境目より上 (バーの裏) での見え方だけが小さく違う。Compose が固定するのは 1 つの見出しだけで、境目まで下げた次の見出しは自分のグループの行と重なるため、見出しは行より前面に描く。スクロール命令と列数の変化での位置の保持も同じ境目を基準にする。
+
+下端の重なり (`bottomOverlapPx`) の使い方は [paging-wrapper](paging-wrapper.md) にある (core/ADR-0025)。
 
 ### スクロールインジケータは公式の数値を描画フェーズで読み、位置だけ補正する
 
@@ -203,6 +208,7 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - [collection-items](../../core/core-model/collection-items.md) — 実現している契約 (項目モデル・グループの宣言・差分・不正入力)
 - [collection-layout](../../core/styling/collection-layout.md) — 実現している契約 (layout 値・間隔・区切り線・見出しの固定・安全領域・content 配置・行の高さ変化)
 - [collection-interaction](../../core/core-model/collection-interaction.md) — 実現している契約 (タップ・スクロール命令)
+- [Android ページングと Pull to Refresh の実現](paging-wrapper.md) — ページングと Pull to Refresh の部品と罠対策 (契約は [collection-paging](../../core/core-model/collection-paging.md))
 - [Android 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の Android 側の実現 (契約は [image-loading](../../core/core-model/image-loading.md))
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
 - [Android 性能検証の手順](../../../handbook/android/performance-verification.md)、[スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md) — 性能の手順と合否の判定規則 (cross/ADR-0006)

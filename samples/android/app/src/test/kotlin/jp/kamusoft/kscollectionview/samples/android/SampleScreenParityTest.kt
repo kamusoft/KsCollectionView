@@ -1,6 +1,8 @@
 package jp.kamusoft.kscollectionview.samples.android
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -11,6 +13,12 @@ import org.junit.Test
  * 守れず、片側を写した表との突き合わせで守る。
  */
 class SampleScreenParityTest {
+
+    /** 「再試行」の押せる範囲の高さ (Material の最小の押せる大きさ)。 */
+    private val RetryTouchTarget = 48.dp
+
+    /** 失敗の文言 1 行の高さの見込み (bodyMedium の行の高さ)。 */
+    private val OneLineOfText = 20.dp
 
     /** iOS Sample の SampleScreen の宣言順と表示文言。 */
     private val iosDemoTitles = listOf(
@@ -26,6 +34,7 @@ class SampleScreenParityTest {
         "画像グリッド",
         "グループ化",
         "差分更新",
+        "ページング",
     )
 
     @Test
@@ -34,8 +43,8 @@ class SampleScreenParityTest {
     }
 
     @Test
-    fun `デモ画面は 12 ある`() {
-        assertEquals(12, SampleScreen.entries.size)
+    fun `デモ画面は 13 ある`() {
+        assertEquals(13, SampleScreen.entries.size)
     }
 
     /**
@@ -68,6 +77,86 @@ class SampleScreenParityTest {
         assertEquals("Item 3", DiffUpdateItem(id = 3, group = 0).row.title)
     }
 
+    /**
+     * 「ページング」画面の文言が iOS Sample と一致する。
+     *
+     * 期待値は iOS Sample の `PagingDemoText.swift` / `PagingLayoutChoice.swift` の文言と、
+     * `PagingDemoSource.swift` の項目のタイトルをそのまま書き写したもの。
+     */
+    @Test
+    fun `ページングの文言が iOS と一致する`() {
+        assertEquals(
+            listOf(
+                "表示",
+                "次の読み込みを失敗させる",
+                "中身を 0 件にする",
+                "再読み込み",
+                "全 10,000 件・1 ページ 50 件",
+                "更新できませんでした",
+                "読み込めませんでした",
+                "再試行",
+                "これ以上ありません",
+                "項目がありません",
+                "操作を畳む",
+                "操作を広げる",
+            ),
+            with(PagingDemoText) {
+                listOf(
+                    LayoutPicker, FailsNextLoad, IsEmpty, Reload, Summary, RefreshFailed,
+                    LoadFailed, Retry, EndReached, Empty, Fold, Unfold,
+                )
+            },
+        )
+        assertEquals(listOf("リスト", "グリッド"), PagingLayoutChoice.entries.map { it.title })
+        assertEquals("Item 51", PagingDemoSource.item(51).title)
+    }
+
+    /**
+     * 「ページング」画面の寸法と透け方が iOS Sample と一致する。
+     *
+     * 期待値は iOS Sample の `PagingPanelMetrics.swift` の値 (pt) をそのまま dp として書き写したもの。
+     * パネルを下端から上げる量 (`bottomMargin`) は、決め方だけをそろえて値は分けるため、ここには含めない
+     * (`ページングの操作のパネルを上げる量は 末尾の失敗の表示が丸ごと入る高さ` で確かめる)。
+     */
+    @Test
+    fun `ページングの操作のパネルの寸法が iOS と一致する`() {
+        with(PagingPanelMetrics) {
+            assertEquals(
+                listOf(16f, 18f, 12f, 10f, 6f, 30f, 44f, 8f, 4f, 16f, 8f, 6f, 16f, 10f),
+                listOf(
+                    horizontalMargin, cornerRadius, horizontalPadding, verticalPadding, rowSpacing,
+                    foldButtonSize, handleSize, shadowRadius, shadowOffset, footerVerticalPadding,
+                    messageSpacing, retryVerticalPadding, retryHorizontalPadding, retryCornerRadius,
+                ).map { it.value },
+            )
+            assertEquals(listOf(8f, 12f, 10f), listOf(bannerTopMargin, bannerCornerRadius, bannerVerticalPadding).map { it.value })
+            assertEquals(3_000L, BannerDurationMillis)
+            assertEquals(200, BannerFadeMillis)
+            assertEquals(0.72f, SurfaceOpacity)
+            assertEquals(0.10f, ShadowOpacity)
+        }
+    }
+
+    /**
+     * パネル (畳んだときは丸いボタン) を画面の下端から上げる量は、両プラットフォームで「末尾の失敗の表示が
+     * 丸ごとパネルの下に入る高さ」という同じ決め方にし、値は失敗の表示の背の高さの差で分ける
+     * (iOS 100pt / Android 128dp)。Android は「再試行」の押せる範囲が 48dp あるため、その分だけ高い。
+     *
+     * ここでは Android の値と、失敗の表示のうち文言の 1 行を除いた部分 (上下の余白・文言と「再試行」の
+     * 間隔・「再試行」の押せる範囲) より十分に高いことを確かめる。
+     */
+    @Test
+    fun `ページングの操作のパネルを上げる量は 末尾の失敗の表示が丸ごと入る高さ`() {
+        with(PagingPanelMetrics) {
+            assertEquals(128f, bottomMargin.value)
+            val failureWithoutText = footerVerticalPadding * 2 + messageSpacing + RetryTouchTarget
+            assertTrue(
+                "上げる量 $bottomMargin が失敗の表示の文言以外の高さ $failureWithoutText と文言の 1 行分より低い",
+                bottomMargin >= failureWithoutText + OneLineOfText,
+            )
+        }
+    }
+
     @Test
     fun `検証画面はデモ画面と別区分の 1 画面である`() {
         assertEquals(
@@ -86,9 +175,10 @@ class SampleScreenParityTest {
     }
 
     @Test
-    fun `グループ化と差分更新は開始ルートで開ける経路を持つ`() {
+    fun `グループ化と差分更新とページングは開始ルートで開ける経路を持つ`() {
         // 起動時の追加情報 ks_start_route に渡す経路。計測と検証はこの経路で画面を直接開く。
         assertEquals("demo/Grouping", SampleRoutes.demo(SampleScreen.Grouping))
         assertEquals("demo/DiffUpdate", SampleRoutes.demo(SampleScreen.DiffUpdate))
+        assertEquals("demo/Paging", SampleRoutes.demo(SampleScreen.Paging))
     }
 }

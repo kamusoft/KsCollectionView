@@ -5,11 +5,39 @@ import SwiftUI
 /// テンプレートのクロージャの中で配列の項目以外の状態 (展開中の ID の集合、選択中の ID など) を
 /// 読むときは、その状態を ``observedValue(_:)`` に渡してください。渡さないと、状態が変わっても
 /// 表示が追従しないことがあります。
+///
+/// 一覧に SwiftUI 標準の `.refreshable` を付けると、先頭で引っ張って取り直せるようになります
+/// (Pull to Refresh)。インジケータは、引っ張ってから取り直しの処理が終わるまで出ます。
+/// その間に配列を差し替えると、差し替えと同時にコンテンツの先頭を表示します。
+/// ``paging(_:threshold:onLoadMore:)`` を付けた一覧では、処理が終わった後も状態が
+/// ``KsPagingState/refreshing`` の間はインジケータを出し続け、状態が ``KsPagingState/appending`` の間と
+/// 次のページの読み込み処理の実行中は引っ張りを受け付けません。
+/// 画面の上端のバーの裏まで一覧を広げて置いた場合も、インジケータはバーの下に出ます。
+///
+/// ```swift
+/// KsCollectionView(model.items) { item in
+///     Row(item: item)
+/// }
+/// .refreshable {
+///     await model.reload()
+/// }
+/// ```
 public struct KsCollectionView<Item: Equatable>: View {
     internal var configuration: KsCollectionConfiguration<Item>
+    // 一覧に付けた `.refreshable` の処理。Pull to Refresh の取り直しに使う (core/ADR-0023)。
+    @Environment(\.refresh) private var refresh
 
     public var body: some View {
-        KsCollectionRepresentable(configuration: configuration)
+        KsCollectionRepresentable(configuration: resolvedConfiguration)
+    }
+
+    // 環境から読む値を載せた構成。
+    private var resolvedConfiguration: KsCollectionConfiguration<Item> {
+        var resolved = configuration
+        if let refresh {
+            resolved.refresh = { await refresh() }
+        }
+        return resolved
     }
 
     /// `Identifiable` な項目を単一テンプレートで表示します。

@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.lazy.grid.LazyGridItemInfo
 import androidx.compose.foundation.lazy.grid.LazyGridLayoutInfo
@@ -70,18 +71,23 @@ internal object KsScrollIndicatorDefaults {
  * (iOS の `UIScrollView` もプログラムによるアニメーションつきスクロールではインジケータを出さない)。
  *
  * 返す値は描画フェーズでだけ読む前提。コンポジションで読むとスクロールのたびに再コンポーズが起きる。
+ *
+ * @param extraDragInteractions 一覧の外 (一覧に重ねた表示) から一覧をスクロールさせるドラッグの知らせ。
+ *   一覧自身のドラッグと同じく表示する
  */
 @Composable
 internal fun rememberKsScrollIndicatorVisibility(
     gridState: LazyGridState,
+    extraDragInteractions: InteractionSource? = null,
 ): Animatable<Float, AnimationVector1D> {
     val visibility = remember(gridState) { Animatable(0f) }
     // 値はこの下の effect の中でだけ読む (コンポジションでは読まない)。
     val isDragged = gridState.interactionSource.collectIsDraggedAsState()
-    LaunchedEffect(gridState, isDragged) {
+    val isExtraDragged = (extraDragInteractions ?: gridState.interactionSource).collectIsDraggedAsState()
+    LaunchedEffect(gridState, isDragged, isExtraDragged) {
         // ドラッグで始まったスクロールの間 (慣性スクロールを含む) だけ表示を保つ。
         var isUserScroll = false
-        snapshotFlow { isDragged.value to gridState.isScrollInProgress }
+        snapshotFlow { (isDragged.value || isExtraDragged.value) to gridState.isScrollInProgress }
             .collectLatest { (dragged, scrolling) ->
                 if (dragged) isUserScroll = true
                 if (dragged || (isUserScroll && scrolling)) {

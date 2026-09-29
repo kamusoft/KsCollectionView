@@ -1,5 +1,6 @@
 package jp.kamusoft.kscollectionview
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
@@ -254,6 +255,75 @@ internal class KsCollectionViewPublicApiTest {
         )
         assertNotEquals(KsWidth.Fixed(40.dp), KsWidth.Column)
         assertEquals(KsWidth.Fixed(40.dp), KsWidth.Fixed(40.dp))
+    }
+
+    /** ページングの状態は待機・取り直し中・追加読み込み中・失敗・終端の 5 値で、付属の値を持たない。 */
+    @Test
+    fun pagingStateHasFiveValues() {
+        assertEquals(
+            listOf(
+                KsPagingState.Idle,
+                KsPagingState.Refreshing,
+                KsPagingState.Appending,
+                KsPagingState.Failed,
+                KsPagingState.EndReached,
+            ),
+            KsPagingState.entries.toList(),
+        )
+    }
+
+    /** ページングの設定は、状態と次ページ要求 (suspend 関数) だけで作れ、しきい値は既定 1、6 つの表示は既定で省略 (null)。 */
+    @Test
+    fun pagingDefaults() {
+        val loadMore: suspend () -> Unit = {}
+        val paging = KsPaging(state = KsPagingState.Idle, onLoadMore = loadMore)
+        assertEquals(KsPagingState.Idle, paging.state)
+        assertEquals(1f, paging.threshold)
+        assertTrue(paging.onLoadMore === loadMore)
+        assertEquals(null, paging.appendingIndicator)
+        assertEquals(null, paging.failedFooter)
+        assertEquals(null, paging.endReachedFooter)
+        assertEquals(null, paging.loadingPlaceholder)
+        assertEquals(null, paging.failedPlaceholder)
+        assertEquals(null, paging.emptyPlaceholder)
+    }
+
+    /** しきい値と 6 つの表示は名前付き引数で差し替えられ、失敗の表示は再試行の操作を受け取る。 */
+    @Test
+    fun pagingDisplaysAreNamedArguments() {
+        val paging = KsPaging(
+            state = KsPagingState.Appending,
+            onLoadMore = {},
+            threshold = 2.5f,
+            appendingIndicator = { Text("読み込み中") },
+            failedFooter = { retry -> Text("再試行", Modifier.clickable(onClick = retry)) },
+            endReachedFooter = { Text("終端") },
+            loadingPlaceholder = { Text("最初の読み込み中") },
+            failedPlaceholder = { retry: () -> Unit -> Text("再試行", Modifier.clickable(onClick = retry)) },
+            emptyPlaceholder = { Text("空") },
+        )
+        assertEquals(2.5f, paging.threshold)
+        assertTrue(paging.appendingIndicator != null && paging.failedFooter != null && paging.endReachedFooter != null)
+        assertTrue(paging.loadingPlaceholder != null && paging.failedPlaceholder != null && paging.emptyPlaceholder != null)
+    }
+
+    /** 一覧はページングの設定と取り直しの処理 (suspend 関数) を名前付き引数で受け取る。どちらも省略できる。 */
+    @Test
+    fun collectionAcceptsPagingAndRefresh() {
+        composeTestRule.setContent {
+            TestContainer {
+                KsCollectionView(
+                    items = testItems(3),
+                    key = { it.id },
+                    paging = KsPaging(state = KsPagingState.EndReached, onLoadMore = {}),
+                    onRefresh = {},
+                ) {
+                    template { item -> ItemRow(item) }
+                }
+            }
+        }
+
+        assertEquals(3, composeTestRule.countNodesWithTag("cell"))
     }
 
     /** リモートの画像ソースは任意のキーを持てる。既定は省略 (null)。 */

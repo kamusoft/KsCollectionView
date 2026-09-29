@@ -26,4 +26,11 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     var prefetchDestination: KsPrefetchDestination = .disk
     // 画像ローダーへの受け口の差し替え口。宣言が無いときは本番の adapter を組み立てる。
     var imageLoading: (any KsImageLoading)?
+    // ページングの設定。付けていない (nil) ときは次ページ要求もページングの表示も行わない。
+    var paging: KsPaging?
+    // 差し替えたページングの表示。ページングを付けていない一覧では使わない。
+    var pagingDisplays = KsPagingDisplays()
+    // Pull to Refresh の取り直しの処理。一覧に付けた `.refreshable` の処理を読んで載せる。
+    // 無い (nil) ときは引っ張れない。
+    var refresh: (@MainActor () async -> Void)?
 }

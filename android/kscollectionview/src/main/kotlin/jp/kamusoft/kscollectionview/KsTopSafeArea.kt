@@ -1,5 +1,6 @@
 package jp.kamusoft.kscollectionview
 
+import android.view.View
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.exclude
@@ -12,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import kotlin.math.roundToInt
 
@@ -39,14 +42,31 @@ import kotlin.math.roundToInt
  * そのうえで、残った insets とコレクションの位置を突き合わせ、実際に重なっている長さだけを使う。
  * `Scaffold` の内側余白を `padding` で当てた置き方のように、insets を消費しないまま安全領域の外に
  * 置かれたコレクションでは重なりは 0 で、見え方は変わらない。
+ *
+ * 下端の安全領域との重なり ([bottomOverlapPx]) も同じ求め方で持つ。
+ *
+ * @param view コレクションを載せたビュー。ウィンドウの高さを得るのに使う
  */
 @Stable
-internal class KsTopSafeArea(private val insets: WindowInsets, private val density: Density) {
+internal class KsTopSafeArea(
+    private val insets: WindowInsets,
+    private val density: Density,
+    private val view: View,
+) {
     /** 祖先が消費済みの insets。 */
     private var consumed: WindowInsets by mutableStateOf(WindowInsets(0, 0, 0, 0))
 
     /** コレクションの上端のウィンドウ上の位置 (px)。 */
     private var topInWindow: Float by mutableFloatStateOf(0f)
+
+    /** コレクションの下端のウィンドウ上の位置 (px)。 */
+    private var bottomInWindow: Float by mutableFloatStateOf(0f)
+
+    /**
+     * ウィンドウの高さ (px)。insets の下端はウィンドウの下端からの長さなので、ウィンドウの座標で突き合わせる
+     * ためにウィンドウの下端の位置として使う。配置されるまでは 0。
+     */
+    private var windowHeight: Int by mutableIntStateOf(0)
 
     /**
      * 安全領域に重なっている長さ (px)。重なっていなければ 0。
@@ -58,10 +78,32 @@ internal class KsTopSafeArea(private val insets: WindowInsets, private val densi
         return (safeTop - topInWindow).roundToInt().coerceAtLeast(0)
     }
 
+    /**
+     * 下端の安全領域 (ナビゲーションバー・画面の切り欠き) に重なっている長さ (px)。重なっていなければ 0。
+     *
+     * 項目が 0 件のときのページングの表示を、上下の安全領域を除いた範囲の真ん中に置くためと、
+     * 次のページの読み込み中の表示を、見えている範囲の下端から下端の安全領域の分だけ上げて重ねるために
+     * 使う (core/ADR-0025)。求め方は上端と同じで、祖先が消費した分を除いた insets の下端と、コレクションの
+     * 下端を、どちらもウィンドウの座標で突き合わせる。コンポジションの根を画面の一部に埋め込んで、根が
+     * ウィンドウの下端に届かない置き方では重なりは 0 になる。snapshot state を読むため、配置や描画の中で
+     * 読むと値が変わったときにやり直される。
+     */
+    fun bottomOverlapPx(): Int {
+        if (windowHeight <= 0) return 0
+        val safeBottom = insets.exclude(consumed).getBottom(density)
+        return (bottomInWindow - (windowHeight - safeBottom)).roundToInt().coerceAtLeast(0)
+    }
+
     /** コレクションの根に付け、消費済みの insets と位置を受け取る修飾。 */
     val modifier: Modifier = Modifier
         .onConsumedWindowInsetsChanged { consumed = it }
-        .onGloballyPositioned { topInWindow = it.positionInWindow().y }
+        .onGloballyPositioned { coordinates ->
+            val top = coordinates.positionInWindow().y
+            topInWindow = top
+            bottomInWindow = top + coordinates.size.height
+            // ウィンドウの根のビュー (装飾のビュー) の高さをウィンドウの高さとする。
+            windowHeight = view.rootView.height
+        }
 }
 
 /** [KsTopSafeArea] を作って覚える。 */
@@ -69,7 +111,8 @@ internal class KsTopSafeArea(private val insets: WindowInsets, private val densi
 internal fun rememberKsTopSafeArea(): KsTopSafeArea {
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     val density = LocalDensity.current
-    return remember(insets, density) { KsTopSafeArea(insets, density) }
+    val view = LocalView.current
+    return remember(insets, density, view) { KsTopSafeArea(insets, density, view) }
 }
 
 /**
