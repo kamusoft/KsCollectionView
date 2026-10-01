@@ -62,8 +62,8 @@ fun SampleNavHost(
             SampleScaffold(
                 title = screen.title,
                 onBack = { navController.popBackStack() },
-                // 「ページング」は一覧を下端のナビゲーションバーの裏まで広げ、操作のパネル越しに透かす。
-                extendsBehindBottomBar = screen == SampleScreen.Paging,
+                // 「ページング」「並べ替え」は一覧を下端のナビゲーションバーの裏まで広げ、操作のパネル越しに透かす。
+                extendsBehindBottomBar = screen == SampleScreen.Paging || screen == SampleScreen.Reorder,
             ) {
                 when (screen) {
                     SampleScreen.List -> ListDemoScreen()
@@ -81,6 +81,7 @@ fun SampleNavHost(
                     SampleScreen.Grouping -> GroupingDemoScreen()
                     SampleScreen.DiffUpdate -> DiffUpdateDemoScreen()
                     SampleScreen.Paging -> PagingDemoScreen(delayMilliseconds = pagingDelayMilliseconds)
+                    SampleScreen.Reorder -> ReorderDemoScreen()
                 }
             }
         }

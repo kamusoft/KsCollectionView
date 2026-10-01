@@ -33,4 +33,11 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     // Pull to Refresh の取り直しの処理。一覧に付けた `.refreshable` の処理を読んで載せる。
     // 無い (nil) ときは引っ張れない。
     var refresh: (@MainActor () async -> Void)?
+    // 並べ替えの設定。付けていない (nil) ときは、付けてスイッチを無効にしたときと同じく並べ替えを受け付けない。
+    var reorder: KsReorder<Item>?
+
+    // 並べ替えのスイッチが有効か。有効の間は長押しが並べ替えの操作になる (core/ADR-0031)。
+    var isReorderEnabled: Bool {
+        reorder?.isEnabled == true
+    }
 }

@@ -326,6 +326,74 @@ internal class KsCollectionViewPublicApiTest {
         assertEquals(3, composeTestRule.countNodesWithTag("cell"))
     }
 
+    /** 並べ替えの設定は、スイッチと置いたときの処理だけで作れ、判定 2 つと読み上げの文言は既定で省略 (null)。 */
+    @Test
+    fun reorderDefaults() {
+        val onMove: (KsReorderMove<TestItem>) -> Boolean = { true }
+        val reorder = KsReorder(enabled = true, onMove = onMove)
+        assertEquals(true, reorder.enabled)
+        assertTrue(reorder.onMove === onMove)
+        assertEquals(null, reorder.canMove)
+        assertEquals(null, reorder.canDrop)
+        assertEquals(null, reorder.accessibilityActions)
+    }
+
+    /** 判定 2 つと読み上げの文言は名前付き引数で渡せ、判定は置いたときと同じ形の知らせを受け取る。 */
+    @Test
+    fun reorderNamedArguments() {
+        val actions = KsReorderAccessibilityActions(previous = "前へ移動", next = "後ろへ移動")
+        val reorder = KsReorder<TestItem>(
+            enabled = false,
+            onMove = { false },
+            canMove = { it.id != "fixed" },
+            canDrop = { move -> move.group == TestKind.Message },
+            accessibilityActions = actions,
+        )
+        assertEquals("前へ移動", reorder.accessibilityActions?.previous)
+        assertEquals("後ろへ移動", reorder.accessibilityActions?.next)
+        assertEquals(false, reorder.canMove?.invoke(TestItem("fixed", "fixed")))
+        val move = KsReorderMove(TestItem("a", "a"), KsReorderDestination.End, TestKind.Message)
+        assertEquals(true, reorder.canDrop?.invoke(move))
+    }
+
+    /** 知らせは動かした項目・行き先 (項目の前 / 末尾)・グループの値 (宣言していなければ null) を持つ。 */
+    @Test
+    fun reorderMoveShape() {
+        val a = TestItem("a", "a")
+        val b = TestItem("b", "b")
+        val before = KsReorderMove(a, KsReorderDestination.Before(b), group = null)
+        assertTrue(before.item === a)
+        val destination: KsReorderDestination<TestItem> = before.destination
+        assertTrue(destination is KsReorderDestination.Before && destination.item === b)
+        assertEquals(null, before.group)
+
+        // 末尾はどの項目の型の行き先にもなる。
+        val end: KsReorderDestination<TestItem> = KsReorderDestination.End
+        val grouped = KsReorderMove(a, end, group = TestKind.Ad)
+        assertEquals(KsReorderDestination.End, grouped.destination)
+        assertEquals(TestKind.Ad, grouped.group)
+    }
+
+    /** 一覧は並べ替えの設定を名前付き引数で受け取る。省略できる。 */
+    @Test
+    fun collectionAcceptsReorder() {
+        composeTestRule.setContent {
+            TestContainer {
+                KsCollectionView(
+                    items = testItems(3),
+                    key = { it.id },
+                    paging = KsPaging(state = KsPagingState.EndReached, onLoadMore = {}),
+                    onRefresh = {},
+                    reorder = KsReorder(enabled = true, onMove = { true }),
+                ) {
+                    template { item -> ItemRow(item) }
+                }
+            }
+        }
+
+        assertEquals(3, composeTestRule.countNodesWithTag("cell"))
+    }
+
     /** リモートの画像ソースは任意のキーを持てる。既定は省略 (null)。 */
     @Test
     fun remoteSourceHasOptionalKey() {

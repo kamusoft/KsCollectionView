@@ -1,14 +1,20 @@
 ---
 type: concept
 title: iOS コレクションエンジン
-description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・グループ・レイアウト・操作契約の実現方法と、その中で守っている仕組み (ページングと Pull to Refresh は paging-engine.md)
+description: KsCollectionView の iOS 実装 — UICollectionView + diffable data source + UIHostingConfiguration による項目モデル・グループ・レイアウト・操作契約の実現方法と、その中で守っている仕組み (ページングと Pull to Refresh は paging-engine.md、並べ替えは reorder-engine.md)
 tags: [ios, engine, uicollectionview, hosting]
 timestamp: 2026-09-29
 ---
 
 # iOS コレクションエンジン
 
-この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。画像の先読みと `KsImage` の iOS 側の実現は [iOS 画像の先読みと KsImage の実現](image-pipeline.md)、ページングと Pull to Refresh の実現は [iOS ページングと Pull to Refresh の実現](paging-engine.md) にある。
+この文書を読むと、[項目モデル](../../core/core-model/collection-items.md)・[レイアウト語彙](../../core/styling/collection-layout.md)・[操作](../../core/core-model/collection-interaction.md) の契約を iOS 側がどの部品で実現し、どこに実測で確かめた罠対策が入っているかが分かる。エンジンは KsSettingsViewUI からの翻案移植 (ios/ADR-0001) で、公開されるのは DSL の入口だけ、エンジン型はすべて `internal` (ios/ADR-0005)。次の機能の iOS 側の実現は、別の文書にある。
+
+| 機能 | 文書 |
+|---|---|
+| 画像の先読みと `KsImage` | [iOS 画像の先読みと KsImage の実現](image-pipeline.md) |
+| ページングと Pull to Refresh | [iOS ページングと Pull to Refresh の実現](paging-engine.md) |
+| 並べ替え (ドラッグ & ドロップ) | [iOS 並べ替えの実現](reorder-engine.md) |
 
 ## 全体像
 
@@ -27,6 +33,7 @@ KsCollectionView (SwiftUI, 値型 + modifier で KsCollectionConfiguration を�
            ├ KsEstimatedHeight        … 自己サイズの実測から推定高さを決める
            ├ KsImagePrefetcher        … 画像の先読みの台帳 (image-pipeline.md)
            ├ KsPagingRequester ほか   … ページングと Pull to Refresh の部品 (paging-engine.md)
+           ├ KsReorderDragDropDelegate ほか … 並べ替えの部品 (reorder-engine.md)
            ├ KsHostingCell            … UIHostingConfiguration { KsRowContentPlacement { content } }
            └ KsHostingSupplementaryView … グループの見出しとルートのヘッダー / フッターの UIHostingConfiguration
 ```
@@ -39,16 +46,17 @@ Store 層と独自 diff 計算は持たない薄い 2 層構成 (ios/ADR-0004)�
 |---|---|
 | `KsSnapshotPlanner` | 旧新の配列から「識別子だけの snapshot」と、再構成 (同 ID・内容変化・キー不変) / 置換 (同 ID・キー変化) の対象を計算する。返すのは配列全体の識別子の列で、塊への区切りは controller が snapshot を組む直前に行う。重複 ID は debug assertion、release は後勝ち |
 | `KsSectionChunking` / `KsSectionID` | 塊の件数を決める (後述)。`KsSectionID` は「グループの値 + 離れて現れた同じ値の何回目か + グループの中の塊の順番」で塊を識別する |
-| `KsGroupChunkTable` / `KsChunkInfo` / `KsGroupInfo` | 配列を先頭から走査してグループ (同じグループの値が続く範囲) に分け、各グループを先頭から塊に区切った表。塊ごとにグループの中の位置・塊の数・件数を持ち、sectionProvider・区切り線・見出しの構成が引く。離れて現れた同じ値もここで検知する |
-| `KsCompositionalLayout` | 塊に割れたグループの見出しを 1 つとして固定する属性の書き換え (後述)、端を表示中の端への挿入で表示範囲を留める位置の移動 |
+| `KsGroupChunkTable` / `KsChunkInfo` / `KsGroupInfo` | 配列を先頭から走査してグループ (同じグループの値が続く範囲) に分け、各グループを先頭から塊に区切った表。塊ごとにグループの中の位置・塊の数・件数を持ち、sectionProvider・区切り線・見出しの構成が引く。離れて現れた同じ値もここで検知する。並べ替えを受け入れた直後は、項目 1 つを別の塊へ移した表を `movingItem(fromSection:toSection:)` で作る |
+| `KsCompositionalLayout` | 塊に割れたグループの見出しを 1 つとして固定する属性の書き換え (後述)、端を表示中の端への挿入で表示範囲を留める位置の移動。並べ替えでは、UIKit が動かした隙間の位置を受け取り、戻る動きの間のセルを隠す |
 | `KsTemplateRegistry` / `KsTemplate` | 値キーごとの `CellRegistration` を保持する。登録は snapshot 適用前に使用キー全てを準備する「登録準備の前倒し」(iOS 26 で初回セル取得中に登録を生成すると実行時例外になるため) |
 | `KsCollectionViewController` | 塊ごとの snapshot の構築と適用、塊の件数やグループの値の並びが変わったときの組み直し、同値配列時の可視セル再構成 (ios/ADR-0006。観測する値が宣言されていればその変化時だけ、ios/ADR-0008)、表示中の見出しの内容の設定し直し、レイアウト生成、区切り線とタッチ feedback の表示切替、表示位置の控えと復元、スクロール命令のキューと apply completion での flush、`applyingSnapshotCount` による再入防止 |
-| `KsHostingCell` | `UIHostingConfiguration` の適用、再利用時のホスティング破棄 (state 非保持、ios/ADR-0002)、上下の区切り線ビューとタッチ feedback ビュー、hitTest による「セル内の操作要素か」の判定、自己サイズ結果の通知、上下の安全領域を中身へ渡さないこと (後述) |
+| `KsHostingCell` | `UIHostingConfiguration` の適用、再利用時のホスティング破棄 (state 非保持、ios/ADR-0002)、上下の区切り線ビューとタッチ feedback ビュー、hitTest による「セル内の操作要素か」の判定、自己サイズ結果の通知、上下の安全領域を中身へ渡さないこと (後述)。読み上げの移動操作の一覧 (`KsReorderAccessibilityModel`) も持つ |
 | `KsHostingSupplementaryView` | グループの見出しとルートのヘッダー / フッターのホスティング。上下の安全領域を中身へ渡さず、透明にされた見出しを読み上げの対象から外す (`accessibilityElementsHidden`) |
 | `KsRowContentPlacement` | セル content を包む `Layout`。行の高さの遅れによる中央配置はみ出しを防ぐ (後述) |
 | `KsEstimatedHeight` | 自己サイズの実測から推定高さを決める値型 (後述) |
 | `KsScrollController` | 命令を受け取り VC へ転送する。未接続のときは何もしない。複数のコレクションに接続されたときは、最後に接続したコレクションだけへ転送する |
 | ページングと Pull to Refresh の部品 (`KsPagingRequester` / `KsRefreshControl` / 重ねる表示の入れ物 / `KsPagingFooterStack`) | 次ページ要求の判定と待ち方、6 つの表示の置き場、引っ張りの部品の位置。詳細は [iOS ページングと Pull to Refresh の実現](paging-engine.md) |
+| 並べ替えの部品 (`KsReorderDragDropDelegate` / `KsReorderPlanner` / `KsReorderGapTracker` / `KsReorderTopAutoScroll`) | UIKit 標準の並べ替えの受け口、行き先の読み替え、隙間の予測、上端の自動スクロール。ドラッグ中は controller が届いた構成を保留し、スクロール命令と次ページ要求の判定を止める。詳細は [iOS 並べ替えの実現](reorder-engine.md) |
 | `KsLayoutDiagnostics` / `KsItemOffsetLookup` | 計測のための入口 (`@_spi(KsMeasurement)` を付けて読み込んだときだけ見える。利用者向け API ではない)。前者は Debug 構成だけに載る「自己サイズを返したセル数と、推定と不一致だった回数」の計数、後者は Release にも載る「画面の indexPath を配列全体の通し番号へ変換する」入口 |
 
 ## 保証すること (実測で確かめた罠対策)
@@ -206,7 +214,7 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 ### レイアウト切替・入力・命令
 
 - **レイアウトオブジェクトは差し替えない**。list ⇄ grid・列数・スペーシング・向き変更のいずれも、sectionProvider が `configuration.layout` を実行時参照し `invalidateLayout()` で反映する。`setCollectionViewLayout` を使うと全セルがバウンドして描画が乱れる (翻案元の実績。ios/ADR-0003)。
-- **セル内の操作要素はタップを奪わない**。`KsHostingCell` の hitTest で操作要素 (UIControl 系) に当たったタッチはセル選択に流さず、feedback も出さない。長押し認識器はハンドラ未宣言時は無効。
+- **セル内の操作要素はタップを奪わない**。`KsHostingCell` の hitTest で操作要素 (UIControl 系) に当たったタッチはセル選択に流さず、feedback も出さない。長押し認識器は、ハンドラ未宣言時と並べ替えのスイッチが有効の間は無効。
 - **スクロール命令は apply completion で flush**。データ差し替えと同時に来た命令は未完了の最後の apply が終わってから実行する。ID への命令と末尾への命令は `dataSource.indexPath(for:)` で解決するので、塊とグループをまたいでも同じに動く。
 - **固定中の見出しの下へ送る**。対象のグループの見出しが固定される場合の先頭合わせは、`scrollToItem` ではなく見出しの高さの分だけ上を空けた位置へ送る。行と見出しの高さは表示されたときに推定から実測へ変わるため、アニメーションしないときは送った先でレイアウトを確定させて数回送り直す。
 
@@ -283,9 +291,10 @@ layout 値の変更や塊の組み直しのように行の並びが変わる更�
 
 - [項目モデルと差分更新](../../core/core-model/collection-items.md)、[レイアウト語彙](../../core/styling/collection-layout.md)、[操作とスクロール制御](../../core/core-model/collection-interaction.md)
 - [iOS 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の iOS 側の実現 (契約は [画像の先読みと KsImage](../../core/core-model/image-loading.md))
-- ios/ADR-0001〜0010 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊、0010: 塊とグループ・見出しの固定)
+- ios/ADR-0001〜0011 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊、0010: 塊とグループ・見出しの固定、0011: UIKit 標準の並べ替え)
 - core/ADR-0010 (区切り線の既定外観)、core/ADR-0015・0016 (グループの宣言・グループごとの区切り線)、cross/ADR-0006 (性能の完了判定)
 - core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)
 - [iOS ページングと Pull to Refresh の実現](paging-engine.md) — ページングと Pull to Refresh の部品と罠対策 (契約は [ページングと Pull to Refresh](../../core/core-model/collection-paging.md))
+- [iOS 並べ替えの実現](reorder-engine.md) — 並べ替えの部品と罠対策 (契約は [並べ替え](../../core/core-model/collection-reorder.md))
 - handbook/cross/runtime-behavior-verification.md (Simulator での観測点表に「検証: 行の高さ変化」を含む)
 - 翻案元: `../KsSettingsView/ios/Sources/KsSettingsViewUI/` (`FullSnapshotContentTargets` / `KsCellRegistry` / `CustomCellRowPlacement` / `SectionBoxLayout`)

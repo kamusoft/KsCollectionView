@@ -12,6 +12,7 @@ enum SampleScreen: String, CaseIterable, Hashable, Identifiable {
     case grouping = "グループ化"
     case diffUpdate = "差分更新"
     case paging = "ページング"
+    case reorder = "並べ替え"
 
     var id: Self { self }
 }

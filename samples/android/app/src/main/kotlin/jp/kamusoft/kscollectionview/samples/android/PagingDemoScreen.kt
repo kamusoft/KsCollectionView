@@ -37,7 +37,7 @@ import jp.kamusoft.kscollectionview.KsPaging
  * 背景の透けるパネルにまとめる。パネルは左端の丸いボタンに畳める。パネルは一覧の本来の動きと表示を
  * 見るための操作のため、一覧の余白はパネルに合わせて変えない。下の余白は全画面の一覧として入れる
  * 下端の安全領域の分だけにし、かわりにパネル (畳んだときは丸いボタン) を画面の下端から
- * [PagingPanelMetrics.bottomMargin] だけ上げて、その下に一覧の底 (末尾までスクロールしたときの
+ * [SamplePanelMetrics.bottomMargin] だけ上げて、その下に一覧の底 (末尾までスクロールしたときの
  * ページングの表示) が見えるようにする。上部バーは画面の上端の安全領域を自分で覆うため、一覧の上端は
  * 安全領域に重ならず、上の余白は入れない。
  *
@@ -76,25 +76,25 @@ fun PagingDemoScreen(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(
-                    top = PagingPanelMetrics.bannerTopMargin,
-                    start = PagingPanelMetrics.horizontalMargin,
-                    end = PagingPanelMetrics.horizontalMargin,
+                    top = SamplePanelMetrics.bannerTopMargin,
+                    start = SamplePanelMetrics.horizontalMargin,
+                    end = SamplePanelMetrics.horizontalMargin,
                 ),
-            enter = fadeIn(tween(PagingPanelMetrics.BannerFadeMillis)),
-            exit = fadeOut(tween(PagingPanelMetrics.BannerFadeMillis)),
+            enter = fadeIn(tween(SamplePanelMetrics.BannerFadeMillis)),
+            exit = fadeOut(tween(SamplePanelMetrics.BannerFadeMillis)),
         ) {
-            PagingRefreshFailedBanner()
+            SampleNoticeBanner(text = PagingDemoText.RefreshFailed)
         }
 
         val controlModifier = Modifier
             .align(Alignment.BottomStart)
             .padding(
-                start = PagingPanelMetrics.horizontalMargin,
-                end = PagingPanelMetrics.horizontalMargin,
-                bottom = bottomSafeArea + PagingPanelMetrics.bottomMargin,
+                start = SamplePanelMetrics.horizontalMargin,
+                end = SamplePanelMetrics.horizontalMargin,
+                bottom = bottomSafeArea + SamplePanelMetrics.bottomMargin,
             )
         if (isPanelFolded) {
-            PagingPanelHandle(onUnfold = { isPanelFolded = false }, modifier = controlModifier)
+            SamplePanelHandle(onUnfold = { isPanelFolded = false }, modifier = controlModifier)
         } else {
             PagingControlPanel(
                 layoutChoice = layoutChoice,
@@ -136,13 +136,13 @@ private fun PagingCollection(model: PagingDemoModel, layoutChoice: PagingLayoutC
                 PagingMessage(
                     message = PagingDemoText.LoadFailed,
                     retry = retry,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = PagingPanelMetrics.footerVerticalPadding),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = PagingMessageMetrics.footerVerticalPadding),
                 )
             },
             endReachedFooter = {
                 PagingMessage(
                     message = PagingDemoText.EndReached,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = PagingPanelMetrics.footerVerticalPadding),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = PagingMessageMetrics.footerVerticalPadding),
                 )
             },
             failedPlaceholder = { retry -> PagingMessage(message = PagingDemoText.LoadFailed, retry = retry) },

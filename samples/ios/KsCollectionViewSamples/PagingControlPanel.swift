@@ -11,16 +11,9 @@ struct PagingControlPanel: View {
     let onFold: () -> Void
 
     var body: some View {
-        VStack(spacing: PagingPanelMetrics.rowSpacing) {
-            HStack(spacing: 8) {
-                Button(action: onFold) {
-                    Text("‹")
-                        .font(.headline)
-                        .foregroundStyle(SampleTheme.accent)
-                        .frame(width: PagingPanelMetrics.foldButtonSize, height: PagingPanelMetrics.foldButtonSize)
-                        .background(SampleTheme.background, in: Circle())
-                }
-                .accessibilityLabel(PagingDemoText.fold)
+        SampleFloatingPanel {
+            HStack(spacing: SamplePanelMetrics.foldButtonSpacing) {
+                SamplePanelFoldButton(onFold: onFold)
 
                 Picker(PagingDemoText.layoutPicker, selection: $layoutChoice) {
                     ForEach(PagingLayoutChoice.allCases) { choice in
@@ -43,8 +36,5 @@ struct PagingControlPanel: View {
         .font(.subheadline)
         .foregroundStyle(SampleTheme.text)
         .tint(SampleTheme.accent)
-        .padding(.horizontal, PagingPanelMetrics.horizontalPadding)
-        .padding(.vertical, PagingPanelMetrics.verticalPadding)
-        .modifier(PagingPanelSurface(shape: RoundedRectangle(cornerRadius: PagingPanelMetrics.cornerRadius)))
     }
 }

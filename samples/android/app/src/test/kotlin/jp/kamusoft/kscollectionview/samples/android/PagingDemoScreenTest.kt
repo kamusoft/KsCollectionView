@@ -128,7 +128,7 @@ class PagingDemoScreenTest {
         // 上げたパネルの上端が一覧の真ん中の表示の「再試行」にかかるため。再試行すると、次ページ要求が
         // 0 件の設定のまま読まれて空の表示になる。
         toggle(PagingDemoText.FailsNextLoad).performClick()
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Fold).performClick()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Fold).performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(PagingDemoText.Retry).performClick()
         waitForText(PagingDemoText.Empty)
@@ -157,7 +157,7 @@ class PagingDemoScreenTest {
         assertTrue("帯 $banner がパネル $summary より上に無い", banner.bottom < summary.top)
 
         // 3 秒たつと消える。
-        composeTestRule.mainClock.advanceTimeBy(PagingPanelMetrics.BannerDurationMillis + 1_000)
+        composeTestRule.mainClock.advanceTimeBy(SamplePanelMetrics.BannerDurationMillis + 1_000)
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(PagingDemoText.RefreshFailed).assertDoesNotExist()
     }
@@ -222,12 +222,12 @@ class PagingDemoScreenTest {
         waitForFirstPage()
         toggle(PagingDemoText.FailsNextLoad).performClick()
 
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Fold).performClick()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Fold).performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText(PagingDemoText.Reload).assertDoesNotExist()
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Unfold).assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Unfold).assertIsDisplayed()
 
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Unfold).performClick()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Unfold).performClick()
         composeTestRule.waitForIdle()
         toggle(PagingDemoText.FailsNextLoad).assertIsOn()
         toggle(PagingDemoText.IsEmpty).assertIsOff()
@@ -241,12 +241,12 @@ class PagingDemoScreenTest {
         waitForFirstPage()
         toggle(PagingDemoText.FailsNextLoad).performClick()
         composeTestRule.onNodeWithText("グリッド").performClick()
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Fold).performClick()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Fold).performClick()
 
         restorationTester.emulateSavedInstanceStateRestore()
 
         waitForFirstPage()
-        composeTestRule.onNodeWithContentDescription(PagingDemoText.Unfold).performClick()
+        composeTestRule.onNodeWithContentDescription(SamplePanelText.Unfold).performClick()
         composeTestRule.waitForIdle()
         toggle(PagingDemoText.FailsNextLoad).assertIsOn()
         composeTestRule.onNodeWithText("グリッド").assertIsDisplayed()

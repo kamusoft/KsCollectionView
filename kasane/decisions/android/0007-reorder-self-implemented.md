@@ -1,7 +1,7 @@
 ---
 id: 0007
 title: Android の並べ替えは Compose の上に自前で作り、OSS には依存も取り込みもしない
-status: proposed
+status: accepted
 date: 2026-09-29
 ---
 

@@ -10,7 +10,7 @@ import UIKit
 ///
 /// 一覧の上下の余白は、全画面の一覧として入れる上端・下端の安全領域の分だけにし、操作の都合では変えない
 /// (パネルは一覧の本来の動きと表示を見るための、上に浮いた操作のため)。かわりにパネルと丸いボタンを
-/// 画面の下端から ``PagingPanelMetrics/bottomMargin`` だけ上げて浮かせ、末尾までスクロールしたときの
+/// 画面の下端から ``SamplePanelMetrics/bottomMargin`` だけ上げて浮かせ、末尾までスクロールしたときの
 /// 一覧の底 (次のページの読み込み中・失敗・終端の表示) がパネルの下に見えるようにする。
 /// 件数・文言・操作の規則は Android Sample の同名画面とそろえる。
 struct PagingDemoView: View {
@@ -32,17 +32,17 @@ struct PagingDemoView: View {
                     }
                     .onDisappear { model.listDidDisappear() }
                 if model.refreshFailed {
-                    PagingRefreshFailedBanner()
-                        .padding(.top, PagingPanelMetrics.bannerTopMargin)
-                        .padding(.horizontal, PagingPanelMetrics.horizontalMargin)
+                    SampleNoticeBanner(text: PagingDemoText.refreshFailed)
+                        .padding(.top, SamplePanelMetrics.bannerTopMargin)
+                        .padding(.horizontal, SamplePanelMetrics.horizontalMargin)
                         .frame(maxHeight: .infinity, alignment: .top)
                         .transition(.opacity)
                 }
                 controls
-                    .padding(.horizontal, PagingPanelMetrics.horizontalMargin)
-                    .padding(.bottom, PagingPanelMetrics.bottomMargin)
+                    .padding(.horizontal, SamplePanelMetrics.horizontalMargin)
+                    .padding(.bottom, SamplePanelMetrics.bottomMargin)
             }
-            .animation(.easeInOut(duration: PagingPanelMetrics.bannerFadeDuration), value: model.refreshFailed)
+            .animation(.easeInOut(duration: SamplePanelMetrics.bannerFadeDuration), value: model.refreshFailed)
             .onChange(of: model.refreshFailed) { isShown in
                 // 帯が出たことを読み上げでも知らせる。
                 if isShown {
@@ -56,7 +56,7 @@ struct PagingDemoView: View {
     @ViewBuilder
     private var controls: some View {
         if isPanelFolded {
-            PagingPanelHandle { isPanelFolded = false }
+            SamplePanelHandle { isPanelFolded = false }
         } else {
             PagingControlPanel(
                 layoutChoice: $layoutChoice,
@@ -86,11 +86,11 @@ struct PagingDemoView: View {
         }
         .pagingFailedFooter { retry in
             PagingMessageView(message: PagingDemoText.loadFailed, retry: retry)
-                .padding(.vertical, PagingPanelMetrics.footerVerticalPadding)
+                .padding(.vertical, PagingMessageMetrics.footerVerticalPadding)
         }
         .pagingEndReachedFooter {
             PagingMessageView(message: PagingDemoText.endReached)
-                .padding(.vertical, PagingPanelMetrics.footerVerticalPadding)
+                .padding(.vertical, PagingMessageMetrics.footerVerticalPadding)
         }
         .pagingFailedPlaceholder { retry in
             PagingMessageView(message: PagingDemoText.loadFailed, retry: retry)

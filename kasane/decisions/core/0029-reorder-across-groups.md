@@ -1,7 +1,7 @@
 ---
 id: 0029
 title: グループをまたぐ並べ替えも提供し、確定には利用者の VM が項目のグループの値を書き換えて配列を渡す
-status: proposed
+status: accepted
 date: 2026-09-29
 ---
 

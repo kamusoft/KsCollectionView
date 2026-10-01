@@ -1,7 +1,7 @@
 ---
 id: 0026
 title: 並べ替えは指を離したときに 1 回だけ利用者へ知らせ、ドラッグ中の仮の並びはライブラリが持つ
-status: proposed
+status: accepted
 date: 2026-09-29
 ---
 
@@ -11,7 +11,7 @@ D&D 並べ替え機能 (ロードマップ v1-foundation) で、ドラッグで�
 
 各 OS の慣習は分かれる。iOS は SwiftUI の List の並べ替えも iOS 27 の SwiftUI 標準の並べ替えもドロップの後に 1 回知らせ、UIKit 標準のドラッグ & ドロップはドラッグ中は隙間 (プレースホルダ) を見せるだけで配列に触らない。Android は RecyclerView の ItemTouchHelper も Compose の OSS (`sh.calvin.reorderable`) も、項目が入れ替わるたびに知らせて利用者がその場でリストを書き換える作りである。Compose には公式の並べ替え API が無い。
 
-前提: iOS は UIKit のドラッグ & ドロップのプレースホルダで、Android はラッパーの中に持つ仮の並びで、ドラッグ中の並びを利用者の配列から切り離して見せられる。
+前提: iOS は UIKit の並べ替えが一覧の表示の上で見せる並びで、Android はラッパーの中に持つ仮の並びで、ドラッグ中の並びを利用者の配列から切り離して見せられる。
 
 ## Decision
 

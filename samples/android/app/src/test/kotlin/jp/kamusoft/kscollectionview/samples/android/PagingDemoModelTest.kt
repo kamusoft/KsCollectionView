@@ -317,8 +317,8 @@ class PagingDemoModelTest {
 
     @Test
     fun `知らせを消すまでの既定の時間は 3 秒`() {
-        assertEquals(3_000L, PagingPanelMetrics.BannerDurationMillis)
-        assertEquals(200, PagingPanelMetrics.BannerFadeMillis)
+        assertEquals(3_000L, SamplePanelMetrics.BannerDurationMillis)
+        assertEquals(200, SamplePanelMetrics.BannerFadeMillis)
     }
 
     @Test

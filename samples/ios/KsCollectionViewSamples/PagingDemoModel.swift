@@ -15,7 +15,7 @@ import KsCollectionView
 ///   取得できたら項目を置き換えるのと同じ回に、終端か待機にする。失敗したとき、項目があれば状態を取り直しの前に戻して
 ///   「更新できませんでした」の知らせを出し、項目が 0 件なら失敗にする。取り直しの前が追加読み込み中か
 ///   取り直し中なら、その読み込みの結果は捨てられて戻る先が無いため待機に戻す
-/// - 「更新できませんでした」の知らせ: 出してから ``PagingPanelMetrics/bannerDuration`` (3 秒) たったら消す。
+/// - 「更新できませんでした」の知らせ: 出してから ``SamplePanelMetrics/bannerDuration`` (3 秒) たったら消す。
 ///   その間に次の取り直しを始めたら、その時点で消す。もう一度失敗したら、また 3 秒出す
 /// - 取り直し中を一覧に届けてから取得する理由: 一覧は差し替えの直前の状態が取り直し中のときだけ、
 ///   結果を先頭から表示する。取得がすぐ終わると、取り直し中への書き換えと結果の差し替えが同じ描画の回に
@@ -151,7 +151,7 @@ final class PagingDemoModel: ObservableObject {
         noticeTask?.cancel()
         refreshFailed = true
         noticeTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(PagingPanelMetrics.bannerDuration * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(SamplePanelMetrics.bannerDuration * 1_000_000_000))
             guard !Task.isCancelled else { return }
             self?.refreshFailed = false
         }

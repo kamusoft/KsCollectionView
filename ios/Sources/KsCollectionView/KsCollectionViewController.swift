@@ -20,14 +20,16 @@ private let ksLiveCellCompactionThreshold = 512
 internal final class KsCollectionViewController<Item: Equatable>: UICollectionViewController,
     UICollectionViewDataSourcePrefetching,
     UIGestureRecognizerDelegate {
-    private var configuration: KsCollectionConfiguration<Item>
-    private var dataSource: UICollectionViewDiffableDataSource<KsSectionID, KsItemIdentifier>!
-    private var itemsByID: [AnyHashable: Item] = [:]
+    private(set) var configuration: KsCollectionConfiguration<Item>
+    private(set) var dataSource: UICollectionViewDiffableDataSource<KsSectionID, KsItemIdentifier>!
+    private(set) var itemsByID: [AnyHashable: Item] = [:]
     private var keysByID: [AnyHashable: AnyHashable] = [:]
     private var registrations: [AnyHashable: UICollectionView.CellRegistration<KsHostingCell, KsItemIdentifier>] = [:]
     private var pendingCommands: [KsScrollCommand] = []
     private var appliedItems: [Item] = []
-    private var appliedIdentifiers: [KsItemIdentifier] = []
+    private(set) var appliedIdentifiers: [KsItemIdentifier] = [] {
+        didSet { reorderPlannerCache = nil }
+    }
     // 控えた位置。`offsetFromTop` は表示範囲の上端 (固定中のグループの見出しが上端を覆っていれば
     // その下端) からの距離で、`belowPinnedHeader` は控えたときに固定中の見出しが上端を覆っていたか。
     private var pendingAnchor: (
@@ -56,7 +58,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private var appliedChunkSize = 0
     // 適用済みの snapshot に載っている塊の表。塊のグループの中での位置 (先頭・末尾) で内側余白・
     // 見出し・区切り線を切り替えるために、セクションの番号から引く。
-    private var appliedChunkTable = KsGroupChunkTable.empty
+    private(set) var appliedChunkTable = KsGroupChunkTable.empty {
+        didSet { reorderPlannerCache = nil }
+    }
     // 塊の組み直しを次の実行機会へ予約したかどうか。レイアウトの途中で snapshot を適用しないため、
     // 発火は同じ実行を抜けてから行う。
     private var isChunkRebuildScheduled = false
@@ -117,6 +121,44 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     var pagingState: KsPagingState? { configuration.paging?.state }
     // 表示の変化に備えて控えた位置を持っているかどうか。控えが捨てられる契機を観測するために読む。
     var hasPendingAnchor: Bool { pendingAnchor != nil }
+    // 適用済みの並びとグループの区切りで行き先を求める部品の控え。並びか塊の表が変わったら捨てる。
+    var reorderPlannerCache: KsReorderPlanner?
+    // 持ち上げた時点の構成。指を動かし始めた時点で今の構成と比べ、配置を組み直す変化やスイッチの無効化が
+    // あればドラッグを取りやめる。持ち上げの取り消しを知らせる通知が無いため、次の持ち上げで上書きするだけにする。
+    var reorderLiftConfiguration: KsCollectionConfiguration<Item>?
+    // 上端の自動スクロールを進めるフレームの通知。ドラッグのセッションの間だけ持つ。
+    private var reorderAutoScrollLink: CADisplayLink?
+    private var reorderAutoScrollTimestamp: CFTimeInterval?
+    // 上端の自動スクロールの計算 (帯に入ってからの時間を持つ)。回している間だけ持つ。
+    private var reorderTopAutoScroll: KsReorderTopAutoScroll?
+    // 指の位置 (一覧の枠の上端から、画面に対しての縦の距離)。ドラッグ中の提案のたびに控え、指が一覧の外へ
+    // 出たとき・ドロップのセッションが終わったとき・置いたときに捨てる。
+    var reorderFingerY: CGFloat?
+    // 上端の自動スクロールを回しているか。
+    var isReorderAutoScrollRunning: Bool { reorderAutoScrollLink != nil }
+    // 進行中の並べ替えのドラッグ。持ち上げたドラッグのセッションが始まってから終わるまで持つ。
+    var reorderDrag: KsReorderDrag?
+    // ドラッグのセッションに付ける、この一覧の目印。ほかの一覧から来たセッションを見分けるために使う。
+    let reorderDragContext = KsReorderDragContext()
+    // ドラッグ & ドロップの delegate。受けた呼び出しをこの一覧へ渡す。
+    private let reorderDelegate = KsReorderDragDropDelegate()
+    // ドラッグの間に届いた構成の最新の 1 つ。ドラッグが終わってから当てる (core/ADR-0033)。
+    private(set) var deferredConfiguration: KsCollectionConfiguration<Item>?
+    // 並べ替えを受け入れた時点に届いていた配列。受け入れた後、これと同じ配列の更新では置いた並びのまま待ち、
+    // 違う配列が届いたらその並びに従う (core/ADR-0027)。受け入れを待っていないときは nil。
+    private(set) var reorderAwaitedItems: [Item]?
+    // 読み上げの移動操作の付け直しの世代。配列・スイッチ・判定が変わりうる更新のたびに進め、可視セルの操作を
+    // 求め直させる。
+    private(set) var reorderAccessibilityGeneration = 0
+    // セルの中身に読み上げの移動操作の部品を付けるか。並べ替えを付けて文言を渡した構成でだけ付け、並べ替えを
+    // 使わない一覧・文言を渡さない一覧の中身には付けない (部品の組み立ては表示に入る項目ごとに走るため)。
+    // スイッチの状態では付け外しせず、無効の間は操作を空にする。付け外しは中身の作り直しを伴い、切り替えの
+    // たびに表示中のセルのテンプレートを呼び直すことになるため。構成の値から毎回求めず控えるのは、ドラッグの
+    // 間に並べ替えの設定だけが先に入れ替わっても、表示中のセルの中身と食い違わないようにするため。
+    private(set) var attachesReorderAccessibility = false
+    // 並べ替えのドラッグ中か。ドラッグ中は配列を当てず、次ページ要求の判定とスクロール命令の実行を止める
+    // (core/ADR-0033、core/ADR-0034)。
+    var isReorderDragging: Bool { reorderDrag != nil }
     #if DEBUG
     // 仮想化・再利用が効いていることを観測するための計数。生存中のセルだけを弱参照で保持し、
     // 再利用プールから外れて破棄されたセルは数から外れる。計測のための仕組みが計測対象に混ざらないよう、
@@ -146,7 +188,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private(set) var unregisteredTemplateKeysAtPreparation: [AnyHashable] = []
     private let logger = Logger(subsystem: "jp.kamusoft.kscollectionview", category: "engine")
 
-    private var isApplyingSnapshot: Bool {
+    // 差分の適用中か (重ねて適用した snapshot のどれかが終わっていない間)。
+    var isApplyingSnapshot: Bool {
         applyingSnapshotCount > 0
     }
 
@@ -163,6 +206,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         var configuration = configuration
         configuration.layout = Self.validatedLayout(configuration.layout)
         self.configuration = configuration
+        attachesReorderAccessibility = Self.attachesReorderAccessibility(configuration)
         super.init(collectionViewLayout: UICollectionViewFlowLayout())
         collectionView.setCollectionViewLayout(makeLayout(), animated: false)
         configureCollectionView()
@@ -188,6 +232,22 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     func update(configuration: KsCollectionConfiguration<Item>) {
         var configuration = configuration
         configuration.layout = Self.validatedLayout(configuration.layout)
+        // ドラッグの間に届いた構成は当てずに最新の 1 つを控え、ドラッグが終わってから当てる (core/ADR-0033)。
+        // 並べ替えの設定 (スイッチ・判定・置いたときの処理) だけは、ドラッグの続きに使うためすぐに入れ替える。
+        if isReorderDragging {
+            deferDuringReorderDrag(configuration)
+            return
+        }
+        // 並べ替えを受け入れた後は、受け入れた時点と同じ配列の更新では置いた並びのまま待つ (core/ADR-0027)。
+        // 違う配列が届いたら待つのをやめ、その並びに従う。
+        if let awaited = reorderAwaitedItems {
+            if configuration.items == awaited {
+                configuration.items = self.configuration.items
+            } else {
+                reorderAwaitedItems = nil
+            }
+        }
+        reorderAccessibilityGeneration &+= 1
         let previousLayout = self.configuration.layout
         let previousPadding = self.configuration.contentPadding
         let previousShowsSeparators = self.configuration.showsSeparators
@@ -224,6 +284,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             != (configuration.grouping?.header == nil)
             || self.configuration.grouping?.pinsHeaders != configuration.grouping?.pinsHeaders
         let layoutKindChanged = previousLayout.kind != configuration.layout.kind
+        // 読み上げの部品の有無が変わったら、作ってあるセルの中身を新しい有無で作り直す。
+        let reorderAccessibilityAttachmentChanged =
+            attachesReorderAccessibility != Self.attachesReorderAccessibility(configuration)
+        attachesReorderAccessibility = Self.attachesReorderAccessibility(configuration)
         // 表示形態だけでなく行間・列間・内側余白の差し替えでも要素の位置が動くため、
         // layout 値と contentPadding のいずれかが変わったらアンカーを控える。
         let layoutChanged = previousLayout != configuration.layout || previousPadding != configuration.contentPadding
@@ -232,7 +296,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
 
         self.configuration = configuration
-        longPressRecognizer?.isEnabled = configuration.onItemLongTap != nil
+        syncReorderInteraction()
 
         if previousController !== configuration.scrollController {
             previousController?.detach(self)
@@ -275,7 +339,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         apply(
             items: configuration.items,
             animatingDifferences: true,
-            reconfiguringAllItems: layoutKindChanged,
+            reconfiguringAllItems: layoutKindChanged || reorderAccessibilityAttachmentChanged,
             rebuildingVisibleCellContentOnEqualItems: rebuildsVisibleCellContent,
             rebuildingSurvivingVisibleCellContent: observedValueChanged,
             regroupingSections: groupingDeclarationChanged || groupValueSourceChanged,
@@ -378,6 +442,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     func disconnect() {
+        stopReorderAutoScroll()
         configuration.scrollController?.detach(self)
         // 画面から消えたときは未完了の取得をすべて取り消す。
         imagePrefetcher?.cancelAll()
@@ -448,15 +513,25 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         collectionView.delegate = self
         collectionView.prefetchDataSource = self
         collectionView.contentInsetAdjustmentBehavior = .never
+        // 指を止めるまで置く先の隙間を動かさない。端での自動スクロールの間も、隙間は指を止めた位置のまま動かない
+        // (UIKit 標準の並べ替えと同じ。reorder-capable な置き先でだけ効く)。
+        collectionView.reorderingCadence = .slow
+        // データソースが並べ替えに対応すると、この controller は既定で対話的な移動の長押しを一覧に付ける
+        // (installsStandardGestureForInteractiveMovement)。並べ替えはドラッグ & ドロップで行い、長押しは
+        // スイッチが無効の間の長押しの知らせに使うため付けない。
+        installsStandardGestureForInteractiveMovement = false
 
         let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
         longPress.cancelsTouchesInView = true
         longPress.delegate = self
-        // 長押しハンドラが宣言されていないときは認識器を無効にする。有効なままだと、
-        // 長押し相当の保持でタッチがキャンセルされ、通常タップのコールバックが失われる。
-        longPress.isEnabled = configuration.onItemLongTap != nil
         collectionView.addGestureRecognizer(longPress)
         longPressRecognizer = longPress
+        // 並べ替えは UIKit 標準のドラッグ & ドロップで行う (ios/ADR-0011)。delegate は常に付け、
+        // ドラッグを受け付けるかはスイッチに合わせて切り替える。
+        reorderDelegate.owner = self
+        collectionView.dragDelegate = reorderDelegate
+        collectionView.dropDelegate = reorderDelegate
+        syncReorderInteraction()
     }
 
     private func configureDataSource() {
@@ -519,6 +594,37 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 )
             }
         }
+        // 並べ替えは一覧が自分で並びを動かす形 (reorder-capable) で行う (ios/ADR-0011)。置いた位置への移動は
+        // 差分データソースが確定し、確定した後に知らせを求める。動かせるかは持ち上げ (itemsForBeginning) で
+        // 判定済みのため、ここではスイッチだけを見る。
+        dataSource.reorderingHandlers.canReorderItem = { [weak self] _ in
+            self?.configuration.isReorderEnabled ?? false
+        }
+        dataSource.reorderingHandlers.didReorder = { [weak self] transaction in
+            guard
+                let self,
+                let identifier = reorderDrag.map({ KsItemIdentifier($0.identifier) }),
+                let indexPath = Self.indexPath(of: identifier, in: transaction.finalSnapshot)
+            else {
+                return
+            }
+            reorderDidReorder(movingTo: indexPath)
+        }
+    }
+
+    // snapshot の中の項目の位置。
+    private static func indexPath(
+        of identifier: KsItemIdentifier,
+        in snapshot: NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>
+    ) -> IndexPath? {
+        guard
+            let sectionID = snapshot.sectionIdentifier(containingItem: identifier),
+            let section = snapshot.indexOfSection(sectionID),
+            let item = snapshot.itemIdentifiers(inSection: sectionID).firstIndex(of: identifier)
+        else {
+            return nil
+        }
+        return IndexPath(item: item, section: section)
     }
 
     #if DEBUG
@@ -546,14 +652,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
 
         let registration = UICollectionView.CellRegistration<KsHostingCell, KsItemIdentifier> {
-            [weak self] cell, _, identifier in
+            [weak self] cell, indexPath, identifier in
             guard
                 let self,
                 let item = itemsByID[identifier.value]
             else {
                 return
             }
-            applyContent(to: cell, item: item)
+            applyContent(to: cell, item: item, at: indexPath)
         }
         registrations[key] = registration
         return registration
@@ -574,7 +680,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         #endif
     }
 
-    private func applyContent(to cell: KsHostingCell, item: Item) {
+    private func applyContent(to cell: KsHostingCell, item: Item, at indexPath: IndexPath) {
         let key = configuration.templateKey(item)
         let content = configuration.registry.content(for: key, item: item)
         // 内容を適用したセルの計測だけを推定高さに数えるため、content と対で設定する
@@ -584,10 +690,28 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
         // 行の高さが content のサイズ変化に 1 パス遅れて追いつく間、ホスト View の既定の
         // 中央配置だと content が上方向にもはみ出す。KsRowContentPlacement で上端へ固定する。
+        guard attachesReorderAccessibility else {
+            cell.contentConfiguration = UIHostingConfiguration {
+                KsRowContentPlacement { content }
+            }
+            .margins(.all, 0)
+            #if DEBUG
+            cell.recordContentApplied(withReorderAccessibility: false)
+            #endif
+            return
+        }
+        // 読み上げの移動操作は、中身を作る前にモデルへ入れる。作った後に入れると、操作の変化の知らせで
+        // 作ったばかりの中身がもう一度描き直される。
+        updateReorderAccessibility(of: cell, at: indexPath)
+        let reorderAccessibility = cell.reorderAccessibility
         cell.contentConfiguration = UIHostingConfiguration {
             KsRowContentPlacement { content }
+                .modifier(KsReorderAccessibilityModifier(model: reorderAccessibility))
         }
         .margins(.all, 0)
+        #if DEBUG
+        cell.recordContentApplied(withReorderAccessibility: true)
+        #endif
     }
 
     // セルが自己サイズで返した高さを推定高さへ入れます。
@@ -629,6 +753,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         cell.configureTouchFeedback(
             color: configuration.touchFeedbackColor ?? KsHostingCell.defaultTouchFeedbackColor
         )
+        updateReorderAccessibility(of: cell, at: indexPath)
     }
 
     // 上端の区切り線を出す項目か。線はグループごとに先頭行の上端へ引く (core/ADR-0016)。
@@ -761,7 +886,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             }
             if rebuildingContent {
                 _ = registration(for: configuration.templateKey(item))
-                applyContent(to: cell, item: item)
+                applyContent(to: cell, item: item, at: indexPath)
             }
             configure(cell: cell, at: indexPath)
         }
@@ -1090,7 +1215,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
     }
 
-    private var compositionalLayout: KsCompositionalLayout? {
+    var compositionalLayout: KsCompositionalLayout? {
         collectionView.collectionViewLayout as? KsCompositionalLayout
     }
 
@@ -1103,6 +1228,9 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         )
         layout.groupHeaderPinning = { [weak self] in
             self?.groupHeaderPinning()
+        }
+        layout.onInteractivelyMovingTargetChange = { [weak self] targets in
+            self?.reorderGapDidMove(to: targets)
         }
         return layout
     }
@@ -1509,6 +1637,310 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         return previousOrder[..<index].last(where: surviving.contains)
     }
 
+    // MARK: - 並べ替え
+
+    // スイッチに合わせて、ドラッグと長押しの認識器を切り替える (core/ADR-0031)。有効の間は長押しを並べ替えの
+    // 操作にして長押しの認識器を止める。無効の間はドラッグを受け付けず、長押しの認識器は長押しの知らせの
+    // 有無で決める (有効なままだと、長押し相当の保持でタッチがキャンセルされ、通常タップのコールバックが失われる)。
+    func syncReorderInteraction() {
+        let isEnabled = configuration.isReorderEnabled
+        if collectionView.dragInteractionEnabled != isEnabled {
+            collectionView.dragInteractionEnabled = isEnabled
+        }
+        longPressRecognizer?.isEnabled = configuration.onItemLongTap != nil && !isEnabled
+    }
+
+    // タップのフィードバックを出す構成か。並べ替えのスイッチが有効の間は、長押しの知らせをハンドラに数えない。
+    var handlesItemTouch: Bool {
+        configuration.onItemTap != nil
+            || (configuration.onItemLongTap != nil && !configuration.isReorderEnabled)
+    }
+
+    // 並べ替えのドラッグを始める。以後、ドラッグが終わるまで届いた構成は控えに回す。
+    // 持ち上げた後、指を動かし始めるまでに配置を組み直す変化やスイッチの無効化があれば、ここで取りやめる
+    // (その間の変化は控えに回さずに当たっているため、持ち上げた時点の構成と比べる)。
+    func beginReorderDrag(identifier: AnyHashable) {
+        guard let indexPath = dataSource.indexPath(for: KsItemIdentifier(identifier)) else { return }
+        let center = collectionView.collectionViewLayout.layoutAttributesForItem(at: indexPath)?.center
+        reorderDrag = KsReorderDrag(identifier: identifier, sourceIndexPath: indexPath, sourceCenter: center)
+        if let lifted = reorderLiftConfiguration, Self.cancelsReorderDrag(from: lifted, to: configuration) {
+            reorderDrag?.isCancelled = true
+        }
+        reorderLiftConfiguration = nil
+        startReorderAutoScroll()
+    }
+
+    // UIKit が置く先の隙間を動かした。見えている隙間の位置を控え、置けるかの判定をこの位置に合わせる。
+    func reorderGapDidMove(to targetIndexPaths: [IndexPath]) {
+        guard isReorderDragging, let target = targetIndexPaths.first else { return }
+        reorderDrag?.gapTracker.gapDidMove(to: target)
+        reorderDrag?.shownGap = target
+    }
+
+    // 並べ替えのドラッグを終える。控えた構成があれば当て、溜めたスクロール命令を実行し、次ページ要求を
+    // 判定し直す (core/ADR-0033、core/ADR-0034)。受け入れた並べ替えは、控えた構成の配列が受け入れた時点と
+    // 同じなら置いた並びのまま待つ。
+    // 置いた結果 (受け入れた並び・元の並びへの戻し) を表示に当てるのを次の周回へ回している間にドラッグの
+    // セッションが終わったら、当て終わるまでドラッグ中の扱いを続け、当て終わった時点で終える。
+    func endReorderDrag() {
+        stopReorderAutoScroll()
+        guard isReorderDragging else { return }
+        if reorderDrag?.isResolving == true {
+            reorderDrag?.isSessionEnded = true
+            return
+        }
+        reorderDrag = nil
+        if let deferred = deferredConfiguration {
+            deferredConfiguration = nil
+            update(configuration: deferred)
+        }
+        // 差分の適用中なら、適用の完了時に実行と判定が行われる。
+        if !isApplyingSnapshot {
+            flushPendingCommands()
+        }
+        evaluatePaging()
+    }
+
+    // ドラッグ中に届いた構成を控える。並べ替えの設定だけはすぐ入れ替え、ドラッグを取りやめる変化なら取りやめる。
+    private func deferDuringReorderDrag(_ configuration: KsCollectionConfiguration<Item>) {
+        if Self.cancelsReorderDrag(from: self.configuration, to: configuration) {
+            reorderDrag?.isCancelled = true
+        }
+        self.configuration.reorder = configuration.reorder
+        deferredConfiguration = configuration
+        syncReorderInteraction()
+    }
+
+    // セルの中身に読み上げの移動操作の部品を付ける構成か。並べ替えを付けて文言を渡した構成でだけ付ける。
+    static func attachesReorderAccessibility(_ configuration: KsCollectionConfiguration<Item>) -> Bool {
+        configuration.reorder?.accessibilityActions != nil
+    }
+
+    // ドラッグを取りやめる変化か。スイッチの無効化と、配置を組み直す設定 (layout 値・グループの宣言) の変化。
+    // 配置が組み直されると、ドラッグ中の仮の並びと行き先の対応が崩れる。
+    static func cancelsReorderDrag(
+        from current: KsCollectionConfiguration<Item>,
+        to next: KsCollectionConfiguration<Item>
+    ) -> Bool {
+        guard next.isReorderEnabled else { return true }
+        if current.layout != next.layout {
+            return true
+        }
+        switch (current.grouping, next.grouping) {
+        case (nil, nil):
+            return false
+        case let (current?, next?):
+            return current.valueSource != next.valueSource
+                || (current.header == nil) != (next.header == nil)
+                || current.pinsHeaders != next.pinsHeaders
+        default:
+            return true
+        }
+    }
+
+    // 上端の自動スクロールを回し始める。一覧をバーの裏まで広げた置き方で、UIKit の上端の反応の帯がバーの裏に
+    // 入る分を補う (KsReorderTopAutoScroll)。安全領域の上が 0 の間は、フレームごとの判定で何もしない。
+    private func startReorderAutoScroll() {
+        stopReorderAutoScroll()
+        let target = KsDisplayLinkTarget { [weak self] link in
+            self?.reorderAutoScrollFrame(link)
+        }
+        let link = CADisplayLink(target: target, selector: #selector(KsDisplayLinkTarget.frame(_:)))
+        link.add(to: .main, forMode: .common)
+        reorderAutoScrollLink = link
+        reorderTopAutoScroll = KsReorderTopAutoScroll(
+            profile: KsReorderTopAutoScroll.profile(
+                osMajorVersion: ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+            )
+        )
+    }
+
+    private func stopReorderAutoScroll() {
+        reorderAutoScrollLink?.invalidate()
+        reorderAutoScrollLink = nil
+        reorderAutoScrollTimestamp = nil
+        reorderTopAutoScroll = nil
+        reorderFingerY = nil
+    }
+
+    private func reorderAutoScrollFrame(_ link: CADisplayLink) {
+        defer { reorderAutoScrollTimestamp = link.timestamp }
+        guard let previous = reorderAutoScrollTimestamp else { return }
+        advanceReorderAutoScroll(elapsed: link.timestamp - previous)
+    }
+
+    // 上端の自動スクロールを 1 フレーム分進める。指が一覧の中の帯にある間だけ上へ送り、先頭で止める。
+    // UIKit の帯と重なる所・iOS 26 より前で帯に入ってからの待ちの間・指が一覧の外へ出た後・置いた後
+    // (指の位置を捨てた後)・取りやめたドラッグでは送らない (KsReorderTopAutoScroll)。
+    func advanceReorderAutoScroll(elapsed: TimeInterval) {
+        guard let drag = reorderDrag, !drag.isCancelled, var autoScroll = reorderTopAutoScroll else { return }
+        let next = autoScroll.nextOffset(
+            fingerY: reorderFingerY,
+            safeAreaTop: collectionView.safeAreaInsets.top,
+            systemBandTop: collectionView.adjustedContentInset.top,
+            currentOffset: collectionView.contentOffset.y,
+            minimumOffset: -collectionView.adjustedContentInset.top,
+            elapsed: elapsed
+        )
+        reorderTopAutoScroll = autoScroll
+        guard let next else { return }
+        collectionView.setContentOffset(CGPoint(x: collectionView.contentOffset.x, y: next), animated: false)
+    }
+
+    // 受け入れた並べ替えを表示に当てる (core/ADR-0027)。
+    //
+    // 項目のグループの値はまだ変わっていないため、グループの値から組み直さず、今の snapshot の中で項目だけを
+    // 動かす。配列の並びと塊の表も、動かした項目を行き先のグループに属させた仮の所属で組み直す。塊の区切り
+    // 直しはせず、動かした項目を抜いた塊と入れた塊の件数だけを変える。項目が無くなったグループは、固定の
+    // 見出しの位置の計算がグループに項目があることを前提にしているため、この時点でセクションと見出しを
+    // 取り除く。受け入れた時点に届いていた配列を控え、それと同じ配列の更新では置いた並びのまま待つ。
+    //
+    // `destinationSection` は項目を入れる塊のセクション。UIKit が並びを動かした後は、UIKit が入れたセクションを
+    // 渡して塊の割り当てを揃える (渡さなければ行き先から求める)。`snapshotTiming` で snapshot を当てる時点を
+    // 選ぶ (差分データソースの並べ替えの確定の中では snapshot を当てられないため、その後は次の周回以降)。
+    // `aligning` を渡すと、先に差分データソースの並びを UIKit が見せている並びへ揃える (alignedReorderSnapshot)。
+    // 表の組み直しはその場で行う。
+    func applyAcceptedReorder(
+        moving source: Int,
+        to placement: KsReorderPlacement,
+        planner: KsReorderPlanner,
+        latestItems: [Item],
+        destinationSection proposedSection: Int? = nil,
+        snapshotTiming: KsReorderSnapshotTiming = .immediate,
+        aligning alignment: (identifier: KsItemIdentifier, indexPath: IndexPath)? = nil,
+        completion: (() -> Void)? = nil
+    ) {
+        let table = appliedChunkTable
+        guard
+            let sourceSection = table.section(containingItemAt: source),
+            let destinationSection = proposedSection ?? destinationSection(of: placement, in: table)
+        else {
+            completion?()
+            return
+        }
+        let reorderedIDs = planner.reorderedIdentifiers(moving: source, to: placement)
+        let movedTable = table.movingItem(fromSection: sourceSection, toSection: destinationSection)
+        let identifiers = reorderedIDs.map(KsItemIdentifier.init)
+        var snapshot = NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>()
+        snapshot.appendSections(movedTable.sectionIDs)
+        for (sectionID, range) in zip(movedTable.sectionIDs, movedTable.sectionItemRanges) where !range.isEmpty {
+            snapshot.appendItems(Array(identifiers[range]), toSection: sectionID)
+        }
+        let reorderedItems = reorderedIDs.compactMap { itemsByID[$0] }
+        appliedIdentifiers = identifiers
+        appliedItems = reorderedItems
+        appliedChunkTable = movedTable
+        configuration.items = reorderedItems
+        reorderAwaitedItems = latestItems
+        reorderAccessibilityGeneration &+= 1
+        applyReorderSnapshot(snapshot, timing: snapshotTiming, aligning: alignment) { [weak self] in
+            self?.updateVisibleGroupHeaders()
+            completion?()
+        }
+    }
+
+    // 並べ替えを受け入れなかったとき、UIKit が動かした並びを、適用済みの並び (動かす前の並び) へ動かして戻す。
+    // ドロップのセッションが終わってから当てる (reorderDidReorder)。
+    func revertReorderedSnapshot(
+        aligning alignment: (identifier: KsItemIdentifier, indexPath: IndexPath)?,
+        completion: @escaping () -> Void
+    ) {
+        let table = appliedChunkTable
+        var snapshot = NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>()
+        snapshot.appendSections(table.sectionIDs)
+        for (sectionID, range) in zip(table.sectionIDs, table.sectionItemRanges) where !range.isEmpty {
+            snapshot.appendItems(Array(appliedIdentifiers[range]), toSection: sectionID)
+        }
+        applyReorderSnapshot(snapshot, timing: .afterDropSession, aligning: alignment, completion: completion)
+    }
+
+    // 並べ替えの snapshot を `timing` の時点で当てる。待つ間も差分の適用中として数え、スクロール命令と次ページ
+    // 要求の判定を当て終わるまで待たせる。`aligning` を渡すと、当てる直前に差分データソースの並びを UIKit が
+    // 見せている並びへ動きなしに揃える。
+    func applyReorderSnapshot(
+        _ snapshot: NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>,
+        timing: KsReorderSnapshotTiming,
+        aligning alignment: (identifier: KsItemIdentifier, indexPath: IndexPath)? = nil,
+        completion: @escaping () -> Void
+    ) {
+        applyingSnapshotCount += 1
+        let apply = { [weak self] in
+            guard let self else { return }
+            if let alignment, let aligned = alignedReorderSnapshot(moving: alignment.identifier, to: alignment.indexPath) {
+                dataSource.apply(aligned, animatingDifferences: false)
+                reorderDrag?.shownSnapshot = nil
+            }
+            snapshotApplyCount += 1
+            dataSource.apply(snapshot, animatingDifferences: true) { [weak self] in
+                guard let self else { return }
+                applyingSnapshotCount = max(0, applyingSnapshotCount - 1)
+                updateVisibleCellSeparators()
+                updateVisibleRootSupplementaryViews()
+                completion()
+                guard applyingSnapshotCount == 0 else { return }
+                flushPendingCommands()
+                evaluatePaging()
+            }
+        }
+        switch timing {
+        case .immediate:
+            apply()
+        case .nextRunLoop:
+            DispatchQueue.main.async(execute: apply)
+        case .afterDropSession:
+            runAfterReorderDropSession(apply)
+        }
+    }
+
+    // 見えているセルの位置にある項目。並べ替えの後、差分データソースの並びを UIKit が見せている並びへ揃えるまでは、
+    // 見せている並びで引く (差分データソースの並びと見えているセルが食い違うため)。
+    func shownItemIdentifier(at indexPath: IndexPath) -> KsItemIdentifier? {
+        guard let shown = reorderDrag?.shownSnapshot else {
+            return dataSource.itemIdentifier(for: indexPath)
+        }
+        guard shown.sectionIdentifiers.indices.contains(indexPath.section) else { return nil }
+        let items = shown.itemIdentifiers(inSection: shown.sectionIdentifiers[indexPath.section])
+        return items.indices.contains(indexPath.item) ? items[indexPath.item] : nil
+    }
+
+    // 差分データソースの今の並びの中で、動かした項目を `destination` (UIKit が見せている位置) に置いた snapshot。
+    // 確定した位置と見せている位置の間の項目は、セルの中身を作り直す (セルは UIKit が見せている位置のまま、
+    // データソースの項目だけが食い違っているため)。
+    func alignedReorderSnapshot(
+        moving identifier: KsItemIdentifier,
+        to destination: IndexPath
+    ) -> NSDiffableDataSourceSnapshot<KsSectionID, KsItemIdentifier>? {
+        var snapshot = dataSource.snapshot()
+        let before = snapshot.itemIdentifiers
+        guard snapshot.sectionIdentifiers.indices.contains(destination.section), before.contains(identifier) else {
+            return nil
+        }
+        snapshot.deleteItems([identifier])
+        let sectionID = snapshot.sectionIdentifiers[destination.section]
+        let items = snapshot.itemIdentifiers(inSection: sectionID)
+        if destination.item < items.count {
+            snapshot.insertItems([identifier], beforeItem: items[destination.item])
+        } else {
+            snapshot.appendItems([identifier], toSection: sectionID)
+        }
+        let changed = zip(before, snapshot.itemIdentifiers).filter { $0 != $1 }.flatMap { [$0, $1] }
+        snapshot.reconfigureItems(Array(Set(changed)))
+        return snapshot
+    }
+
+    // 行き先の項目が入る塊のセクションの番号。項目の前なら、その項目の塊。末尾なら、行き先のグループの最後の塊。
+    private func destinationSection(of placement: KsReorderPlacement, in table: KsGroupChunkTable) -> Int? {
+        switch placement.target {
+        case let .before(identifier):
+            guard let index = appliedIdentifiers.firstIndex(of: KsItemIdentifier(identifier)) else { return nil }
+            return table.section(containingItemAt: index)
+        case .end:
+            guard table.groups.indices.contains(placement.groupIndex) else { return nil }
+            let sections = table.groups[placement.groupIndex].sectionRange
+            return sections.isEmpty ? nil : sections.upperBound - 1
+        }
+    }
+
     // MARK: - ページング
 
     // 最後の項目の後ろに出すページングの表示。項目が 0 件のときと、出す表示が無い状態では nil。
@@ -1718,12 +2150,14 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     }
 
     // 次ページ要求を判定し、条件を満たせば頼む (core/ADR-0020)。ページングを付けていない一覧、画面に
-    // 載る前、差分の適用中は判定しない (適用の完了時に判定し直す)。
-    private func evaluatePaging() {
+    // 載る前、差分の適用中は判定しない (適用の完了時に判定し直す)。並べ替えのドラッグ中も判定せず、
+    // ドラッグが終わってから判定し直す (core/ADR-0034)。
+    func evaluatePaging() {
         guard
             let paging = configuration.paging,
             hasAppliedSnapshot,
             !isApplyingSnapshot,
+            !isReorderDragging,
             collectionView.window != nil
         else {
             return
@@ -1897,7 +2331,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private func handleLongPress(_ recognizer: UILongPressGestureRecognizer) {
         guard
             recognizer.state == .began,
-            configuration.onItemLongTap != nil
+            configuration.onItemLongTap != nil,
+            !configuration.isReorderEnabled
         else {
             return
         }
@@ -1911,8 +2346,11 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         performLongPress(at: indexPath)
     }
 
+    // 長押しの知らせを呼ぶ。並べ替えのスイッチが有効の間は、長押しは並べ替えの操作なので呼ばない
+    // (core/ADR-0031)。
     func performLongPress(at indexPath: IndexPath) {
         guard
+            !configuration.isReorderEnabled,
             let identifier = dataSource.itemIdentifier(for: indexPath)?.value,
             let item = itemsByID[identifier]
         else {
@@ -1985,7 +2423,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }
     }
 
-    private func flushPendingCommands() {
+    // 保留中のスクロール命令を受けた順に実行する。並べ替えのドラッグ中は指の下の一覧を動かさないよう
+    // 溜めたままにし、ドラッグが終わって配列を当てた後に実行する (core/ADR-0007)。
+    func flushPendingCommands() {
+        guard !isReorderDragging else { return }
         let commands = pendingCommands
         pendingCommands.removeAll()
         commands.forEach(execute)
@@ -2028,8 +2469,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         guard let cell = collectionView.cellForItem(at: indexPath) as? KsHostingCell else {
             return false
         }
-        return !cell.lastHitWasInteractive
-            && (configuration.onItemTap != nil || configuration.onItemLongTap != nil)
+        return !cell.lastHitWasInteractive && handlesItemTouch
     }
 
     // セルが表示に入る時点で、位置依存の表示とタッチ時の背景色を現在の構成に揃える。
@@ -2061,7 +2501,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             return
         }
         guard
-            let identifier = dataSource.itemIdentifier(for: indexPath)?.value,
+            let identifier = shownItemIdentifier(at: indexPath)?.value,
             let item = itemsByID[identifier]
         else {
             return
@@ -2073,7 +2513,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
 extension KsCollectionViewController: KsScrollCommandReceiver {
     func receive(_ command: KsScrollCommand) {
         pendingCommands.append(command)
-        guard !isApplyingSnapshot, !isCommandFlushScheduled else { return }
+        guard !isApplyingSnapshot, !isReorderDragging, !isCommandFlushScheduled else { return }
 
         isCommandFlushScheduled = true
         DispatchQueue.main.async { [weak self] in

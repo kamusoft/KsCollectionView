@@ -103,7 +103,7 @@ KsCollectionView(
 | 失敗 (`failed`) | 自動では頼まない。再試行の操作でだけ頼む |
 | 終端 (`endReached`) | 頼まない。末尾を表示中の末尾への挿入で末尾に留める (下記「表示範囲の置き方」) |
 
-### 発火の条件 (core/ADR-0020)
+### 発火の条件 (core/ADR-0020・0034)
 
 状態が待機のとき、次の式が成り立てば次ページ要求を呼ぶ。
 
@@ -118,6 +118,8 @@ KsCollectionView(
 項目が 0 件で状態が待機なら、しきい値によらず頼む。VM は最初の読み込みを自分で始めなくてよい。項目が 1 件以上あるのに画面に出ている項目が 1 つも無い (ルートのヘッダーだけで表示範囲が埋まっている等) ときは頼まず、項目が画面に出てから判定する。
 
 判定し直すきっかけは、スクロール・配列の差し替え・状態の変化・しきい値の変化・一覧の大きさの変化 (回転を含む) である。そのため 1 ページが画面に満たない一覧は、スクロールしなくても残りの項目の数が式の右辺を超えるまで続けて頼み、失敗から待機に戻したときもその場で判定される。
+
+並べ替えのドラッグ中 (ドラッグが始まってから、置いて受け入れの結果が出て表示が落ち着くまで) は判定せず、ドラッグが終わってから判定し直す (core/ADR-0034。[collection-reorder](collection-reorder.md))。ドラッグ中は届いた配列を表示に当てないため、判定すると頼んだページが表示に出ないまま待ちが解け、次のページを連鎖して頼むためである。
 
 ### 不正なしきい値
 
@@ -264,9 +266,10 @@ iOS で上の `contentPadding` に安全領域の分を入れた一覧では、�
 - [collection-items](collection-items.md) — 配列の差し替えと端を表示中の端への挿入 (ページングを付けた一覧の例外はこの文書)
 - [collection-layout](../styling/collection-layout.md) — ルートのヘッダー / フッター・`contentPadding`・安全領域
 - [collection-interaction](collection-interaction.md) — `KsScrollController` の命令 (`scrollToStart` を含む)
+- [collection-reorder](collection-reorder.md) — 並べ替えのドラッグ中の配列の保留 (その間は次ページ要求を判定しない)
 - [iOS ページングの実現](../../ios/architecture/paging-engine.md) / [Android ページングの実現](../../android/architecture/paging-wrapper.md) — この契約を実現する部品と罠対策
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) / [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — 一覧全体の実現
 - core/ADR-0005 (5 状態の外形と責務の分担)、core/ADR-0019 (失敗の状態と再試行)、core/ADR-0020 (発火の条件としきい値)、core/ADR-0022 (非同期の処理と待ち方)、core/ADR-0023 (Pull to Refresh)
 - core/ADR-0021 (表示範囲の置き方。0018 を一部改訂)、core/ADR-0024 (6 つの表示と差し替え口。0005 を一部改訂)、core/ADR-0025 (重ねる表示と安全領域。0017 を一部改訂)
-- core/ADR-0011 (不正入力の release 挙動)、core/ADR-0017 (安全領域)、core/ADR-0018 (端を表示中の端への挿入)
+- core/ADR-0011 (不正入力の release 挙動)、core/ADR-0017 (安全領域)、core/ADR-0018 (端を表示中の端への挿入)、core/ADR-0034 (並べ替えのドラッグ中は判定しない。0020 を一部改訂)
 - 出典: kasane/changes/archive/2026-09-29-paging-state-machine/ (design.md・deviation.md)

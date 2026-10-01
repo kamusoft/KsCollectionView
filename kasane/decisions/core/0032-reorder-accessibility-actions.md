@@ -1,7 +1,7 @@
 ---
 id: 0032
 title: 並べ替えの読み上げ用の移動操作はライブラリが両プラットフォームで出し、操作の文言は利用者から受け取る
-status: proposed
+status: accepted
 date: 2026-09-29
 ---
 

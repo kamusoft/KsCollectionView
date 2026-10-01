@@ -29,10 +29,4 @@ enum PagingDemoText {
 
     /// 空の表示。
     static let empty = "項目がありません"
-
-    /// 操作のパネルを畳む操作 (読み上げ用)。
-    static let fold = "操作を畳む"
-
-    /// 畳んだ操作のパネルを広げる操作 (読み上げ用)。
-    static let unfold = "操作を広げる"
 }

@@ -41,7 +41,7 @@ KsCollectionView (SwiftUI)
 
 `visiblePagingItems()` は `indexPathsForVisibleItems` を、レイアウト属性の矩形が bounds (バーの裏を含む表示範囲の全体) と交わる項目に絞って数え、配列上の位置を塊の表 (`sectionItemRanges[section].lowerBound + indexPath.item`) から O(1) で引く。可視セルの一覧には表示範囲の外のセルが残りうるためで、表示位置の控え (用語節) で使う `leadingVisibleID()` と同じ絞り方である。UIKit の先読みの通知 (`prefetchItemsAt`) は範囲が UIKit の判断で決まり、画面に出ている項目の数も分からないため契機にしない。
 
-判定するのは `scrollViewDidScroll`・差分の適用の完了・`update(configuration:)`・`viewDidLayoutSubviews`・`viewDidAppear` と、次ページ要求の処理が終わったときである。`scrollViewDidScroll` の時点の可視セルは新しい位置のレイアウトより前のものなので、レイアウトの確定後にも判定する。差分の適用中と画面に載る前 (`window` が無い) は判定しない。
+判定するのは `scrollViewDidScroll`・差分の適用の完了・`update(configuration:)`・`viewDidLayoutSubviews`・`viewDidAppear` と、次ページ要求の処理が終わったときである。`scrollViewDidScroll` の時点の可視セルは新しい位置のレイアウトより前のものなので、レイアウトの確定後にも判定する。差分の適用中と画面に載る前 (`window` が無い) は判定しない。並べ替えのドラッグ中 (`isReorderDragging`) も判定せず、ドラッグが終わったときに判定し直す (core/ADR-0034。[iOS 並べ替えの実現](reorder-engine.md))。
 
 配列の版は `update` で配列を同値比較して進める。状態と版は判定しない間も毎回 `KsPagingRequester` に知らせる。知らせないと、その間の状態の往復 (待機 → 追加読み込み中 → 待機) を見逃して待ち方の控えが残り、次を頼まなくなる。
 

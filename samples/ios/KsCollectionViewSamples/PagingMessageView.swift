@@ -10,7 +10,7 @@ struct PagingMessageView: View {
     var retry: (@MainActor () -> Void)?
 
     var body: some View {
-        VStack(spacing: PagingPanelMetrics.messageSpacing) {
+        VStack(spacing: PagingMessageMetrics.messageSpacing) {
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(SampleTheme.secondaryText)
@@ -18,11 +18,11 @@ struct PagingMessageView: View {
                 Button(PagingDemoText.retry, action: retry)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(SampleTheme.accent)
-                    .padding(.vertical, PagingPanelMetrics.retryVerticalPadding)
-                    .padding(.horizontal, PagingPanelMetrics.retryHorizontalPadding)
+                    .padding(.vertical, PagingMessageMetrics.retryVerticalPadding)
+                    .padding(.horizontal, PagingMessageMetrics.retryHorizontalPadding)
                     .background(
                         SampleTheme.cell,
-                        in: RoundedRectangle(cornerRadius: PagingPanelMetrics.retryCornerRadius)
+                        in: RoundedRectangle(cornerRadius: PagingMessageMetrics.retryCornerRadius)
                     )
             }
         }

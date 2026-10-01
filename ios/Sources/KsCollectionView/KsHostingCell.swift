@@ -14,6 +14,9 @@ internal final class KsHostingCell: UICollectionViewCell {
     /// 書き込みの省略 (同じオブジェクトなら書かない) が既定色でも効くようにする。
     static let defaultTouchFeedbackColor: UIColor = .systemFill
 
+    /// 中身に出す読み上げの移動操作。
+    let reorderAccessibility = KsReorderAccessibilityModel()
+
     private let touchFeedbackView = UIView()
     private let topSeparatorView = UIView()
     private let bottomSeparatorView = UIView()
@@ -25,6 +28,16 @@ internal final class KsHostingCell: UICollectionViewCell {
     private var writtenTouchFeedbackColor: UIColor?
     private var writtenSeparatorColor: UIColor = KsHostingCell.defaultSeparatorColor
     #if DEBUG
+    // 最後に中身を設定したときに、読み上げの移動操作の部品を付けたか。
+    private(set) var hasReorderAccessibilityContent = false
+    // 最後に中身を設定した時点の、読み上げの移動操作の入れ替えの回数。この後の入れ替えは、作った中身の描き直しを起こす。
+    private(set) var reorderAccessibilityChangeCountAtContentApply = 0
+
+    func recordContentApplied(withReorderAccessibility attached: Bool) {
+        hasReorderAccessibilityContent = attached
+        reorderAccessibilityChangeCountAtContentApply = reorderAccessibility.actionsChangeCount
+    }
+
     // 色を実際に書き込んだ回数。同じ構成での揃え直しが書き込みを起こさないことを観測するために読む。
     // 計測のための仕組みが計測対象に混ざらないよう、debug ビルドにだけ載せる。
     private(set) var touchFeedbackColorWriteCount = 0
@@ -159,6 +172,7 @@ internal final class KsHostingCell: UICollectionViewCell {
         backgroundConfiguration = nil
         // 内容を適用したセルの計測だけが推定高さに入るよう、内容と一緒に解除する。
         onMeasuredSize = nil
+        reorderAccessibility.clear()
         touchFeedbackView.isHidden = true
         topSeparatorView.isHidden = true
         bottomSeparatorView.isHidden = true

@@ -115,6 +115,8 @@ iOS で 1 つのグループが内部の塊に割れても、見出しはグル�
 
 置き場と振る舞いの全体は [collection-paging](../core-model/collection-paging.md) にある。
 
+並べ替えのドラッグ中の端での自動スクロールは、iOS では上端の反応する範囲を安全領域の境目 (バーのすぐ下) から取る。バーの裏には指を置けないためである。Android は一覧の外枠の端から測り、安全領域は使わない ([collection-reorder](../core-model/collection-reorder.md))。
+
 ### セルの高さと content の配置 (ios/ADR-0007、両プラットフォーム共通)
 
 - **セルの高さはコンテンツから自動決定される**。利用者に高さの指定や事前計算を要求しない。
@@ -177,6 +179,7 @@ iOS は `UICollectionView` の既定のインジケータをそのまま使う�
 
 - [collection-items](../core-model/collection-items.md) — 差分更新とテンプレート、グループの宣言
 - [collection-paging](../core-model/collection-paging.md) — ページングの表示の置き場と、重ねる表示の安全領域
+- [collection-reorder](../core-model/collection-reorder.md) — 並べ替えのドラッグ中の端での自動スクロール
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 自前 compositional レイアウト・区切り線サブビュー・自己サイズと推定高さ
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — `LazyVerticalGrid` 統一・`BoxWithConstraints` による向き判定・項目単位の区切り線描画・高さ補間
 - core/ADR-0006 (layout 値の語彙)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0015 (グループの宣言と見出し)、core/ADR-0016 (グループごとの区切り線)、core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0025 (重ねる表示も安全領域に合わせる。0017 を一部改訂)

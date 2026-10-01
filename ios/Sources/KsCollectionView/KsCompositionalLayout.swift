@@ -24,13 +24,36 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
     // この余白の分だけ下がった表示範囲の上端を基準にするため、安全領域と二重に数えないよう差し引く。
     var refreshExtraTopInset: CGFloat = 0
 
+    // 見せない項目。並べ替えで置かずに終え、持ち上げた項目が元の位置へ戻る動きの間だけ、元の位置のセルを隠す。
+    var hiddenItemIndexPath: IndexPath?
+
     override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-        let attributes = super.layoutAttributesForElements(in: rect)
-        guard let attributes, let pinning = groupHeaderPinning?() else { return attributes }
+        guard let attributes = super.layoutAttributesForElements(in: rect) else { return nil }
+        let pinning = groupHeaderPinning?()
+        guard pinning != nil || hiddenItemIndexPath != nil else { return attributes }
         return attributes.map { original in
-            guard original.representedElementKind == KsSupplementaryKind.groupHeader else { return original }
+            if original.representedElementCategory == .cell {
+                return hidingIfNeeded(original)
+            }
+            guard let pinning, original.representedElementKind == KsSupplementaryKind.groupHeader else { return original }
             return pinnedGroupHeaderAttributes(from: original, pinning: pinning)
         }
+    }
+
+    override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+        super.layoutAttributesForItem(at: indexPath).map(hidingIfNeeded)
+    }
+
+    // 見せない項目なら、透明にした複製を返す。キャッシュされた属性は書き換えない。
+    private func hidingIfNeeded(_ original: UICollectionViewLayoutAttributes) -> UICollectionViewLayoutAttributes {
+        guard
+            original.indexPath == hiddenItemIndexPath,
+            let hidden = original.copy() as? UICollectionViewLayoutAttributes
+        else {
+            return original
+        }
+        hidden.alpha = 0
+        return hidden
     }
 
     override func layoutAttributesForSupplementaryView(
@@ -64,6 +87,28 @@ internal final class KsCompositionalLayout: UICollectionViewCompositionalLayout 
         }
         guard abs(collectionView.contentOffset.y - target) >= 0.5 else { return }
         collectionView.contentOffset = CGPoint(x: collectionView.contentOffset.x, y: target)
+    }
+
+    // ドラッグ & ドロップで置く先の隙間が動いたときに、隙間の位置を受け取る。UIKit は隙間を動かすたびに
+    // 動いた先の位置を渡してこのレイアウトを無効化するため、ここで見えている隙間の位置を知る。
+    var onInteractivelyMovingTargetChange: (([IndexPath]) -> Void)?
+
+    override func invalidationContext(
+        forInteractivelyMovingItems targetIndexPaths: [IndexPath],
+        withTargetPosition targetPosition: CGPoint,
+        previousIndexPaths: [IndexPath],
+        previousPosition: CGPoint
+    ) -> UICollectionViewLayoutInvalidationContext {
+        let context = super.invalidationContext(
+            forInteractivelyMovingItems: targetIndexPaths,
+            withTargetPosition: targetPosition,
+            previousIndexPaths: previousIndexPaths,
+            previousPosition: previousPosition
+        )
+        if !targetIndexPaths.isEmpty {
+            onInteractivelyMovingTargetChange?(targetIndexPaths)
+        }
+        return context
     }
 
     // 固定中のグループの見出しを置く上端の位置 (内容の座標)。表示範囲の上端に、上端の安全領域に

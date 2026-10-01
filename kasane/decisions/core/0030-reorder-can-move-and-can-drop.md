@@ -1,7 +1,7 @@
 ---
 id: 0030
 title: 並べ替えの業務ルールは「動かせるか」と「ここに置けるか」の任意の 2 つの判定で受け、置く前に止める
-status: proposed
+status: accepted
 date: 2026-09-29
 ---
 

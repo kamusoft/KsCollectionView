@@ -34,8 +34,11 @@ enum SampleTheme {
     ]
 
     /// 描かれる場所の外観がダークならダークの組、それ以外ならライトの組の値になる色。
-    private static func adaptive(_ light: UIColor, _ dark: UIColor) -> Color {
-        Color(uiColor: UIColor { traits in
+    ///
+    /// 色を解決する処理は SwiftUI が描画のスレッド (アニメーション中はメインでないことがある) から呼ぶため、
+    /// メインアクターに縛らない処理にする。
+    private nonisolated static func adaptive(_ light: UIColor, _ dark: UIColor) -> Color {
+        Color(uiColor: UIColor { @Sendable traits in
             traits.userInterfaceStyle == .dark ? dark : light
         })
     }

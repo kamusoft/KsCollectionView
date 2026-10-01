@@ -32,6 +32,8 @@ struct SampleDestinationView: View {
                 DiffUpdateDemoView()
             case .paging:
                 PagingDemoView()
+            case .reorder:
+                ReorderDemoView()
             }
         }
         .navigationTitle(screen.rawValue)

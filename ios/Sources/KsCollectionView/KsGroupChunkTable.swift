@@ -95,6 +95,72 @@ internal struct KsGroupChunkTable: Equatable {
         return groups[chunk.groupIndex]
     }
 
+    /// 配列の位置の項目が載る塊のセクションの番号。範囲外なら nil。
+    func section(containingItemAt index: Int) -> Int? {
+        sectionItemRanges.firstIndex { $0.contains(index) }
+    }
+
+    /// 項目を 1 つ、あるセクションの塊から別の (または同じ) セクションの塊へ動かした後の表。
+    ///
+    /// 並べ替えを受け入れた直後の、項目のグループの値がまだ変わっていない間に使う。塊の区切り直しは
+    /// せず、抜いた塊と入れた塊の件数だけを変え、項目の位置の範囲を先頭から数え直す。項目が無くなった
+    /// 塊は取り除き、項目が無くなったグループは表から取り除く。塊の識別子は動かさない (差分の適用で
+    /// 残った塊が作り直されないようにする)。
+    func movingItem(fromSection source: Int, toSection destination: Int) -> KsGroupChunkTable {
+        guard chunks.indices.contains(source), chunks.indices.contains(destination) else { return self }
+        var counts = chunks.map(\.itemCount)
+        counts[source] -= 1
+        counts[destination] += 1
+
+        // 残る塊を、グループごとに集める。
+        var keptSections: [[Int]] = Array(repeating: [], count: groups.count)
+        for section in chunks.indices where counts[section] > 0 {
+            keptSections[chunks[section].groupIndex].append(section)
+        }
+        let keptGroups = groups.indices.filter { !keptSections[$0].isEmpty }
+
+        var sectionIDs: [KsSectionID] = []
+        var newChunks: [KsChunkInfo] = []
+        var sectionItemRanges: [Range<Int>] = []
+        var newGroups: [KsGroupInfo] = []
+        var itemStart = 0
+        for (newGroupIndex, groupIndex) in keptGroups.enumerated() {
+            let sections = keptSections[groupIndex]
+            let firstSection = sectionIDs.count
+            let groupItemStart = itemStart
+            for (chunkInGroup, section) in sections.enumerated() {
+                sectionIDs.append(self.sectionIDs[section])
+                newChunks.append(
+                    KsChunkInfo(
+                        groupIndex: newGroupIndex,
+                        chunkInGroup: chunkInGroup,
+                        chunkCountInGroup: sections.count,
+                        itemCount: counts[section],
+                        isFirstGroup: newGroupIndex == 0,
+                        isLastGroup: newGroupIndex == keptGroups.count - 1
+                    )
+                )
+                sectionItemRanges.append(itemStart..<(itemStart + counts[section]))
+                itemStart += counts[section]
+            }
+            newGroups.append(
+                KsGroupInfo(
+                    value: groups[groupIndex].value,
+                    occurrence: groups[groupIndex].occurrence,
+                    sectionRange: firstSection..<sectionIDs.count,
+                    itemRange: groupItemStart..<itemStart
+                )
+            )
+        }
+        return KsGroupChunkTable(
+            sectionIDs: sectionIDs,
+            chunks: newChunks,
+            sectionItemRanges: sectionItemRanges,
+            groups: newGroups,
+            reappearingValues: reappearingValues
+        )
+    }
+
     // 同じグループの値が続く範囲。
     private struct Run {
         let value: AnyHashable?

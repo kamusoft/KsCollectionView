@@ -51,10 +51,13 @@ KsCollectionView(
 - **ハンドラを宣言した項目だけがフィードバックを出す**。`onItemTap` も `onItemLongTap` も無い項目は、タッチしてもハイライトしない。既定のフィードバックはプラットフォーム標準の塗り (iOS はハイライト、Android は material3 の ripple — android/ADR-0003)。
 - **セル内の操作要素が優先される**。テンプレート内の `Button` / `Toggle` がタッチを処理したときは、項目のタップコールバックもフィードバックも発火しない。セル背景の余白をタップしたときだけ項目タップになる。
 - **タップと長押しは排他**。長押しが成立したタッチでは `onItemTap` は発火しない。
+- **並べ替えのスイッチが有効の間は、長押しは並べ替えの操作になる** (core/ADR-0031)。`onItemLongTap` は動かせない項目も含めて発火せず、並べ替えのスイッチを無効に戻すと元どおり発火する。`onItemTap` は並べ替えのスイッチによらず発火する ([collection-reorder](collection-reorder.md))。
+- **その間は `onItemLongTap` をハンドラに数えない**。`onItemLongTap` だけを宣言した項目は、タップしてもフィードバックを出さない。
 
 ### スクロール命令
 
 - **命令はデータ反映後に実行される** (core/ADR-0007)。配列の末尾に要素を追加して同じ処理内で `scrollToEnd()` を呼ぶと、追加後の末尾まで到達する。実行前に対象要素が削除されていれば no-op。
+- **並べ替えのドラッグ中に受けた命令は、ドラッグが終わって配列を表示に当てた後に実行する**。指の下の一覧を命令で動かさないためで、受けた順は保たれる ([collection-reorder](collection-reorder.md))。
 - **命令は呼んだ順に取り出され、取りこぼされない**。次の命令の実行開始時に先行するアニメーションは中断されるため、最終位置は最後の命令のものになる。
 - **アニメーションは一方向で着地する**。`Center` / `End` 指定でも、対象を行き過ぎてから戻る動きにならない (Sample「スクロール制御」で実機確認。観測点は [実行時挙動の検証規約](../../../handbook/cross/runtime-behavior-verification.md))。
 - **位置の基準は `contentPadding` ([collection-layout](../styling/collection-layout.md)) の内側の表示範囲**。到達できない位置はスクロール可能範囲で clamp される。先頭・末尾付近の項目はスクロール端で止まり、表示範囲より高い項目は先頭合わせになる。
@@ -82,6 +85,7 @@ iOS は渡された色をそのままセル全面の塗りにする。Android �
 
 - [collection-items](collection-items.md) — 差分反映の単位 (スクロール命令の順序保証はこれに乗る)
 - [collection-layout](../styling/collection-layout.md) — `contentPadding` (位置指定の基準になる表示範囲)
+- [collection-reorder](collection-reorder.md) — 並べ替えのスイッチが有効の間の長押しと、ドラッグ中のスクロール命令の扱い
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — hitTest による操作要素判定と、apply completion で flush するコマンドキュー
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — `combinedClickable` + ripple と、コンポジション後に最新配列で解決するコマンドキュー
-- core/ADR-0007 (スクロール制御)、core/ADR-0009 (タップ・ハイライト)、android/ADR-0003 (material3 依存と ripple)
+- core/ADR-0007 (スクロール制御)、core/ADR-0009 (タップ・ハイライト)、core/ADR-0031 (並べ替えのスイッチと長押し)、android/ADR-0003 (material3 依存と ripple)

@@ -1,18 +1,24 @@
 ---
 type: concept
 title: Android Compose ラッパー
-description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・グループ・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策 (ページングと Pull to Refresh は paging-wrapper.md)
+description: Compose LazyVerticalGrid の薄いラッパーとして core の契約 (項目モデル・グループ・レイアウト・操作) をどう実現しているか、その責務境界と実測で確かめた罠対策 (ページングと Pull to Refresh は paging-wrapper.md、並べ替えは reorder-wrapper.md)
 tags: [architecture, compose, lazy-grid]
 timestamp: 2026-09-29
 ---
 
 # Android Compose ラッパー
 
-この文書を読むと、Android の `KsCollectionView` が Compose の Lazy 系にどう載っていて、core の契約 ([collection-items](../../core/core-model/collection-items.md) / [collection-layout](../../core/styling/collection-layout.md) / [collection-interaction](../../core/core-model/collection-interaction.md)) のどの部分をどの部品が担い、Compose のどの挙動を回避しているかが分かる。core の 3 文書を先に読むと分かりやすい。iOS の対応物は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)。画像の先読みと `KsImage` の Android 側の実現は [Android 画像の先読みと KsImage の実現](image-pipeline.md)、ページングと Pull to Refresh の実現は [Android ページングと Pull to Refresh の実現](paging-wrapper.md) にある。
+この文書を読むと、Android の `KsCollectionView` が Compose の Lazy 系にどう載っていて、core の契約 ([collection-items](../../core/core-model/collection-items.md) / [collection-layout](../../core/styling/collection-layout.md) / [collection-interaction](../../core/core-model/collection-interaction.md)) のどの部分をどの部品が担い、Compose のどの挙動を回避しているかが分かる。core の 3 文書を先に読むと分かりやすい。iOS の対応物は [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)。次の機能の Android 側の実現は、別の文書にある。
+
+| 機能 | 文書 |
+|---|---|
+| 画像の先読みと `KsImage` | [Android 画像の先読みと KsImage の実現](image-pipeline.md) |
+| ページングと Pull to Refresh | [Android ページングと Pull to Refresh の実現](paging-wrapper.md) |
+| 並べ替え (ドラッグ & ドロップ) | [Android 並べ替えの実現](reorder-wrapper.md) |
 
 ## 目的
 
-Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化・グループの並べ方と間隔・端への挿入・スクロールインジケータ) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ね、配置の変化は `animateItem` で見せる (android/ADR-0006)。テンプレートのラムダは item の合成の中で実行されるため、そこで読んだ親の State は自動で購読され、iOS の `observedValue(_:)` に当たる指定は無い (ios/ADR-0008)。
+Android は独自の描画エンジンを持たず、Compose Lazy 系の薄いラッパーである (core/ADR-0001)。ラッパーの仕事は、公開 DSL (スコープで集めたテンプレートと引数) を `LazyVerticalGrid` の DSL に流し込み、Compose がそのままでは満たさない core の契約 (不正入力の縮退・命令の順序保証・区切り線・content 配置・行の高さ変化・グループの並べ方と間隔・端への挿入・スクロールインジケータ・並べ替え) をその周りで成立させることに限る。iOS 側 (ios/ADR-0004) と同じく、独自のデータ保持層 (Store) や差分計算層を持たない。差分は Compose の `key` に委ね、配置の変化は `animateItem` で見せる (android/ADR-0006)。テンプレートのラムダは item の合成の中で実行されるため、そこで読んだ親の State は自動で購読され、iOS の `observedValue(_:)` に当たる指定は無い (ios/ADR-0008)。
 
 ## 構成
 
@@ -38,6 +44,7 @@ flowchart TD
     BOX["Box(propagateMinConstraints = true) + ksAnimatedHeight<br/>行の高さを補間し、補間中の高さを根まで制約として届ける"]
     TPL["テンプレート (利用者の Composable)"]
     PAGE["ページングと Pull to Refresh の部品<br/>(paging-wrapper.md)"]
+    REORDER["並べ替えの部品<br/>(reorder-wrapper.md)"]
 
     KCV --> SCOPE
     KCV --> PLAN --> DIAG
@@ -52,6 +59,7 @@ flowchart TD
     GRID --> ITEMS
     ITEMS -- 項目ラッパー: 外側から内側へ --> ANIM --> SPACE --> SEP --> TAP --> BOX --> TPL
     KCV --> PAGE -- layoutInfo を読み、前面に表示を重ねる --> GRID
+    KCV --> REORDER -- "表示する並びを差し替え、一覧の pointerInput でドラッグを受ける" --> GRID
 ```
 
 list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed(1)` の 1 列グリッドである (android/ADR-0001)。`LazyColumn` は使わない。グループを宣言しない場合も、配列全体を値なしの 1 つのグループとして同じ並べ方に乗せる (見出しは並べない)。
@@ -64,18 +72,19 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | `resolveItems` / `KsItemsPlan` | `items()` に渡す前に配列を走査し、重複 ID を後勝ちで除去、未登録テンプレートキーと Bundle に載らない `key` を診断として集める。未登録キーの要素は最小高 1dp の空 item として残し件数を保つ。`contentType` にはテンプレートキーをそのまま渡す |
 | `KsDiagnostics` | 診断を debug では `IllegalStateException` で止め、release では警告ログ (タグ `KsCollectionView`) にする。debug 判定は組み込み先アプリの debuggable フラグ。`WarnOnce` が同じ内容の警告を再コンポジションで繰り返さない |
 | `KsLayout` / `KsColumns` | layout 値の値型。不正値 (0 以下の列数・負の spacing) の診断と、負の間隔を 0 にした実効値。`GridCells` への変換は `BoxWithConstraints` で列数を決めてから行う |
-| `KsGroups` / `resolveGroups` / `KsGroupPlan` (`KsGroupPlan.kt`) | 配列を走査して同じグループの値が続く範囲をグループにし、離れて現れた同じ値と Bundle に載らないグループの値を診断に集める。構成表は項目の位置 ⇄ lazy の index の写像と、`KsGroupRows` (行の数え方) を持つ。表の大きさはグループの数に比例し、項目の数には比例しない |
+| `KsGroups` / `resolveGroups` / `KsGroupPlan` (`KsGroupPlan.kt`) | 配列を走査して同じグループの値が続く範囲をグループにし、離れて現れた同じ値と Bundle に載らないグループの値を診断に集める。構成表は項目の位置 ⇄ lazy の index の写像と、`KsGroupRows` (行の数え方) を持つ。表の大きさはグループの数に比例し、項目の数には比例しない。並べ替えの仮の並びでは、項目 1 件を別のグループへ移した構成表を `movingItem` で作る |
 | `KsGroupHeaderKey` / `KsRootSlotKey` | グループの見出しとルートのヘッダー / フッターの lazy のキー。ライブラリ内部の `Parcelable` で包み、項目の `key` と衝突させない (後述) |
 | `KsGroupSpacing` / `ksItemSpacing` | 行間・見出しの下の間隔・グループ間の間隔を、項目の上下の余白として置く (後述) |
 | `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) にグループの先頭行の上端と全項目の下端の線を全幅 1dp で描く。見出しが無ければ上端の線は最初のグループだけ (core/ADR-0016)。色は `listSeparatorColor` 未指定なら `#D9D9DE` |
-| 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003) |
+| 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003)。並べ替えのスイッチが有効の間は `onItemLongTap` をハンドラに数えず、`onLongClick` も渡さない |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
-| `ksAnimateItem` / `KsAnimatedItemBox` / `KsFullSpanBox` | 項目・グループの見出し・ルートのヘッダー / フッターに `animateItem` を付け、配列の差し替えによる移動と出入りをアニメーションで見せる (android/ADR-0006。後述) |
+| `ksAnimateItem` / `KsAnimatedItemBox` / `KsFullSpanBox` | 項目・グループの見出し・ルートのヘッダー / フッターに `animateItem` を付け、配列の差し替えによる移動と出入りをアニメーションで見せる (android/ADR-0006。後述)。並べ替えで持ち上げた項目は配置のアニメーションを外し、pin でコンポジションに留める |
 | `KsPositionKeeper` / `KsAppearingItems` (`KsAppearingItems.kt`) | 配列の差し替えと列数の変化の直前の配置から、端を表示中の端への挿入と、固定中の見出しの下の項目の位置を補う。末尾への挿入で表示範囲の外に足された項目は、最初に配置されたときにフェードさせる (後述) |
 | `KsTopSafeArea` / `ksPinnedHeaderSafeArea` (`KsTopSafeArea.kt`) | コレクションの上端・下端が安全領域に重なる長さ (`overlapPx` / `bottomOverlapPx`) を求め、固定中の見出しをその境目で止める (後述)。一覧に重ねる表示の位置にも使う |
 | `ksScrollIndicator` / `rememberKsScrollIndicatorVisibility` (`KsScrollIndicator.kt`) | `LazyVerticalGrid` の前面 (`drawWithContent`) に縦のインジケータを描く。見た目と時間は `KsScrollIndicatorDefaults` の定数 (iOS の既定の実測値)。表示の濃さは利用者のドラッグで始まったスクロール (慣性を含む) の間だけ 1 にし、止まって 1 秒後に 250 ms でフェードする。位置と長さは `LazyGridState.scrollIndicatorState` を `ksGroupedScrollIndicatorMetrics` で数え直して求める |
 | ページングと Pull to Refresh の部品 (`KsPagingRequester` / `KsPaging` / `KsPullRefresh` / `ksBlockingTouches`) | 次ページ要求の判定と待ち方、6 つの表示の置き場、引っ張りの受け付けとインジケータ。詳細は [Android ページングと Pull to Refresh の実現](paging-wrapper.md) |
-| `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID を項目の位置にし、`KsGroupPlan` の写像で lazy 上の置き場所 (index・上下の余白・固定される見出しのキー) へ解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約 |
+| `KsScrollController` / `KsScrollCommandReceiver` | 命令を receiver のキューに積み、コンポジション後に最新の配列で ID を項目の位置にし、`KsGroupPlan` の写像で lazy 上の置き場所 (index・上下の余白・固定される見出しのキー) へ解決して `LazyGridState` を動かす。未接続 no-op、複数接続は最後勝ち、メインスレッド契約。並べ替えで配列を保留している間は命令を取り出さない |
+| 並べ替えの部品 (`KsReorderController` / `ksReorderGestures` / `KsReorderPlanner` / `ksReorderLift`) | 自前のドラッグ、仮の並び、持ち上げた項目の描画、端での自動スクロール、読み上げの移動操作。配列を保留している間は `KsPositionKeeper` と次ページ要求の判定も止める。詳細は [Android 並べ替えの実現](reorder-wrapper.md) |
 
 ## 保証すること (実測で確かめた罠対策)
 
@@ -212,6 +221,6 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - [Android 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の Android 側の実現 (契約は [image-loading](../../core/core-model/image-loading.md))
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
 - [Android 性能検証の手順](../../../handbook/android/performance-verification.md)、[スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md) — 性能の手順と合否の判定規則 (cross/ADR-0006)
-- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)
+- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)、android/ADR-0007 (並べ替えは自前で作る)
 - android/ADR-0004 (行の高さ変化の補間)、android/ADR-0006 (差分の移動・挿入・削除を `animateItem` で見せる。0004 を一部改訂)、core/ADR-0015 (グループの宣言)、core/ADR-0016 (グループごとの区切り線)
 - core/ADR-0007、core/ADR-0011、core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)、ios/ADR-0007

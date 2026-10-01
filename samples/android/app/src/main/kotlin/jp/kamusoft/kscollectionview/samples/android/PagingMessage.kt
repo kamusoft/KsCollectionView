@@ -35,7 +35,7 @@ fun PagingMessage(
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(PagingPanelMetrics.messageSpacing),
+        verticalArrangement = Arrangement.spacedBy(PagingMessageMetrics.messageSpacing),
     ) {
         Text(
             text = message,
@@ -44,7 +44,7 @@ fun PagingMessage(
             textAlign = TextAlign.Center,
         )
         if (retry != null) {
-            val shape = RoundedCornerShape(PagingPanelMetrics.retryCornerRadius)
+            val shape = RoundedCornerShape(PagingMessageMetrics.retryCornerRadius)
             Text(
                 text = PagingDemoText.Retry,
                 style = MaterialTheme.typography.bodyMedium,
@@ -55,8 +55,8 @@ fun PagingMessage(
                     .background(SampleTheme.cell)
                     .clickable(role = Role.Button, onClick = retry)
                     .padding(
-                        horizontal = PagingPanelMetrics.retryHorizontalPadding,
-                        vertical = PagingPanelMetrics.retryVerticalPadding,
+                        horizontal = PagingMessageMetrics.retryHorizontalPadding,
+                        vertical = PagingMessageMetrics.retryVerticalPadding,
                     ),
             )
         }

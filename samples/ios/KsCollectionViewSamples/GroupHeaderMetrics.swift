@@ -1,6 +1,6 @@
-/// 「グループ化」「差分更新」の 2 画面が使う、グループまわりの寸法。
+/// 「グループ化」「差分更新」「並べ替え」の画面が使う、グループまわりの寸法。
 ///
-/// 値は Android Sample の同名定義とそろえる。この 2 画面だけの値のため `SampleTheme` には置かない。
+/// 値は Android Sample の同名定義とそろえる。これらの画面だけの値のため `SampleTheme` には置かない。
 enum GroupHeaderMetrics {
     /// 見出しの帯の高さ。
     static let height = 40.0

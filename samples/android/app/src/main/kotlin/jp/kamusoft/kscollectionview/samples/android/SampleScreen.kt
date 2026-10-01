@@ -21,4 +21,5 @@ enum class SampleScreen(val title: String) {
     Grouping("グループ化"),
     DiffUpdate("差分更新"),
     Paging("ページング"),
+    Reorder("並べ替え"),
 }

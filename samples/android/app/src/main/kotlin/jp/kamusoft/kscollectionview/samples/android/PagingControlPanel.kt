@@ -1,17 +1,9 @@
 package jp.kamusoft.kscollectionview.samples.android
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -19,17 +11,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-
-/** 畳むボタンと表示の形の切り替えの間隔。 */
-private val FoldButtonSpacing = 8.dp
 
 /**
  * 「ページング」画面の操作のパネル。畳むボタンと表示の形の切り替え、2 つの切り替え、
@@ -57,21 +41,12 @@ fun PagingControlPanel(
     onFold: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier
-            .pagingPanelSurface(RoundedCornerShape(PagingPanelMetrics.cornerRadius))
-            .padding(
-                horizontal = PagingPanelMetrics.horizontalPadding,
-                vertical = PagingPanelMetrics.verticalPadding,
-            ),
-        verticalArrangement = Arrangement.spacedBy(PagingPanelMetrics.rowSpacing),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    SampleFloatingPanel(modifier = modifier) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(FoldButtonSpacing),
+            horizontalArrangement = Arrangement.spacedBy(SamplePanelMetrics.foldButtonSpacing),
         ) {
-            FoldButton(onFold = onFold)
+            SamplePanelFoldButton(onFold = onFold)
             SampleSegmentedControl(
                 modifier = Modifier
                     .weight(1f)
@@ -92,31 +67,6 @@ fun PagingControlPanel(
             text = PagingDemoText.Summary,
             style = MaterialTheme.typography.bodySmall,
             color = SampleTheme.secondaryText,
-        )
-    }
-}
-
-/** パネル左上の畳むボタン。 */
-@Composable
-private fun FoldButton(onFold: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(PagingPanelMetrics.foldButtonSize)
-            .clip(CircleShape)
-            .background(SampleTheme.background)
-            .clickable(onClick = onFold)
-            // 図案の文字ではなく、操作の名前を読み上げる。
-            .clearAndSetSemantics {
-                contentDescription = PagingDemoText.Fold
-                role = Role.Button
-                onClick { onFold(); true }
-            },
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "‹",
-            style = MaterialTheme.typography.titleMedium,
-            color = SampleTheme.accent,
         )
     }
 }

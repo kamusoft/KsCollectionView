@@ -378,4 +378,73 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertNil(displays.content(for: .failedPlaceholder, retry: {}))
         XCTAssertNil(displays.content(for: .emptyPlaceholder, retry: {}))
     }
+
+    // MARK: - 並べ替え
+
+    func test並べ替えのスイッチと判定と読み上げの文言と置いたときの処理を組み立てられる() {
+        let items = [Product(id: 1, category: "果物"), Product(id: 2, category: "野菜")]
+        var received: [KsReorderMove<Product>] = []
+        let view = KsCollectionView(items) { product in
+            Text("\(product.id)")
+        }
+        .reorder(
+            isEnabled: true,
+            canMove: { $0.id != 2 },
+            canDrop: { $0.group == AnyHashable("果物") },
+            accessibilityActions: KsReorderAccessibilityActions(previous: "前へ移動", next: "後ろへ移動")
+        ) { move in
+            received.append(move)
+            return true
+        }
+
+        guard let reorder = view.configuration.reorder else {
+            XCTFail("並べ替えの設定が構成に渡っていません")
+            return
+        }
+        XCTAssertTrue(reorder.isEnabled)
+        XCTAssertTrue(view.configuration.isReorderEnabled)
+        XCTAssertEqual(reorder.canMove?(items[0]), true)
+        XCTAssertEqual(reorder.canMove?(items[1]), false)
+        let move = KsReorderMove(item: items[1], destination: .before(items[0]), group: AnyHashable("果物"))
+        XCTAssertEqual(reorder.canDrop?(move), true)
+        XCTAssertEqual(reorder.accessibilityActions, KsReorderAccessibilityActions(previous: "前へ移動", next: "後ろへ移動"))
+        XCTAssertTrue(reorder.onMove(move))
+        XCTAssertEqual(received, [move])
+    }
+
+    func test並べ替えは判定と文言を省略でき付けなければ構成に無い() {
+        let base = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        XCTAssertNil(base.configuration.reorder)
+        XCTAssertFalse(base.configuration.isReorderEnabled)
+
+        let disabled = base.reorder(isEnabled: false) { _ in false }
+        XCTAssertNotNil(disabled.configuration.reorder)
+        XCTAssertFalse(disabled.configuration.isReorderEnabled)
+        XCTAssertNil(disabled.configuration.reorder?.canMove)
+        XCTAssertNil(disabled.configuration.reorder?.canDrop)
+        XCTAssertNil(disabled.configuration.reorder?.accessibilityActions)
+    }
+
+    func test並べ替えの知らせは項目と行き先とグループの値を持つ() {
+        let a = Item(id: 1, kind: .message, title: "A")
+        let b = Item(id: 2, kind: .ad, title: "B")
+        let before = KsReorderMove(item: a, destination: .before(b), group: nil)
+        let end = KsReorderMove(item: a, destination: KsReorderDestination<Item>.end, group: AnyHashable("X"))
+
+        XCTAssertEqual(before.item, a)
+        XCTAssertEqual(before.destination, .before(b))
+        XCTAssertNil(before.group)
+        XCTAssertEqual(end.destination, .end)
+        XCTAssertEqual(end.group, AnyHashable("X"))
+        XCTAssertNotEqual(before, end)
+
+        let texts = KsReorderAccessibilityActions(previous: "前へ", next: "後ろへ")
+        XCTAssertEqual(texts.previous, "前へ")
+        XCTAssertEqual(texts.next, "後ろへ")
+        // 読み上げの文言は Sendable として渡せる。
+        let sendable: any Sendable = texts
+        XCTAssertEqual(sendable as? KsReorderAccessibilityActions, texts)
+    }
 }

@@ -31,10 +31,4 @@ object PagingDemoText {
 
     /** 空の表示。 */
     const val Empty = "項目がありません"
-
-    /** 操作のパネルを畳む操作 (読み上げ用)。 */
-    const val Fold = "操作を畳む"
-
-    /** 畳んだ操作のパネルを広げる操作 (読み上げ用)。 */
-    const val Unfold = "操作を広げる"
 }

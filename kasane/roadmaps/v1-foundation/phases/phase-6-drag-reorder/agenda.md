@@ -69,4 +69,23 @@ ksn-propose で設計・確認すること (議論で「提案で決める」と
 - [x] `sh.calvin.reorderable` の依存・取り込みの見積もり → [artifacts/reorderable-oss-assessment-2026-09-29.md](artifacts/reorderable-oss-assessment-2026-09-29.md)
 - [x] グループ間の移動の ADR を、行き先の表し方が決まったら起票する (core/ADR-0028・0029)
 - [x] 開始の操作の ADR を、既存の長押しとの関係が決まったら起票する (core/ADR-0031)
-- [x] ksn-propose で変更提案を起こす → [drag-reorder](../../../../changes/drag-reorder/proposal.md) (L 級。提案の自己レビューで core/ADR-0020 との衝突を検出し core/ADR-0034 を起票)
+- [x] ksn-propose で変更提案を起こす → [drag-reorder](../../../../changes/archive/2026-10-01-drag-reorder/proposal.md) (L 級。提案の自己レビューで core/ADR-0020 との衝突を検出し core/ADR-0034 を起票)
+
+## 実装結果 (2026-10-01 反映)
+
+change `drag-reorder` ([archive](../../../../changes/archive/2026-10-01-drag-reorder/proposal.md)) で両プラットフォームに実装し、蒸留で core/ADR-0026〜0034・ios/ADR-0011・android/ADR-0007 を accepted にした (0034 は 0020 を一部改訂)。決定事項から実装で変わったもの:
+
+- iOS の実装方式: ドラッグ & ドロップの delegate だけで置く形から、UIKit 標準の並べ替えの仕組み (差分データソースの並べ替えハンドラで一覧を並べ替えのできる置き先にする) に変えた (ios/ADR-0011 を書き直し)。基準機の目視で、自動スクロールしながらのドラッグで隙間が動き続けること・置いた後の収まりが遅いことが指摘されたため
+- 境目に置いたときの所属 (agenda の導出「見出しより上なら前のグループの末尾」): Android はそのとおり。iOS は UIKit の隙間に従い、別のグループから来て項目の上で止めるとその項目の前に、同じグループの中では入れ替わる位置に空く (見出し・間隔の上では境目に空かない)
+- 受け入れないときの戻し方 (core/ADR-0027): iOS は UIKit が並びを確定した後に受け入れを聞くため、いったん置いた位置に収まってから元の位置へ戻る。ADR の「すぐアニメーションで」を外した
+- 全画面に広げた一覧 (core/ADR-0017) の上端の自動スクロールは、iOS だけエンジンが足す (UIKit の反応する帯がバーの裏に入るため)
+- 読み上げの移動操作の基準機での目視は行わなかった (自動テストと Simulator の書き出しで担保)。iOS 16・17 は未確認
+- 実装の実際: `kasane/changes/archive/2026-10-01-drag-reorder/deviation.md`、公開契約の現在の形は concepts の core/core-model/collection-reorder.md
+
+申し送り:
+
+- 利用者向けガイドに書く約束ごと (「提案への申し送り」の「ガイドに書くこと」と、実装で増えた分) → phase-7 の agenda「phase-6 からの申し送り (2026-10-01、drag-reorder)」に追記した
+- 実機の VoiceOver / TalkBack での移動操作の確認と、iOS 16・17 での並べ替えの確認 → phase-7 の agenda の同じ申し送りに「確かめること」として追記した
+- Sample の見出しの帯と画面の背景が同じ色で、グループの間隔が見出しにくっついて見える → 起票済みの change `sample-group-header-spacing-color` (kasane/changes/sample-group-header-spacing-color/exploration.md)
+- iOS のセルを再利用するたびに中身の hosting を作り直している (変更前からの作り) → 起票済みの change `ios-hosting-content-reuse` (kasane/changes/ios-hosting-content-reuse/exploration.md)
+

@@ -46,7 +46,7 @@ flowchart TD
 
 画面に出ている項目は、`LaunchedEffect(gridState, pagingRequester)` の中で `snapshotFlow` により `layoutInfo.visibleItemsInfo` を観測し、`KsGroupPlan.itemIndexOfLazy` で項目の添字に直して数える。見出し・ルートのヘッダー / フッターは -1 になって除かれる (画像の先読みの `visibleItemRange` (`KsImagePrefetchWindow.kt`) と同じ取り方)。フッターの枠 (失敗・終端の表示) も lazy の項目だが、項目としては数えない。
 
-状態・しきい値・配列の版・処理の実行中の印 (`KsPagingRequester.isRunning` は snapshot state) も同じ流れの入力にしているため、スクロールに加えて、配列・状態・しきい値の変化と処理の終わりで判定し直す。状態と配列の版は、判定とは別に毎回のコンポジションの `SideEffect` で requester に知らせ、待ち方の控えを捨てる機会を逃さない。ページングを付けていない一覧では観測しない。
+状態・しきい値・配列の版・処理の実行中の印 (`KsPagingRequester.isRunning` は snapshot state) も同じ流れの入力にしているため、スクロールに加えて、配列・状態・しきい値の変化と処理の終わりで判定し直す。並べ替えで配列を保留している間 (`KsReorderController.isHolding`) も同じ流れの入力で、その間は判定の材料を返さず、保留を終えたときに判定し直す (core/ADR-0034。[Android 並べ替えの実現](reorder-wrapper.md))。状態と配列の版は、判定とは別に毎回のコンポジションの `SideEffect` で requester に知らせ、待ち方の控えを捨てる機会を逃さない。ページングを付けていない一覧では観測しない。
 
 ### 表示の置き場 (core/ADR-0024)
 

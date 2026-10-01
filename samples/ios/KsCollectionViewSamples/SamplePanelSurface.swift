@@ -1,0 +1,20 @@
+import SwiftUI
+
+/// 一覧の上に浮かせる操作のパネルと、畳んだときの丸いボタンに共通の面。
+///
+/// セル背景の色に不透明度を掛けた面で一覧を透かし、区切り線の色の枠と薄い影を付ける。ぼかしは
+/// 使わない (Android Sample と同じ透け方にするため)。
+struct SamplePanelSurface<SurfaceShape: InsettableShape>: ViewModifier {
+    let shape: SurfaceShape
+
+    func body(content: Content) -> some View {
+        content
+            .background(SampleTheme.cell.opacity(SamplePanelMetrics.surfaceOpacity), in: shape)
+            .overlay(shape.strokeBorder(SampleTheme.separator, lineWidth: 1))
+            .shadow(
+                color: .black.opacity(SamplePanelMetrics.shadowOpacity),
+                radius: SamplePanelMetrics.shadowRadius,
+                y: SamplePanelMetrics.shadowOffset
+            )
+    }
+}

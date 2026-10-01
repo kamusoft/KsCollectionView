@@ -32,7 +32,7 @@ typealias PagingDemoFetch = suspend (page: Int, fails: Boolean, isEmpty: Boolean
  *   取り直し中なら、その読み込みの結果は捨てられて戻る先が無いため待機に戻す
  * - 世代: 読み込みと取り直しは始めたときの世代を控え、取得から戻ったときに世代が進んでいたら
  *   結果を捨てて何も書き換えない (取り直しより前に始めた読み込みのページが後から混ざらないようにする)
- * - 「更新できませんでした」の知らせ ([refreshFailed]): 出してから [PagingPanelMetrics.BannerDurationMillis]
+ * - 「更新できませんでした」の知らせ ([refreshFailed]): 出してから [SamplePanelMetrics.BannerDurationMillis]
  *   (3 秒) たったら消す。その間に次の取り直しを始めたら、その時点で消す。もう一度失敗したら、また 3 秒出す
  * - 「次の読み込みを失敗させる」: 次の取得から効き、切り替えただけでは読み込み直さない
  * - 「中身を 0 件にする」: 切り替えたら、その場で取り直す
@@ -57,7 +57,7 @@ class PagingDemoModel(
     initialItemCount: Int = 0,
     initialState: KsPagingState = KsPagingState.Idle,
     private val awaitFrame: suspend () -> Unit = { withFrameNanos { } },
-    private val awaitNoticeTimeout: suspend () -> Unit = { delay(PagingPanelMetrics.BannerDurationMillis) },
+    private val awaitNoticeTimeout: suspend () -> Unit = { delay(SamplePanelMetrics.BannerDurationMillis) },
 ) {
     /** 表示している項目。 */
     var items: List<DemoItem> by mutableStateOf((1..initialItemCount).map(PagingDemoSource::item))

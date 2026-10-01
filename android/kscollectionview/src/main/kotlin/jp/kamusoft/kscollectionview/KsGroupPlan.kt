@@ -206,6 +206,46 @@ internal class KsGroupPlan(
     }
 
     /**
+     * グループ [fromGroup] の項目 1 件をグループ [toGroup] へ移した構成を作る。
+     *
+     * 並べ替えの仮の並びと、受け入れた直後の並びの表示に使う。項目のグループの値はまだ変わっていない
+     * ため、グループの値から組み直さずに、各グループの項目の数だけを変える。
+     *
+     * @param keepsEmptyGroups 項目が無くなったグループを残すかどうか。ドラッグの間は元のグループの見出しを
+     *   残し、受け入れた時点で見出しごと取り除く (core/ADR-0029)
+     */
+    fun movingItem(fromGroup: Int, toGroup: Int, keepsEmptyGroups: Boolean): KsGroupPlan {
+        val counts = IntArray(groupCount) { group -> groupEnd(group) - groupStart(group) }
+        counts[fromGroup] -= 1
+        counts[toGroup] += 1
+        val kept = (0 until groupCount).filter { keepsEmptyGroups || counts[it] > 0 }
+        val newStarts = IntArray(kept.size)
+        var start = 0
+        kept.forEachIndexed { position, group ->
+            newStarts[position] = start
+            start += counts[group]
+        }
+        return KsGroupPlan(
+            itemCount = itemCount,
+            starts = newStarts,
+            values = kept.map { values[it] },
+            occurrences = IntArray(kept.size) { occurrences[kept[it]] },
+            hasHeaders = hasHeaders,
+            pinsHeaders = pinsHeaders,
+            leadingCount = leadingCount,
+            hasFooter = hasFooter,
+        )
+    }
+
+    /** ルートのヘッダー / フッターの有無だけを差し替えた構成。同じなら自分自身を返す。 */
+    fun withRootSlots(leadingCount: Int, hasFooter: Boolean): KsGroupPlan =
+        if (leadingCount == this.leadingCount && hasFooter == this.hasFooter) {
+            this
+        } else {
+            KsGroupPlan(itemCount, starts, values, occurrences, hasHeaders, pinsHeaders, leadingCount, hasFooter)
+        }
+
+    /**
      * グループの構成 (境目・グループの値・何回目か) と並べ方がすべて等しいかどうか。
      *
      * グループの値の取り出し方が差し替わっても、構成が変わらなければ組み直さないために比べる。
