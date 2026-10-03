@@ -23,6 +23,7 @@ class SamplePaletteParityTest {
         "text" to 0xFF111214L,
         "secondaryText" to 0xFF6E7076L,
         "separator" to 0xFFD9D9DEL,
+        "groupHeader" to 0xFFE3E3EAL,
         "onAccent" to 0xFFFFFFFFL,
     )
 
@@ -34,6 +35,7 @@ class SamplePaletteParityTest {
         "text" to 0xFFE6EBF5L,
         "secondaryText" to 0xFF8E9AB3L,
         "separator" to 0xFF2A3752L,
+        "groupHeader" to 0xFF223050L,
         "onAccent" to 0xFF0D1321L,
     )
 
@@ -67,6 +69,8 @@ class SamplePaletteParityTest {
                 "文字 / 行" to (text to cell),
                 "補助の文字 / 下地" to (secondaryText to background),
                 "補助の文字 / 行" to (secondaryText to cell),
+                "文字 / 見出しの帯" to (text to groupHeader),
+                "補助の文字 / 見出しの帯" to (secondaryText to groupHeader),
                 "アクセント / 下地" to (accent to background),
                 "アクセント / 行" to (accent to cell),
                 "アクセントの上の色 / アクセント" to (onAccent to accent),
@@ -93,6 +97,7 @@ class SamplePaletteParityTest {
         "text" to text.argb(),
         "secondaryText" to secondaryText.argb(),
         "separator" to separator.argb(),
+        "groupHeader" to groupHeader.argb(),
         "onAccent" to onAccent.argb(),
     )
 

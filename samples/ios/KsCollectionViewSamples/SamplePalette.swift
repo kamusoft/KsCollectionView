@@ -19,6 +19,8 @@ struct SamplePalette: Sendable {
     let secondaryText: UIColor
     /// 区切りの線。
     let separator: UIColor
+    /// グループの見出しの帯の面。
+    let groupHeader: UIColor
     /// アクセントで塗った面の上に載せる文字・印・つまみ。
     let onAccent: UIColor
 
@@ -30,6 +32,7 @@ struct SamplePalette: Sendable {
         text: rgb(17, 18, 20),             // #111214
         secondaryText: rgb(110, 112, 118), // #6E7076
         separator: rgb(217, 217, 222),     // #D9D9DE
+        groupHeader: rgb(227, 227, 234),   // #E3E3EA
         onAccent: rgb(255, 255, 255)       // #FFFFFF
     )
 
@@ -43,6 +46,7 @@ struct SamplePalette: Sendable {
         text: rgb(230, 235, 245),          // #E6EBF5
         secondaryText: rgb(142, 154, 179), // #8E9AB3
         separator: rgb(42, 55, 82),        // #2A3752
+        groupHeader: rgb(34, 48, 80),      // #223050
         onAccent: rgb(13, 19, 33)          // #0D1321
     )
 

@@ -19,7 +19,7 @@ import java.util.Locale
 /**
  * グループの見出しの帯。グループ名を左、件数を右に置く。
  *
- * 背景は画面の背景と同じ色で、上端に固定されている間もこの帯のまま表示される。
+ * 背景は画面の背景とも行の面とも違う専用の色で、上端に固定されている間もこの帯のまま表示される。
  *
  * @param name グループ名
  * @param itemCount グループの項目の件数
@@ -30,7 +30,7 @@ fun GroupHeaderBand(name: String, itemCount: Int, modifier: Modifier = Modifier)
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = GroupHeaderMetrics.height)
-            .background(SampleTheme.background)
+            .background(SampleTheme.groupHeader)
             .padding(horizontal = SampleTheme.horizontalPadding)
             // 名前と件数をひとまとまりで読み上げる。
             .semantics(mergeDescendants = true) {},

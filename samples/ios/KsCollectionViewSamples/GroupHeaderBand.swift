@@ -2,7 +2,7 @@ import SwiftUI
 
 /// グループの見出しの帯。グループ名を左、件数を右に置く。
 ///
-/// 背景は画面の背景と同じ色で、上端に固定されている間もこの帯のまま表示される。
+/// 背景は画面の背景とも行の面とも違う専用の色で、上端に固定されている間もこの帯のまま表示される。
 struct GroupHeaderBand: View {
     let name: String
     let itemCount: Int
@@ -19,7 +19,7 @@ struct GroupHeaderBand: View {
         }
         .padding(.horizontal, SampleTheme.horizontalPadding)
         .frame(maxWidth: .infinity, minHeight: GroupHeaderMetrics.height)
-        .background(SampleTheme.background)
+        .background(SampleTheme.groupHeader)
         .accessibilityElement(children: .combine)
     }
 

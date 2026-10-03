@@ -45,6 +45,10 @@ object SampleTheme {
     val separator: Color
         @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.separator
 
+    /** グループの見出しの帯の面。 */
+    val groupHeader: Color
+        @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.groupHeader
+
     /** アクセントで塗った面の上に載せる文字・印・つまみ。 */
     val onAccent: Color
         @Composable @ReadOnlyComposable get() = LocalSamplePalette.current.onAccent

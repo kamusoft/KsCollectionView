@@ -12,6 +12,7 @@ enum SampleTheme {
     static let text = adaptive(SamplePalette.light.text, SamplePalette.dark.text)
     static let secondaryText = adaptive(SamplePalette.light.secondaryText, SamplePalette.dark.secondaryText)
     static let separator = adaptive(SamplePalette.light.separator, SamplePalette.dark.separator)
+    static let groupHeader = adaptive(SamplePalette.light.groupHeader, SamplePalette.dark.groupHeader)
     static let onAccent = adaptive(SamplePalette.light.onAccent, SamplePalette.dark.onAccent)
 
     static let horizontalPadding = 16.0

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
  * @property text 主な文字
  * @property secondaryText 補助の文字
  * @property separator 区切りの線
+ * @property groupHeader グループの見出しの帯の面
  * @property onAccent アクセントで塗った面の上に載せる文字・印・つまみ
  */
 @Immutable
@@ -27,6 +28,7 @@ data class SamplePalette(
     val text: Color,
     val secondaryText: Color,
     val separator: Color,
+    val groupHeader: Color,
     val onAccent: Color,
 ) {
     companion object {
@@ -38,6 +40,7 @@ data class SamplePalette(
             text = Color(0xFF111214),
             secondaryText = Color(0xFF6E7076),
             separator = Color(0xFFD9D9DE),
+            groupHeader = Color(0xFFE3E3EA),
             onAccent = Color(0xFFFFFFFF),
         )
 
@@ -53,6 +56,7 @@ data class SamplePalette(
             text = Color(0xFFE6EBF5),
             secondaryText = Color(0xFF8E9AB3),
             separator = Color(0xFF2A3752),
+            groupHeader = Color(0xFF223050),
             onAccent = Color(0xFF0D1321),
         )
     }
