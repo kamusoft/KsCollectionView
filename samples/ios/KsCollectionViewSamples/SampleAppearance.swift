@@ -50,8 +50,15 @@ enum SampleAppearance: String, CaseIterable, Identifiable {
     static let resetArgument = "--reset-appearance"
 
     /// 起動引数で求められたときだけ、保存した選択を消す。
-    static func resetIfRequested() {
-        guard ProcessInfo.processInfo.arguments.contains(resetArgument) else { return }
-        UserDefaults.standard.removeObject(forKey: storageKey)
+    ///
+    /// - Parameters:
+    ///   - arguments: 起動引数の並び
+    ///   - defaults: 選択の保存先
+    static func resetIfRequested(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        defaults: UserDefaults = .standard
+    ) {
+        guard arguments.contains(resetArgument) else { return }
+        defaults.removeObject(forKey: storageKey)
     }
 }

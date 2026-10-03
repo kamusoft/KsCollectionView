@@ -51,8 +51,11 @@ enum PagingDelay {
     static let resolved = resolve(arguments: ProcessInfo.processInfo.arguments)
 
     /// この起動で使う遅延 (ミリ秒)。
-    static var milliseconds: Int {
-        switch resolved {
+    static var milliseconds: Int { milliseconds(for: resolved) }
+
+    /// 読み取り結果から決まる遅延 (ミリ秒)。指定が無いか受け取れないときは既定の遅延。
+    static func milliseconds(for resolution: Resolution) -> Int {
+        switch resolution {
         case .unspecified, .invalid: defaultMilliseconds
         case let .specified(value): value
         }

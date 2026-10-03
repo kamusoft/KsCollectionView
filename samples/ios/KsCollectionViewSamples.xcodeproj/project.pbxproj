@@ -18,11 +18,19 @@
 			remoteGlobalIDString = A00000000000000000000008;
 			remoteInfo = KsCollectionViewSamples;
 		};
+		C00000000000000000000004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A0000000000000000000000C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A00000000000000000000008;
+			remoteInfo = KsCollectionViewSamples;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		A00000000000000000000003 /* KsCollectionViewSamples.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KsCollectionViewSamples.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B00000000000000000000001 /* KsCollectionViewSamplesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KsCollectionViewSamplesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C00000000000000000000001 /* KsCollectionViewSamplesTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KsCollectionViewSamplesTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -34,6 +42,11 @@
 		B00000000000000000000002 /* KsCollectionViewSamplesUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = KsCollectionViewSamplesUITests;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000002 /* KsCollectionViewSamplesTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KsCollectionViewSamplesTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -54,6 +67,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C00000000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -62,6 +82,7 @@
 			children = (
 				A00000000000000000000004 /* KsCollectionViewSamples */,
 				B00000000000000000000002 /* KsCollectionViewSamplesUITests */,
+				C00000000000000000000002 /* KsCollectionViewSamplesTests */,
 				A00000000000000000000007 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,6 +92,7 @@
 			children = (
 				A00000000000000000000003 /* KsCollectionViewSamples.app */,
 				B00000000000000000000001 /* KsCollectionViewSamplesUITests.xctest */,
+				C00000000000000000000001 /* KsCollectionViewSamplesTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -122,6 +144,27 @@
 			productReference = B00000000000000000000001 /* KsCollectionViewSamplesUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		C00000000000000000000005 /* KsCollectionViewSamplesTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C00000000000000000000006 /* Build configuration list for PBXNativeTarget "KsCollectionViewSamplesTests" */;
+			buildPhases = (
+				C00000000000000000000007 /* Sources */,
+				C00000000000000000000003 /* Frameworks */,
+				C00000000000000000000008 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C00000000000000000000009 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C00000000000000000000002 /* KsCollectionViewSamplesTests */,
+			);
+			name = KsCollectionViewSamplesTests;
+			productName = KsCollectionViewSamplesTests;
+			productReference = C00000000000000000000001 /* KsCollectionViewSamplesTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -137,6 +180,10 @@
 					};
 					B00000000000000000000005 = {
 						CreatedOnToolsVersion = 26.5;
+						TestTargetID = A00000000000000000000008;
+					};
+					C00000000000000000000005 = {
+						CreatedOnToolsVersion = 27.0;
 						TestTargetID = A00000000000000000000008;
 					};
 				};
@@ -160,6 +207,7 @@
 			targets = (
 				A00000000000000000000008 /* KsCollectionViewSamples */,
 				B00000000000000000000005 /* KsCollectionViewSamplesUITests */,
+				C00000000000000000000005 /* KsCollectionViewSamplesTests */,
 			);
 		};
 /* End PBXProject section */
@@ -173,6 +221,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		B00000000000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C00000000000000000000008 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -196,6 +251,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C00000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -203,6 +265,11 @@
 			isa = PBXTargetDependency;
 			target = A00000000000000000000008 /* KsCollectionViewSamples */;
 			targetProxy = B00000000000000000000004 /* PBXContainerItemProxy */;
+		};
+		C00000000000000000000009 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A00000000000000000000008 /* KsCollectionViewSamples */;
+			targetProxy = C00000000000000000000004 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -212,6 +279,7 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
+				ENABLE_TESTABILITY = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -307,6 +375,40 @@
 			};
 			name = Release;
 		};
+		C0000000000000000000000A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kamusoft.kscollectionview.samples.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KsCollectionViewSamples.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/KsCollectionViewSamples";
+			};
+			name = Debug;
+		};
+		C0000000000000000000000B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				PRODUCT_BUNDLE_IDENTIFIER = jp.kamusoft.kscollectionview.samples.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KsCollectionViewSamples.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/KsCollectionViewSamples";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -333,6 +435,15 @@
 			buildConfigurations = (
 				B0000000000000000000000A /* Debug */,
 				B0000000000000000000000B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C00000000000000000000006 /* Build configuration list for PBXNativeTarget "KsCollectionViewSamplesTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0000000000000000000000A /* Debug */,
+				C0000000000000000000000B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

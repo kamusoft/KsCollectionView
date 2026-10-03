@@ -7,20 +7,6 @@ import XCTest
 /// 切れていなくても気づけないため、実機と同じ経路で確かめます
 /// (Android の `ImageLoadingSlotCounterTest` に対応)。
 final class ImageLoadingSlotUITests: XCTestCase {
-    @MainActor
-    func test数える起動では画像グリッドの印に枠の決まった読み込み中が出る() {
-        let app = launchCountingImageGrid()
-        let mark = markElement(in: app)
-
-        // 取得の成否に依らず、枠が決まった状態の読み込み中は現れる。取得結果を待たない。
-        // `unsized=` にも "sized=" が含まれるため、直前の空白まで込みで見分ける。
-        assertLabelMatches(
-            mark,
-            pattern: ".* sized=[1-9][0-9]* .*",
-            message: "枠の決まった読み込み中が数えられませんでした"
-        )
-    }
-
     /// 印を叩くと観測区間が切り替わり、そこから先の差分だけが `sized` に出ることを確かめます。
     ///
     /// 「戻ってきたときの再表示」は初回表示を含む累計では判定できないため、この操作が実機で

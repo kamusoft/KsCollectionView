@@ -42,3 +42,6 @@
 - distilled: sample-comment-policy-cleanup (ADR なし: コメント 3 行の言い換えで選別基準外 / handbook・concepts の変更なし。検査の誤検知 (Android の 7 件) の直しは配布元 Kasane への依頼として未着手)
 - distilled: sample-group-header-spacing-color (ADR なし: Sample の色 1 つの可逆な判断で選別基準外 / handbook・concepts の変更なし (見出しの帯の色を書いた長命の文書は無い))
 - distilled: android-build-jdk-range (ADR: android/ADR-0008 を accepted (amends android/ADR-0002 の「JDK 17 (`jvmToolchain(17)`)」の 1 項目)、android/ADR-0002 に amended-by / handbook: cross/local-development-setup.md の JDK の要件・前置きの案内・「版の定義元」の表と、cross/test-execution.md の前置きの案内を改訂 / concepts の変更なし)
+
+## 2026-10-04
+- distilled: test-suite-speedup-and-pruning (ADR: cross/ADR-0008 を accepted / handbook: cross/test-execution.md に「全系統の合計は 10 分以内」の節を追加し、iOS Sample のテストがユニットテストと UI テストの 2 ターゲットになったことを反映 / concepts の変更なし)

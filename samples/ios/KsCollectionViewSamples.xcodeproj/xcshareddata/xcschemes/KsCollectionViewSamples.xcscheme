@@ -33,6 +33,16 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C00000000000000000000005"
+               BuildableName = "KsCollectionViewSamplesTests.xctest"
+               BlueprintName = "KsCollectionViewSamplesTests"
+               ReferencedContainer = "container:KsCollectionViewSamples.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "B00000000000000000000005"
                BuildableName = "KsCollectionViewSamplesUITests.xctest"
                BlueprintName = "KsCollectionViewSamplesUITests"

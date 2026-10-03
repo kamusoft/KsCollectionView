@@ -10,21 +10,24 @@ struct RootMenuView: View {
             List {
                 // 見出しと隙間は行として置く (plain の List の見出しは上端に固定され、スクロールしても
                 // 「外観」がデモ画面の項目の上に残るため)。
-                SampleMenuHeadingRow(title: SampleAppearance.sectionTitle)
-                ForEach(SampleAppearance.allCases) { entry in
-                    SampleAppearanceRow(appearance: entry, selection: $appearance)
-                        .listRowBackground(SampleTheme.cell)
-                }
-                SampleMenuGapRow()
-                ForEach(SampleScreen.allCases) { screen in
-                    NavigationLink(screen.rawValue, value: screen)
-                        .listRowBackground(SampleTheme.cell)
-                        .foregroundStyle(SampleTheme.text)
-                }
-                ForEach(VerificationScreen.allCases) { screen in
-                    NavigationLink(screen.rawValue, value: screen)
-                        .listRowBackground(SampleTheme.cell)
-                        .foregroundStyle(SampleTheme.text)
+                ForEach(RootMenuRow.all, id: \.self) { row in
+                    switch row {
+                    case .heading(let title):
+                        SampleMenuHeadingRow(title: title)
+                    case .appearance(let entry):
+                        SampleAppearanceRow(appearance: entry, selection: $appearance)
+                            .listRowBackground(SampleTheme.cell)
+                    case .gap:
+                        SampleMenuGapRow()
+                    case .screen(let screen):
+                        NavigationLink(screen.rawValue, value: screen)
+                            .listRowBackground(SampleTheme.cell)
+                            .foregroundStyle(SampleTheme.text)
+                    case .verification(let screen):
+                        NavigationLink(screen.rawValue, value: screen)
+                            .listRowBackground(SampleTheme.cell)
+                            .foregroundStyle(SampleTheme.text)
+                    }
                 }
             }
             .listStyle(.plain)

@@ -32,11 +32,7 @@ struct SampleLaunchView: View {
     private let verifiesHeightChange = ProcessInfo.processInfo.arguments.contains(
         "--verify-height-change"
     )
-    private let requestedScreen = ProcessInfo.processInfo.arguments
-        .drop { $0 != "--screen" }
-        .dropFirst()
-        .first
-
+    private let requestedScreen = SampleScreen.requested(arguments: ProcessInfo.processInfo.arguments)
 
     var body: some View {
         if verifiesInteractiveControl {
@@ -64,10 +60,9 @@ struct SampleLaunchView: View {
                 automaticallyRuns: automaticallyVerifiesPerformance,
                 fixture: PerformanceFixture.requested
             )
-        } else if let requestedScreen,
-           let screen = SampleScreen.allCases.first(where: { $0.rawValue == requestedScreen }) {
+        } else if let requestedScreen {
             NavigationStack {
-                SampleDestinationView(screen: screen)
+                SampleDestinationView(screen: requestedScreen)
             }
             .tint(SampleTheme.accent)
         } else {

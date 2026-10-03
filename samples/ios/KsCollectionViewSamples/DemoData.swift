@@ -23,7 +23,12 @@ enum DemoData {
     }
 
     /// 「大量件数」画面の項目。件数は起動引数で変えられ、内容は ID から決まるため件数に依らない。
-    static let largeItems = (1...LargeDataCount.value).map { largeItem($0) }
+    static let largeItems = makeLargeItems(count: LargeDataCount.value)
+
+    /// 「大量件数」画面の項目を、指定した件数だけ ID 1 から昇順に作る。
+    static func makeLargeItems(count: Int) -> [DemoItem] {
+        (1...count).map { largeItem($0) }
+    }
 
     /// 「大量件数」と同じ行の見た目の項目。7 の倍数の ID だけ長文の説明を持ち、行の高さが変わる。
     ///
@@ -42,8 +47,11 @@ enum DemoData {
     static let imageGridItemCount = ImageGridCount.value
 
     /// 「画像グリッド」画面が使う項目。セルの文言は ID から作る。
-    static let imageGridItems = (1...imageGridItemCount).map {
-        DemoItem(id: $0, title: "#\($0)")
+    static let imageGridItems = makeImageGridItems(count: imageGridItemCount)
+
+    /// 「画像グリッド」画面の項目を、指定した件数だけ ID 1 から昇順に作る。
+    static func makeImageGridItems(count: Int) -> [DemoItem] {
+        (1...count).map { DemoItem(id: $0, title: "#\($0)") }
     }
 
     /// 「画像グリッド」画面のデモ画像の URL。

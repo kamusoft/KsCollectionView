@@ -51,8 +51,11 @@ enum LargeDataCount {
     static let resolved = resolve(arguments: ProcessInfo.processInfo.arguments)
 
     /// この起動で使う件数。
-    static var value: Int {
-        switch resolved {
+    static var value: Int { value(for: resolved) }
+
+    /// 読み取り結果から決まる件数。指定が無いか受け取れないときは既定の件数。
+    static func value(for resolution: Resolution) -> Int {
+        switch resolution {
         case .unspecified, .invalid: defaultValue
         case let .specified(count): count
         }

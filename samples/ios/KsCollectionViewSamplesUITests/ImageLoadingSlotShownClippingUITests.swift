@@ -7,8 +7,10 @@ import XCTest
 /// いても切り取られて見えません。窓との交差だけで判定すると、これを画面に出たと数えてしまい、
 /// 先読みに当たった件数の判定 (`matchedShown`) を誤らせます。
 final class ImageLoadingSlotShownClippingUITests: XCTestCase {
+    /// 切り取られた範囲の外にある下敷きは数えず、表示範囲に入ったら数えます。続けて、見張る相手が
+    /// いなくなると周期が止まり、下敷きが足されると再開することを確かめます。
     @MainActor
-    func test窓の中でも切り取られた範囲の外にある下敷きは数えず表示範囲に入ったら数える() {
+    func test窓の中でも切り取られた範囲の外にある下敷きは数えず表示範囲に入ったら数え見張る相手がいなくなると周期が止まる() {
         let app = launchClippingVerification()
         let state = stateElement(in: app)
 
@@ -30,14 +32,7 @@ final class ImageLoadingSlotShownClippingUITests: XCTestCase {
             pattern: "inside=1 outside=1 added=0/0 monitor=.*",
             message: "表示範囲に入った下敷きが数えられませんでした"
         )
-    }
 
-    @MainActor
-    func test見張る相手がいなくなると周期が止まり足されると再開する() {
-        let app = launchClippingVerification()
-        let state = stateElement(in: app)
-
-        app.buttons["slotShownClipping.scroll"].tap()
         // 内側と外側がどちらも知らせ終えると、見張る相手がいなくなり周期が止まる。
         assertLabelMatches(
             state,

@@ -42,8 +42,16 @@ final class ReorderDemoModel: ObservableObject {
     /// 画面の上の帯に出している知らせ。出していなければ nil。
     @Published private(set) var notice: String?
 
+    /// 帯を出しておく時間 (秒)。
+    private let noticeDuration: Double
+
     /// 帯を決まった時間の後に消す処理。
     private var noticeTask: Task<Void, Never>?
+
+    /// - Parameter noticeDuration: 帯を出しておく時間 (秒)
+    init(noticeDuration: Double = SamplePanelMetrics.bannerDuration) {
+        self.noticeDuration = noticeDuration
+    }
 
     /// 初期の配列。
     static var initialItems: [ReorderDemoItem] {
@@ -105,8 +113,8 @@ final class ReorderDemoModel: ObservableObject {
     private func showNotice(_ text: String) {
         noticeTask?.cancel()
         notice = text
-        noticeTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(SamplePanelMetrics.bannerDuration * 1_000_000_000))
+        noticeTask = Task { [weak self, noticeDuration] in
+            try? await Task.sleep(nanoseconds: UInt64(noticeDuration * 1_000_000_000))
             guard !Task.isCancelled else { return }
             self?.notice = nil
         }

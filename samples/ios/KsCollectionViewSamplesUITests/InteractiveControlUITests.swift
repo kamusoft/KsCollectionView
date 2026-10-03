@@ -33,15 +33,6 @@ final class InteractiveControlUITests: XCTestCase {
         )
     }
 
-    @MainActor
-    func test長押し未宣言時は長押し相当の保持でも通常タップを発火する() {
-        let app = launchLongPressVerification(argument: "--verify-tap-only", declaresLongTap: false)
-        pressCell(in: app)
-
-        XCTAssertTrue(app.staticTexts["longPress.itemTapCount"]
-            .waitForLabel("Item tap count: 1", timeout: 10))
-    }
-
     /// 検証画面を起動し、カウント表示とセルが実座標入力を受け取れる状態になるまで待ちます。
     @MainActor
     private func launchLongPressVerification(
