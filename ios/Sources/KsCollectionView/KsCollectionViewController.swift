@@ -2270,7 +2270,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         guard isPullRefreshing else { return }
         isPullRefreshing = false
         pullRefreshControl.endRefreshing()
-        // 取り直しの間に先頭を表示していなければ (取り直しの結果の配列が同値だった等)、ここで取り直しの結果として
+        // 取り直しの間に先頭を表示していなければ (取り直しの結果の配列が同値の場合等)、ここで取り直しの結果として
         // 先頭を表示する (core/ADR-0021)。表示していれば、上端に空白を残さない戻しだけを行う。
         removeRefreshExtraTopInset(showsContentTop: !pullRefreshShowedContentTop)
         pullRefreshShowedContentTop = false

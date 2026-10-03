@@ -912,7 +912,7 @@ final class KsImageCacheContractTests: XCTestCase {
         XCTAssertNotNil(pipeline.cache[request.imageRequest], "先読みの項目が載っていません")
     }
 
-    /// 組み立ての時点で先読みが取得中だったため画面に出る時点まで待った表示が、表示の要求で読み込んだ画像は、
+    /// 組み立ての時点で先読みが取得中のため画面に出る時点まで待った表示が、表示の要求で読み込んだ画像は、
     /// メモリのみ消去の後に親が組み立て直されても読み込み中へ戻らず、ディスクから再デコードしない。
     func test先読みの取得中に待った表示が読み込んだ画像はメモリのみ消去の後に親が組み立て直されても置き換わらない() async throws {
         KsStubURLProtocol.payloadOverride = Self.makePNG(width: 64, height: 64)
