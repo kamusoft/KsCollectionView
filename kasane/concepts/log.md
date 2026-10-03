@@ -37,3 +37,8 @@
 
 ## 2026-10-01
 - distilled: drag-reorder (ADR core/0026〜0034・ios/0011・android/0007 を accepted。ios/0011 は実装を経た視点で本文を書き直した (UIKit 標準の並べ替えの仕組みで作り、隙間・持ち上げ・置く動きは UIKit に任せる。全画面の一覧の上端の自動スクロールだけエンジンが足す)。core/0026・0027・0034 は前提と時機の記述を実装に合わせた。amends により core/0020 に amended-by 0034 を追記 / handbook の変更なし / concepts: 新規 3 本 — core/core-model/collection-reorder.md (並べ替えの公開契約)・ios/architecture/reorder-engine.md・android/architecture/reorder-wrapper.md (初見可読性レビュー 2 周)。追随 8 本 — core/core-model/collection-interaction.md (並べ替えのスイッチが有効の間は onItemLongTap を呼ばない)・collection-items.md (並べ替えの表示の責務境界。「並べ替えの DSL」を「ソートの DSL」に言い換え)・collection-paging.md (ドラッグ中は追加読み込みを判定しない)・core/styling/collection-layout.md (全画面の一覧での自動スクロール)・ios/architecture/collection-engine.md・android/architecture/compose-wrapper.md (並べ替えの部品への参照。冒頭の機能ごとの文書の案内を表に組み替え)・ios/architecture/paging-engine.md・android/architecture/paging-wrapper.md (判定の入力に並べ替えのドラッグ中) / lessons: inbox 新規 9 件・既存 1 件に加算、昇格なし / deviation 13 件 (iOS の UIKit 標準の並べ替えへの組み替え・受け入れないときは置いてから戻る・上端の自前の自動スクロール・読み上げの目視は行わない ほか))
+
+## 2026-10-03
+- distilled: sample-comment-policy-cleanup (ADR なし: コメント 3 行の言い換えで選別基準外 / handbook・concepts の変更なし。検査の誤検知 (Android の 7 件) の直しは配布元 Kasane への依頼として未着手)
+- distilled: sample-group-header-spacing-color (ADR なし: Sample の色 1 つの可逆な判断で選別基準外 / handbook・concepts の変更なし (見出しの帯の色を書いた長命の文書は無い))
+- distilled: android-build-jdk-range (ADR: android/ADR-0008 を accepted (amends android/ADR-0002 の「JDK 17 (`jvmToolchain(17)`)」の 1 項目)、android/ADR-0002 に amended-by / handbook: cross/local-development-setup.md の JDK の要件・前置きの案内・「版の定義元」の表と、cross/test-execution.md の前置きの案内を改訂 / concepts の変更なし)

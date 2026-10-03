@@ -47,7 +47,10 @@ android {
 }
 
 kotlin {
-    jvmToolchain(17)
+    // 出力するバイトコードは Java 17 向けに固定する。ビルドを動かす JDK は 17 以上であればよい (android/ADR-0008)。
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 // 計測は benchmark 構成だけで行う。debug / release の変種は作らない。

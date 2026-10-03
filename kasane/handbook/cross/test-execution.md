@@ -68,7 +68,7 @@ Sample (`samples/ios/`) の UI テストターゲットには、計測のため�
 
 - 本体は `android/` で `./gradlew :kscollectionview:testDebugUnitTest --rerun-tasks`
 - Sample は `samples/android/` で `./gradlew :app:testDebugUnitTest --rerun-tasks`
-- JDK 17 が既定でない環境では `JAVA_HOME=$(/usr/libexec/java_home -v 17)` を前置きする
+- 既定の JDK が 17 より古い環境では `JAVA_HOME=$(/usr/libexec/java_home -v 17+)` を前置きする (ビルドは JDK 17 以上のどれでも動く)
 
 件数の得方と落とし穴は次のとおり。
 

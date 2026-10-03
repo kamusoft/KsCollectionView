@@ -3,6 +3,7 @@ id: 0002
 title: Android は単一モジュール + explicitApi strict で組み、Compose BOM は利用者に未普及の SDK Platform を強いない範囲で最新安定版に追随する
 status: accepted
 date: 2026-09-04
+amended-by: 0008
 ---
 
 ## Context

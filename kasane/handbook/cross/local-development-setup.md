@@ -5,7 +5,7 @@ applies-when:
   tasks: [環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
 title: ローカル開発環境と Sample の実行
 description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。両プラットフォームとも実際に確認した手順を記す
-timestamp: 2026-09-17
+timestamp: 2026-10-03
 ---
 
 # ローカル開発環境と Sample の実行
@@ -30,11 +30,11 @@ wrapper とバージョンカタログがビルド時に取得する (版の宣�
 
 | 対象 | 要件 | 確かめ方 |
 |---|---|---|
-| JDK | 17 (`jvmToolchain(17)` と `compileOptions` が要求) | `/usr/libexec/java_home -v 17` が場所を返す |
+| JDK | 17 以上 (出力するバイトコードは Java 17 向けに固定。確認済みの版は 21 — [android/ADR-0008](../../decisions/android/0008-build-jdk-17-or-later-with-java-17-output.md)) | `/usr/libexec/java_home -v 17+` が場所を返す |
 | Android SDK Platform | android-36 (`compileSdk = 36`。minor 指定なし) | SDK の `platforms/` に `android-36` がある |
 | Android Build-Tools | 36.0.0 (AGP が compileSdk から選ぶ既定) | SDK の `build-tools/` に `36.0.0` がある |
 
-JDK 17 が既定の JDK でない環境では、Gradle を呼ぶときに `JAVA_HOME=$(/usr/libexec/java_home -v 17)` を
+既定の JDK が 17 より古い環境では、Gradle を呼ぶときに `JAVA_HOME=$(/usr/libexec/java_home -v 17+)` を
 前置きする。Xcode・Swift・Android Studio の版は下限を定めていない。
 
 iOS の開発ツール側の要件 (Xcode・Swift の版) は、下限を定める必要が生じた時点でここへ追記する。
@@ -55,7 +55,7 @@ iOS の開発ツール側の要件 (Xcode・Swift の版) は、下限を定め�
 | iOS Sample の最低対応版・bundle ID | `samples/ios/KsCollectionViewSamples.xcodeproj/project.pbxproj` |
 | AGP・Kotlin・Compose BOM・Navigation・compileSdk / targetSdk・ライブラリの版 | `android/gradle/libs.versions.toml` |
 | Gradle の版 (本体 / Sample それぞれの wrapper) | `android/gradle/wrapper/gradle-wrapper.properties` と `samples/android/gradle/wrapper/gradle-wrapper.properties` |
-| Android の minSdk・JDK・namespace | `android/kscollectionview/build.gradle.kts` |
+| Android の minSdk・出力するバイトコードの対象の Java の版・namespace | `android/kscollectionview/build.gradle.kts` |
 | Android Sample の application ID・minSdk・ビルド構成 | `samples/android/app/build.gradle.kts` |
 | Sample でしか使わない依存 (Activity Compose・計測) の版 | `samples/android/gradle/sample.versions.toml` |
 
@@ -72,7 +72,7 @@ Android SDK の場所は、ビルドルートごとの `local.properties` に `s
 「設定できた」と読み違える落とし穴は翻案元でも実際に起きている
 (参考: `../KsSettingsView/kasane/handbook/cross/local-development-setup.md`)。
 
-JDK 17 が既定でない環境では、Gradle を呼ぶコマンドに `JAVA_HOME=$(/usr/libexec/java_home -v 17)` を前置きする。
+既定の JDK が 17 より古い環境では、Gradle を呼ぶコマンドに `JAVA_HOME=$(/usr/libexec/java_home -v 17+)` を前置きする。
 実機・エミュレータが複数つながっている環境では、導入先を 1 台に絞るのに `ANDROID_SERIAL=<端末の識別子>` を使う
 (指定しないと接続中の全端末へ導入される)。
 
