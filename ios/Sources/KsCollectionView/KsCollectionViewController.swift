@@ -657,6 +657,8 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
                 let self,
                 let item = itemsByID[identifier.value]
             else {
+                // 当てる中身が無いときは、再利用されたセルに前の項目の中身を残さない。
+                cell.contentConfiguration = nil
                 return
             }
             applyContent(to: cell, item: item, at: indexPath)
@@ -684,7 +686,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         let key = configuration.templateKey(item)
         let content = configuration.registry.content(for: key, item: item)
         // 内容を適用したセルの計測だけを推定高さに数えるため、content と対で設定する
-        // (prepareForReuse で内容と一緒に解除される)。
+        // (受け口は prepareForReuse で解除される)。
         cell.onMeasuredSize = { [weak self] size, original in
             self?.recordMeasuredSize(size, original: original)
         }

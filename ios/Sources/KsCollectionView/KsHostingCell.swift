@@ -168,9 +168,15 @@ internal final class KsHostingCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        contentConfiguration = nil
+        // iOS 18 以降は中身を外さない。同じ型の構成を当て直すと、中身を載せるホスティングがそのまま
+        // 使われ、テンプレートの内部 state は再利用されたセルが表示される前に OS が初期値へ戻す
+        // (ios/ADR-0012)。それより前の版は OS が戻さないので、中身を外してホスティングごと作り直させ、
+        // 前の項目の内部 state を次の項目へ持ち越さない (ios/ADR-0002)。
+        if #unavailable(iOS 18) {
+            contentConfiguration = nil
+        }
         backgroundConfiguration = nil
-        // 内容を適用したセルの計測だけが推定高さに入るよう、内容と一緒に解除する。
+        // 内容を適用したセルの計測だけが推定高さに入るよう、次の内容を当てるまで解除する。
         onMeasuredSize = nil
         reorderAccessibility.clear()
         touchFeedbackView.isHidden = true

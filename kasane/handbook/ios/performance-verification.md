@@ -48,7 +48,7 @@ timestamp: 2026-09-17
 
 接続は「アプリを先に起動し、記録を後から張る」順序で行う。起動済みのアプリに接続してから駆動側で前面化すると、前面化の瞬間に対象アプリが終了したものとして記録が打ち切られる。
 
-実機の記録では `xctrace record` に `--device <UDID>` を付けて端末を指名する。`devicectl` の `--device` に渡す CoreDevice の識別子とは別の値なので、取り違えると端末が見つからない。
+実機の記録では `xctrace record` に `--device <UDID>` を付けて端末を指名する。`devicectl` の `--device` に渡す CoreDevice の識別子とは別の値なので、取り違えると端末が見つからない。識別子で指名して「Cannot find process matching name」(プロセス番号の指定でも同じ) が続くときは、端末の名前 (`xctrace list devices` の表示名) で指名する。再試行と接続の張り直しでは直らず、名前の指定でつながった (2026-10-04、Xcode 27.0・iOS 18.7.8)。証跡には端末の名前を書かない。
 
 `xctrace record --attach` はプロセス名指定でも端末の認識が揺れてタイムアウトすることがある。その場合は「Starting recording」が出るまで再試行する。「Timed out waiting for device to boot」で止まるときは、`xcrun devicectl device info details --device <CoreDevice の識別子>` を 1 回実行して端末との接続を張ってから再試行する。失敗した試行でオーナーが操作した分は、キャッシュ状態を揃え直すために入れ直してからやり直す。
 

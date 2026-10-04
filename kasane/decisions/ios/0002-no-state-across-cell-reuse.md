@@ -3,6 +3,7 @@ id: 0002
 title: セル再利用で SwiftUI の内部 state を保持しない
 status: accepted
 date: 2026-09-01
+amended-by: 0012
 ---
 
 ## Context

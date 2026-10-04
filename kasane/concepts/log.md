@@ -45,3 +45,6 @@
 
 ## 2026-10-04
 - distilled: test-suite-speedup-and-pruning (ADR: cross/ADR-0008 を accepted / handbook: cross/test-execution.md に「全系統の合計は 10 分以内」の節を追加し、iOS Sample のテストがユニットテストと UI テストの 2 ターゲットになったことを反映 / concepts の変更なし)
+
+## 2026-10-05
+- distilled: ios-hosting-content-reuse (ios/ADR-0012 起票 (amends ios/ADR-0002) / ios/architecture/collection-engine.md 更新 / handbook ios/performance-verification.md 改訂)

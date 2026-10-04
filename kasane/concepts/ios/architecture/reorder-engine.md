@@ -239,7 +239,7 @@ drag / drop の delegate は常に付け、`syncReorderInteraction` が `update`
 
 ## 性能
 
-「並べ替え」画面 (10,000 件・100 件ずつのグループ・見出しの固定・list、並べ替えのスイッチは有効) は、基準機 iPhone 11 (iOS 18.7.8、Release) の手動フリックで体感合格だった (2026-09-30、[証跡](../../../changes/archive/2026-10-01-drag-reorder/evidence/perf-ios-reorder.md))。数値は体感と食い違い、操作中の hitch time ratio は 175〜329 ms/s だった。この数値は、読み上げの部品の付け方の修正と、並べ替えハンドラを使う形への組み替えより前のビルドのもので、測り直していない (どちらもフリックの負荷を増やさない変更のため)。切り分けでは、数値の大半は表示に入る項目ごとにセルの中身を作り直す既存の作りによるもので、並べ替えに由来しない (`kasane/changes/ios-hosting-content-reuse` で扱う)。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md)。
+「並べ替え」画面 (10,000 件・100 件ずつのグループ・見出しの固定・list、並べ替えのスイッチは有効) は、基準機 iPhone 11 (iOS 18.7.8、Release) の手動フリックで体感合格だった (2026-09-30、[証跡](../../../changes/archive/2026-10-01-drag-reorder/evidence/perf-ios-reorder.md))。数値は体感と食い違い、操作中の hitch time ratio は 175〜329 ms/s だった。この数値は、読み上げの部品の付け方の修正と、並べ替えハンドラを使う形への組み替えより前のビルドのもので、測り直していない (どちらもフリックの負荷を増やさない変更のため)。切り分けでは、数値の大半は表示に入る項目ごとにセルの中身を作り直す既存の作りによるもので、並べ替えに由来しない。この作りは iOS 18 以降について改め、同じ画面の基準機の比較で hosting の解放の比が 9.8% から 0.1% になった (ios/ADR-0012、[iOS コレクションエンジン](collection-engine.md) の「性能」)。判定規則は [スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md)。
 
 並べ替えに由来する費用は、読み上げの操作の組み立てである。並べ替えのスイッチが有効で文言を渡した一覧では、Simulator の診断用の自動スクロールで主スレッドの CPU 時間が約 5〜8% 増える ([証跡](../../../changes/archive/2026-10-01-drag-reorder/evidence/perf-diag-ios-reorder-cells.md))。並べ替えを付けない一覧・文言を渡さない一覧・並べ替えのスイッチが無効の一覧には上乗せが無い。支援技術が無効の間は操作を組み立てない形 (SwiftUI の `accessibilityEnabled`) は、どの支援技術で真になるかが定まっておらず、VoiceOver 以外で操作が消えるおそれがあるため採っていない。
 
