@@ -33,6 +33,9 @@ internal struct KsCollectionConfiguration<Item: Equatable> {
     // Pull to Refresh の取り直しの処理。一覧に付けた `.refreshable` の処理を読んで載せる。
     // 無い (nil) ときは引っ張れない。
     var refresh: (@MainActor () async -> Void)?
+    // 一覧が出す読み込み中の表示 (差し替えていない次のページの読み込み中・最初の読み込み中と、
+    // Pull to Refresh の部品) の色。無い (nil) ときは 3 つとも標準の色のままにする (core/ADR-0035)。
+    var loadingIndicatorColor: UIColor?
     // 並べ替えの設定。付けていない (nil) ときは、付けてスイッチを無効にしたときと同じく並べ替えを受け付けない。
     var reorder: KsReorder<Item>?
 

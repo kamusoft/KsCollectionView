@@ -159,6 +159,13 @@ internal object KsTapFeedback {
  * @param reorder 項目を長押ししてドラッグで並べ替えられるようにする設定。スイッチ・置いたときの処理・
  *   動かせるかと置けるかの判定・読み上げの移動操作の文言を渡す。スイッチが有効の間は長押しが並べ替えの
  *   操作になり、[onItemLongTap] は呼ばれない。省略すると並べ替えはできない。詳しくは [KsReorder] を参照
+ * @param loadingIndicatorColor 一覧が出す読み込み中の表示の色。[paging] の次のページの読み込み中と
+ *   最初の読み込み中のうち差し替えていない標準の表示と、Pull to Refresh ([onRefresh]) のインジケータに
+ *   同時に効く。ページングを付けない一覧でも Pull to Refresh のインジケータに効く。[KsPaging] の
+ *   `appendingIndicator` / `loadingPlaceholder` で差し替えた表示には効かないため、差し替えた表示の色は
+ *   その表示の中で決める。Pull to Refresh のインジケータでは矢印に効き、丸い下地はテーマの色のまま変わらない。
+ *   テーマと合わない色 (明るいテーマで白など) を指定すると、下地の上で矢印が見えにくくなることがある。
+ *   省略すると標準の色のまま (ページングの 2 つはテーマの primary、Pull to Refresh は Material の既定の色)
  * @param content テンプレートを宣言するブロック
  */
 @Composable
@@ -183,6 +190,7 @@ public fun <Item> KsCollectionView(
     paging: KsPaging? = null,
     onRefresh: (suspend () -> Unit)? = null,
     reorder: KsReorder<Item>? = null,
+    loadingIndicatorColor: Color? = null,
     content: KsCollectionViewScope<Item>.() -> Unit,
 ) {
     val context = LocalContext.current
@@ -828,7 +836,7 @@ public fun <Item> KsCollectionView(
                 val pagingFooter = if (paging != null && displayedItems.isNotEmpty()) {
                     KsPagingDisplay.resolve(paging.state, isEmpty = false)
                         ?.takeIf { it.isFooter }
-                        ?.let { paging.content(it, retryPaging) }
+                        ?.let { paging.content(it, retryPaging, loadingIndicatorColor) }
                 } else {
                     null
                 }
@@ -850,7 +858,8 @@ public fun <Item> KsCollectionView(
         // 真ん中に、ルートのヘッダー / フッターより手前に重ねる (core/ADR-0025)。入れ物自体はタッチを
         // 受けないため、表示の外の操作 (ヘッダー / フッター・引っ張り) は下の一覧へ通る。
         val placeholder = if (paging != null && displayedItems.isEmpty()) {
-            KsPagingDisplay.resolve(paging.state, isEmpty = true)?.let { paging.content(it, retryPaging) }
+            KsPagingDisplay.resolve(paging.state, isEmpty = true)
+                ?.let { paging.content(it, retryPaging, loadingIndicatorColor) }
         } else {
             null
         }
@@ -871,7 +880,7 @@ public fun <Item> KsCollectionView(
         // 分かりにくいため。下の余白 (contentPadding) は中身の周りの余白で、中身の外に重ねるこの表示の置き場は
         // 変えない。入れ物はタッチを受けず、表示の外のタッチは下の項目へ通す。
         val appendingIndicator = if (paging != null && displayedItems.isNotEmpty()) {
-            paging.content(KsPagingDisplay.AppendingIndicator, retryPaging)
+            paging.content(KsPagingDisplay.AppendingIndicator, retryPaging, loadingIndicatorColor)
         } else {
             null
         }
@@ -902,9 +911,11 @@ public fun <Item> KsCollectionView(
             // インジケータは上端の安全領域の境目の下から出す。行はバーの裏を流れたまま、インジケータだけを
             // 境目まで下げる (core/ADR-0025)。インジケータは自分の上端より上を描かないため、引っ張り始めは
             // 境目の下に上から現れる。
+            // 読み込み中の表示の色は矢印にだけ渡す。丸い下地の色は渡さず、テーマの色のままにする。
             PullToRefreshDefaults.Indicator(
                 state = pullToRefreshState,
                 isRefreshing = showsRefreshIndicator,
+                color = loadingIndicatorColor ?: PullToRefreshDefaults.indicatorColor,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .zIndex(2f)

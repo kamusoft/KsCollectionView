@@ -3,7 +3,7 @@ type: concept
 title: iOS ページングと Pull to Refresh の実現
 description: ページングと Pull to Refresh の契約を iOS のコレクションエンジンの上で実現する部品 (KsPagingRequester・重ねる表示の入れ物・KsRefreshControl) の責務境界と、実測で確かめた罠対策
 tags: [ios, engine, paging, pull-to-refresh]
-timestamp: 2026-09-29
+timestamp: 2026-10-04
 ---
 
 # iOS ページングと Pull to Refresh の実現
@@ -82,6 +82,23 @@ Pull to Refresh の間は、`edgeToKeep` が直前の状態によらず先頭を
 
 引っ張れなくする間 (追加読み込み中・次ページ要求の処理の実行中) は `collectionView.refreshControl` を外し、それ以外で付け直す。取り直しのインジケータを出している間は外さない。一覧は 0 件でも引っ張れるよう `alwaysBounceVertical` を常に立てている。
 
+### UIRefreshControl には補正した色を渡す (core/ADR-0035)
+
+標準の `UIRefreshControl` は、`tintColor` に渡した色をそのままでは描かない。実際に指で引っ張って取り直し中になったとき、線 1 本の下地に渡した色を使い、その線を 8 本に複製するレイヤーがもう一度同じ色を掛けるため、RGB の成分ごとに 2 乗した色になる。複製ごとの不透明度は少しずつ増え、いちばん濃い線でも約 57% である。色を指定しない標準の色も同じ描き方で、公開の手段 (`tintColor` と `attributedTitle` だけ) では濃さを変えられない。
+
+`KsRefreshControl` は、一覧に指定された色を RGB の成分ごとの平方根にして `tintColor` に渡し、2 乗を打ち消す。色みは指定した色になり、濃さは標準の Pull to Refresh と同じになる。指定を外すと `tintColor` を nil に戻し、標準の色に戻る。
+
+| 指定された色 | 渡し方 |
+|---|---|
+| 表示モードで値が変わる色 | 描くときの表示の特性で解決してから補正する (外観の切り替えに部品の側で追随する) |
+| 不透明度を持つ色 | 不透明度は変えずに渡す (部品が 2 回掛けるのは RGB だけ) |
+| sRGB の外の色 | 成分を 0〜1 に収めてから補正する (広色域の色みは保てない) |
+| RGB の成分に直せない色 | 補正せずそのまま渡す |
+
+この描き方は iOS 18.6・27.0 の画素とレイヤーの値で確かめ、26.0 もレイヤーの構成は同じだった。対応 OS の下限の iOS 16・17 では確かめていない。2 回掛けない版の OS では、補正した分だけ指定より明るく出る。
+
+色を合わせる時機は、一覧の更新のたびに行う部品の付け外しの中である。並べ替えのドラッグ中に届いた色は、ほかの設定と同じく控えに回り、ドラッグが終わってから当たる。
+
 ### 処理の寿命
 
 次ページ要求と取り直しの処理は `Task { @MainActor in … }` で起動し、representable の dismantle から呼ばれる `disconnect()` で取り消す。取り消した処理が後から終わったときは `Task.isCancelled` で見分け、実行中の印を下ろさない。下ろすと、取り消しの後に始めた次の処理がまだ実行中なのに、終わったものとして扱ってしまう。
@@ -118,5 +135,5 @@ Pull to Refresh の間は、`edgeToKeep` が直前の状態によらず先頭を
 - [ページングと Pull to Refresh](../../core/core-model/collection-paging.md) — 実現している契約
 - [iOS コレクションエンジン](collection-engine.md) — 内部の塊・補助ビューの測り直し・端への挿入・表示位置の控え
 - [Android ページングの実現](../../android/architecture/paging-wrapper.md) — 同じ契約の Android 側の実現
-- core/ADR-0020 (発火の条件)、core/ADR-0021 (表示範囲の置き方)、core/ADR-0022 (待ち方)、core/ADR-0023 (Pull to Refresh)、core/ADR-0024 (6 つの表示)、core/ADR-0025 (重ねる表示と安全領域)
+- core/ADR-0020 (発火の条件)、core/ADR-0021 (表示範囲の置き方)、core/ADR-0022 (待ち方)、core/ADR-0023 (Pull to Refresh)、core/ADR-0024 (6 つの表示)、core/ADR-0025 (重ねる表示と安全領域)、core/ADR-0035 (読み込み中の表示の色)
 - core/ADR-0017 (安全領域)、ios/ADR-0009・0010 (内部の塊)、cross/ADR-0006 (性能の完了判定)

@@ -10,7 +10,54 @@ import UIKit
 // では、引っ張り始めてバーの下に隙間が空けば部品がバーのすぐ下に見える。余白の無い一覧では、引っ張った
 // 量が安全領域に満たない間は部品がバーの裏に留まり、バーの下に空いた隙間に上から現れる。
 // 取り直し中にコンテンツを部品の下で止める余白 (安全領域のうち上の内側余白で覆えない分) は一覧が足す。
+//
+// 部品の色は、一覧に指定した読み込み中の表示の色に合わせる。指定が無いときは標準の色のままにする
+// (core/ADR-0035)。
+//
+// 標準の部品は、渡した色 (tintColor) をそのままの色では描かない。引っ張って取り直し中になると、線 1 本の
+// 下地に渡した色を塗り、それを 8 本に複製するレイヤーが同じ色をもう一度掛けるため、RGB の成分ごとに
+// 2 乗した色になる (iOS 18.6・27.0 で、描いた画素とレイヤーの値の両方から確認)。線の不透明度は複製ごとに
+// 決まり、いちばん濃い線で約 57%。これは色を指定しない標準の色でも同じで、公開の手段では変えられない。
+// このため部品には、成分ごとの平方根にした色を渡して 2 乗を打ち消す。色みは指定した色になり、濃さは
+// 標準の Pull to Refresh と同じ (読み込み中の表示より薄い) になる。
 internal final class KsRefreshControl: UIRefreshControl {
+    // 部品の色。nil は標準の色。
+    var indicatorColor: UIColor? {
+        didSet {
+            guard indicatorColor != oldValue else { return }
+            tintColor = indicatorColor.map(Self.tintColor(drawing:))
+        }
+    }
+
+    // 標準の部品が `color` の色みで描くように、部品に渡す色。RGB の成分ごとの平方根にする。
+    //
+    // - 表示モードで値が変わる色は、描くときの表示の特性で解決してから補正する。解決の前に補正すると、
+    //   どの外観の値を補正したのか決まらず、外観の切り替えにも追随しない。
+    // - 不透明度は変えずに渡す。部品が 2 回掛けるのは RGB だけで、不透明度は線の下地に 1 回だけ効く
+    //   (標準の色の不透明度 0.6 が、線の下地にそのまま入っている)。
+    // - 成分は sRGB の 0〜1 に収めてから平方根にする。sRGB の外の色は成分が負や 1 超になり、負の数の
+    //   平方根は求められず、1 超の成分は部品が掛け合わせた結果を画面の色に収められないため、sRGB の
+    //   範囲でいちばん近い色として扱う。
+    // - RGB の成分に直せない色 (模様の色など) は、補正せずそのまま渡す。
+    static func tintColor(drawing color: UIColor) -> UIColor {
+        UIColor { traits in
+            let resolved = color.resolvedColor(with: traits)
+            var red: CGFloat = 0
+            var green: CGFloat = 0
+            var blue: CGFloat = 0
+            var alpha: CGFloat = 0
+            guard resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+                return resolved
+            }
+            return UIColor(
+                red: min(max(red, 0), 1).squareRoot(),
+                green: min(max(green, 0), 1).squareRoot(),
+                blue: min(max(blue, 0), 1).squareRoot(),
+                alpha: alpha
+            )
+        }
+    }
+
     // コンテンツの先頭にある空白の高さ (一覧の上の内側余白)。部品はこの空白の中までは下げてよい。
     var emptyTopSpace: CGFloat = 0 {
         didSet {

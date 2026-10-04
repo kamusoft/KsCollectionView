@@ -3,6 +3,7 @@ import SwiftUI
 // 利用者が差し替えた 6 つのページングの表示。差し替えていない表示は nil で、既定の見え方になる。
 // 既定で出すのは 2 つの読み込み中 (標準の読み込み中の表示、文言なし) だけで、失敗・終端・空は
 // 差し替えたときだけ出す (core/ADR-0024)。
+// 一覧に指定した読み込み中の表示の色は既定の 2 つにだけ渡し、差し替えた表示には渡さない (core/ADR-0035)。
 internal struct KsPagingDisplays {
     typealias Retry = @MainActor () -> Void
 
@@ -15,16 +16,16 @@ internal struct KsPagingDisplays {
 
     // 表示の中身。何も出さない表示 (差し替えていない失敗・終端・空) は nil。
     // 失敗の表示には、次ページ要求を呼び直す再試行の操作を渡す (core/ADR-0019)。
-    func content(for display: KsPagingDisplay, retry: @escaping Retry) -> AnyView? {
+    func content(for display: KsPagingDisplay, retry: @escaping Retry, loadingIndicatorColor: UIColor?) -> AnyView? {
         switch display {
         case .appendingIndicator:
-            appendingIndicator?() ?? AnyView(KsPagingDefaultIndicator())
+            appendingIndicator?() ?? AnyView(KsPagingDefaultProgress(color: loadingIndicatorColor))
         case .failedFooter:
             failedFooter?(retry)
         case .endReachedFooter:
             endReachedFooter?()
         case .loadingPlaceholder:
-            loadingPlaceholder?() ?? AnyView(KsPagingDefaultProgress())
+            loadingPlaceholder?() ?? AnyView(KsPagingDefaultProgress(color: loadingIndicatorColor))
         case .failedPlaceholder:
             failedPlaceholder?(retry)
         case .emptyPlaceholder:

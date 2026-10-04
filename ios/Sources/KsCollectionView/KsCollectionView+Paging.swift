@@ -30,7 +30,8 @@ extension KsCollectionView {
     ///
     /// 状態が ``KsPagingState/appending`` の間は一覧の見えている範囲の下端に、項目が 1 件も無い間は一覧の
     /// 真ん中に、標準の読み込み中の表示が出ます。失敗・終端・空の表示は、既定では何も出ません。
-    /// 表示は ``pagingAppendingIndicator(_:)`` などで差し替えられます。
+    /// 表示は ``pagingAppendingIndicator(_:)`` などで差し替えられます。標準の読み込み中の表示の色は
+    /// ``loadingIndicatorColor(_:)`` で指定できます。
     ///
     /// 取り直しの結果は、コンテンツの先頭から表示します。
     ///
@@ -67,7 +68,8 @@ extension KsCollectionView {
     /// この表示は一覧の見えている範囲の下端 (画面下端の安全領域の上) の中央に止めて重ね、
     /// 項目はその裏を流れます。状態が ``KsPagingState/appending`` の間だけ出て、短いフェードで出入りします。
     ///
-    /// 差し替えない場合は、標準の読み込み中の表示がそのまま (下地なしで) 出ます。既定の表示はタッチを
+    /// 差し替えない場合は、標準の読み込み中の表示がそのまま (下地なしで) 出ます。その色は
+    /// ``loadingIndicatorColor(_:)`` で指定でき、差し替えた表示には効きません。既定の表示はタッチを
     /// 受けず、下の項目を押せます。差し替えた表示はそのまま置き、その表示の範囲だけタッチを
     /// 受けます。差し替えた表示の範囲から始めたドラッグでも、一覧はスクロールします。
     /// 何も出したくない場合は `EmptyView()` を返してください。
@@ -105,8 +107,8 @@ extension KsCollectionView {
     /// 項目が 1 件も無く、状態が ``KsPagingState/appending`` か ``KsPagingState/refreshing`` のときに、
     /// 一覧の真ん中へ出す表示を差し替えます。
     ///
-    /// 差し替えない場合は、標準の読み込み中の表示が出ます。何も出したくない場合は `EmptyView()` を
-    /// 返してください。
+    /// 差し替えない場合は、標準の読み込み中の表示が出ます。その色は ``loadingIndicatorColor(_:)`` で
+    /// 指定でき、差し替えた表示には効きません。何も出したくない場合は `EmptyView()` を返してください。
     public func pagingLoadingPlaceholder<Content: View>(
         @ViewBuilder _ content: @escaping () -> Content
     ) -> KsCollectionView<Item> {

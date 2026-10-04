@@ -1,6 +1,7 @@
 package jp.kamusoft.kscollectionview
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 /**
  * 一覧に付けるページング (無限スクロール) の設定です。
@@ -34,7 +35,8 @@ import androidx.compose.runtime.Composable
  * 無ければ一覧の真ん中に、標準の読み込み中の表示が出ます。見えている範囲の下端の表示はスクロールしても
  * 動かず、項目はその裏を流れます。失敗・終端の表示は最後の項目の後ろに、空の表示は一覧の真ん中に出ますが、
  * 既定では何も出ません。6 つの表示はそれぞれの引数で差し替えられます。読み込み中の既定を消したいときは、
- * 何も描かない Composable を渡してください。
+ * 何も描かない Composable を渡してください。標準の読み込み中の表示の色は、`KsCollectionView` の
+ * `loadingIndicatorColor` で指定できます (省略するとテーマの primary)。差し替えた表示には効きません。
  *
  * ページングを付けた一覧では、状態が [KsPagingState.Refreshing] の間に配列を差し替えると、差し替えと
  * 同時にコンテンツの先頭を表示します。また、状態が [KsPagingState.EndReached] になるまでは、末尾を
@@ -56,7 +58,8 @@ import androidx.compose.runtime.Composable
  * @property appendingIndicator 項目があり、状態が [KsPagingState.Appending] のときに、一覧の見えている
  *   範囲の下端 (下端のシステムバーに重なっていればその分だけ上) の中央に重ねて出す表示。下の余白
  *   (`contentPadding`) では位置は変わりません。スクロールしても動きません。省略すると、標準の読み込み中の
- *   表示が下地なしで出て、タッチは受けずに下の項目へ通します。差し替えた表示はそのまま置き、押せる部品を
+ *   表示が下地なしで出て、タッチは受けずに下の項目へ通します。標準の表示の色は `KsCollectionView` の
+ *   `loadingIndicatorColor` で指定できます。差し替えた表示はそのまま置き (色の指定は効きません)、押せる部品を
  *   持たなくても表示の範囲のタップを受け止めて下の項目へ通しません。表示の範囲から始めたドラッグは
  *   一覧のスクロールになります。表示の範囲の外のタッチは下へ通します
  * @property failedFooter 項目があり、状態が [KsPagingState.Failed] のときに最後の項目の後ろへ出す表示。
@@ -64,7 +67,9 @@ import androidx.compose.runtime.Composable
  * @property endReachedFooter 項目があり、状態が [KsPagingState.EndReached] のときに最後の項目の後ろへ
  *   出す表示。省略すると何も出ません
  * @property loadingPlaceholder 項目が 1 件も無く、状態が [KsPagingState.Appending] か
- *   [KsPagingState.Refreshing] のときに一覧の真ん中へ出す表示。省略すると標準の読み込み中の表示が出ます
+ *   [KsPagingState.Refreshing] のときに一覧の真ん中へ出す表示。省略すると標準の読み込み中の表示が出ます。
+ *   標準の表示の色は `KsCollectionView` の `loadingIndicatorColor` で指定できます。差し替えた表示には
+ *   色の指定は効きません
  * @property failedPlaceholder 項目が 1 件も無く、状態が [KsPagingState.Failed] のときに一覧の真ん中へ
  *   出す表示。再試行の操作を受け取ります。Pull to Refresh を付けていても、再試行で呼ばれるのは
  *   [onLoadMore] です。省略すると何も出ません
@@ -85,13 +90,22 @@ public class KsPaging(
     /**
      * 表示 [display] の中身。差し替えていない読み込み中は標準の読み込み中の表示、差し替えていない
      * 失敗・終端・空は null (何も出さない)。
+     *
+     * [loadingIndicatorColor] は標準の読み込み中の表示にだけ渡す。差し替えた表示は利用者が色を決めるため、
+     * 色を渡さずそのまま返す (core/ADR-0035)。
      */
-    internal fun content(display: KsPagingDisplay, retry: () -> Unit): (@Composable () -> Unit)? =
+    internal fun content(
+        display: KsPagingDisplay,
+        retry: () -> Unit,
+        loadingIndicatorColor: Color?,
+    ): (@Composable () -> Unit)? =
         when (display) {
-            KsPagingDisplay.AppendingIndicator -> appendingIndicator ?: { KsPagingAppendingIndicatorDefault() }
+            KsPagingDisplay.AppendingIndicator ->
+                appendingIndicator ?: { KsPagingAppendingIndicatorDefault(loadingIndicatorColor) }
             KsPagingDisplay.FailedFooter -> failedFooter?.let { content -> { content(retry) } }
             KsPagingDisplay.EndReachedFooter -> endReachedFooter
-            KsPagingDisplay.LoadingPlaceholder -> loadingPlaceholder ?: { KsPagingDefaultProgress() }
+            KsPagingDisplay.LoadingPlaceholder ->
+                loadingPlaceholder ?: { KsPagingDefaultProgress(loadingIndicatorColor) }
             KsPagingDisplay.FailedPlaceholder -> failedPlaceholder?.let { content -> { content(retry) } }
             KsPagingDisplay.EmptyPlaceholder -> emptyPlaceholder
         }

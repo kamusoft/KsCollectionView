@@ -1,10 +1,12 @@
 package jp.kamusoft.kscollectionview
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -324,6 +326,34 @@ internal class KsCollectionViewPublicApiTest {
         }
 
         assertEquals(3, composeTestRule.countNodesWithTag("cell"))
+    }
+
+    /**
+     * 一覧は読み込み中の表示の色を名前付き引数で受け取り、省略も null の指定もできる。ページングを
+     * 付けない一覧でも渡せる。
+     */
+    @Test
+    fun collectionAcceptsLoadingIndicatorColor() {
+        val colors: List<Color?> = listOf(Color.Gray, null)
+        composeTestRule.setContent {
+            TestContainer {
+                Column {
+                    colors.forEach { color ->
+                        KsCollectionView(
+                            items = testItems(1),
+                            key = { it.id },
+                            modifier = Modifier.height(100.dp),
+                            onRefresh = {},
+                            loadingIndicatorColor = color,
+                        ) {
+                            template { item -> ItemRow(item) }
+                        }
+                    }
+                }
+            }
+        }
+
+        assertEquals(2, composeTestRule.countNodesWithTag("cell"))
     }
 
     /** 並べ替えの設定は、スイッチと置いたときの処理だけで作れ、判定 2 つと読み上げの文言は既定で省略 (null)。 */
