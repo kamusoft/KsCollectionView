@@ -149,6 +149,8 @@ private fun PagingCollection(model: PagingDemoModel, layoutChoice: PagingLayoutC
             emptyPlaceholder = { PagingMessage(message = PagingDemoText.Empty) },
         ),
         onRefresh = model::refresh,
+        // 読み込み中の表示 (最初の読み込み中・次のページの読み込み中・Pull to Refresh) を補助の文字の色でそろえる。
+        loadingIndicatorColor = SampleTheme.secondaryText,
     ) {
         template { item -> DemoListRow(item) }
     }

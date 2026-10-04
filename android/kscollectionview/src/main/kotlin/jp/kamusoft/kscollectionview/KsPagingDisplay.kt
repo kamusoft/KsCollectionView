@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ProgressIndicatorDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
@@ -58,12 +60,13 @@ internal enum class KsPagingDisplay {
 }
 
 /**
- * 既定の読み込み中の表示 (0 件のときの真ん中)。標準の不定の読み込み中の表示をそのまま使い、文言・色・
- * 大きさはテーマの既定に任せる (core/ADR-0024)。
+ * 既定の読み込み中の表示 (0 件のときの真ん中)。標準の不定の読み込み中の表示をそのまま使い、文言・
+ * 大きさはテーマの既定に任せる (core/ADR-0024)。色は [color] で描き、null ならテーマの既定 (primary) に
+ * 任せる (core/ADR-0035)。
  */
 @Composable
-internal fun KsPagingDefaultProgress() {
-    CircularProgressIndicator()
+internal fun KsPagingDefaultProgress(color: Color?) {
+    CircularProgressIndicator(color = color ?: ProgressIndicatorDefaults.circularColor)
 }
 
 /**
@@ -75,12 +78,13 @@ private val KsAppendingIndicatorStrokeWidth = 2.5.dp
 
 /**
  * 次のページの読み込み中の既定の表示。標準の不定の読み込み中の表示を下地なしでそのまま出す。文言は持たない。
- * タッチを受ける修飾は付けず、下の項目へ通す。
+ * タッチを受ける修飾は付けず、下の項目へ通す。色は [color] で描き、null ならテーマの既定 (primary) に任せる。
  */
 @Composable
-internal fun KsPagingAppendingIndicatorDefault() {
+internal fun KsPagingAppendingIndicatorDefault(color: Color?) {
     CircularProgressIndicator(
         modifier = Modifier.size(KsAppendingIndicatorSize),
+        color = color ?: ProgressIndicatorDefaults.circularColor,
         strokeWidth = KsAppendingIndicatorStrokeWidth,
     )
 }

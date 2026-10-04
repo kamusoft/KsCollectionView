@@ -1,9 +1,9 @@
 ---
 type: concept
 title: ページングと Pull to Refresh
-description: KsCollectionView に付けるページング (5 状態・次ページ要求・しきい値) と Pull to Refresh の公開契約 — 発火の条件・頼んだ後の待ち方・6 つの表示の置き場と差し替え口・表示範囲の置き方・安全領域・利用者の VM が守る書き方 (iOS / Android 共通)
+description: KsCollectionView に付けるページング (5 状態・次ページ要求・しきい値) と Pull to Refresh の公開契約 — 発火の条件・頼んだ後の待ち方・6 つの表示の置き場と差し替え口・読み込み中の表示の色・表示範囲の置き方・安全領域・利用者の VM が守る書き方 (iOS / Android 共通)
 tags: [core-model, paging, pull-to-refresh, loading]
-timestamp: 2026-09-29
+timestamp: 2026-10-04
 ---
 
 # ページングと Pull to Refresh
@@ -72,9 +72,10 @@ KsCollectionView(
 | 次のページの読み込み中 | `.pagingAppendingIndicator { }` | `KsPaging(appendingIndicator = { })` |
 | 次のページの失敗 / 終端 | `.pagingFailedFooter { retry in }` / `.pagingEndReachedFooter { }` | `failedFooter = { retry -> }` / `endReachedFooter = { }` |
 | 最初の読み込み中 / 失敗 (0 件) / 空 | `.pagingLoadingPlaceholder { }` / `.pagingFailedPlaceholder { retry in }` / `.pagingEmptyPlaceholder { }` | `loadingPlaceholder` / `failedPlaceholder` / `emptyPlaceholder` |
+| 読み込み中の表示の色 | `.loadingIndicatorColor(_ color: Color)` modifier | `KsCollectionView(loadingIndicatorColor: Color? = null)` |
 | Pull to Refresh | 一覧に付けた `.refreshable { await }` を一覧が環境値 (`EnvironmentValues.refresh`) として読む。ライブラリの modifier は無い | `KsCollectionView(onRefresh = suspend () -> Unit)` |
 
-語彙は 1 対 1 に対応し、記法は各プラットフォームの流儀に従う (core/ADR-0002)。表示の modifier は `.paging` の前後どちらに付けてもよく、`.paging` の無い一覧では効かない。Pull to Refresh はページングの外に置いてあり、ページングを付けない一覧でも使える。
+語彙は 1 対 1 に対応し、記法は各プラットフォームの流儀に従う (core/ADR-0002)。表示の modifier は `.paging` の前後どちらに付けてもよく、`.paging` の無い一覧では効かない。Pull to Refresh と読み込み中の表示の色はページングの外に置いてあり、ページングを付けない一覧でも使える。Swift では、ライブラリの modifier は `.refreshable` より前に付ける (`.refreshable` は SwiftUI 標準の modifier で、その後ろではライブラリの modifier を呼べない)。
 
 ## 責務境界
 
@@ -145,7 +146,7 @@ KsCollectionView(
 | 取り直し中 | 出さない | 最初の読み込み中 |
 | 待機 | 出さない | 出さない |
 
-既定で出すのは 2 つの読み込み中だけで、各プラットフォームの標準のくるくる (iOS `ProgressView`、Android `CircularProgressIndicator`) を文言なし・下地なしで出す。色はアプリの色設定 (iOS の tint、Android の Material の primary) に従い、色を指定する設定は持たない。失敗・終端・空は、差し替え口を書いたときだけ出る。読み込み中の既定を消したいときは、空の View / Composable を渡す。
+既定で出すのは 2 つの読み込み中だけで、各プラットフォームの標準のくるくる (iOS `ProgressView`、Android `CircularProgressIndicator`) を文言なし・下地なしで出す。色は、指定しなければアプリの色設定 (iOS の tint、Android の Material の primary) に従い、一覧の設定で指定できる (下の「読み込み中の表示の色」)。失敗・終端・空は、差し替え口を書いたときだけ出る。読み込み中の既定を消したいときは、空の View / Composable を渡す。
 
 VM が自分で始めた取り直しの間、項目が並んでいればライブラリは何も重ねない (取り直し中だと見せたいアプリは自分で出す)。
 
@@ -180,6 +181,22 @@ VM が自分で始めた取り直しの間、項目が並んでいればライ�
 | 引っ張らずに状態を取り直し中にした (VM が始めた取り直し) | 出さない |
 
 状態が追加読み込み中の間と、ライブラリが頼んだ次ページ要求の処理が実行中の間は、引っ張っても取り直しは始まらない。どちらでもなくなれば、また引っ張れる。追加読み込みの結果が取り直しの後に遅れて届き、新しい一覧の後ろに古いページが混ざるのを防ぐためである。
+
+### 読み込み中の表示の色 (core/ADR-0035)
+
+一覧は、ライブラリが描く読み込み中の表示の色を指定する設定を 1 つ持つ (上の「公開 API」の表)。指定した色は次の 3 つに同時に効き、表示ごとに色を分ける設定は無い。ページングを付けない一覧でも、Pull to Refresh のインジケータに効く。
+
+| 表示 | 色を指定したとき | 指定しないとき |
+|---|---|---|
+| 次のページの読み込み中・最初の読み込み中 (差し替えていないもの) | 指定した色 | iOS は親の View に付けた SwiftUI の `tint`、Android は Material のテーマの primary |
+| Pull to Refresh のインジケータ (iOS) | 色みは指定した色、濃さは指定しないときと同じ | OS の標準の色 |
+| Pull to Refresh のインジケータ (Android) | 矢印が指定した色。丸い下地はテーマの色のまま | material3 の既定の色 |
+
+利用者が差し替え口に書いた表示には効かない。差し替えた表示の色は、その表示の中で利用者が決める。ライブラリは既定の色の値を持たず、指定しない一覧の見え方は各プラットフォームの標準のままである。
+
+表示を出している間に色を変える・指定を外すと、出ている表示はその場で追随する (指定を外すと標準の色に戻る)。iOS の並べ替えのドラッグ中だけは、ドラッグ中に届くほかの設定と同じく、ドラッグが終わってから反映する ([collection-reorder](collection-reorder.md))。
+
+iOS の Pull to Refresh のインジケータは、同じ色を指定しても 2 つの読み込み中より薄く出る。OS の標準の部品が、色を指定しないときも含めて、インジケータをいちばん濃い所でも半透明で描くためである。色の系統はそろうが濃さはそろわないので、下地との差が小さい色 (暗い下地に中間のグレーなど) では見えにくくなる。Android では、テーマと合わない色 (ライトのテーマで白など) を指定すると、テーマの色の下地の上で矢印が見えにくくなる。
 
 ### 表示範囲の置き方 (core/ADR-0021)
 
@@ -217,6 +234,7 @@ iOS で上の `contentPadding` に安全領域の分を入れた一覧では、�
 | 実行中の処理が取り消される時機 | `NavigationStack` で次の画面を積んでも一覧は残り、取り消さない | Navigation Compose で次の画面へ進むと前の画面はコンポジションを離れ、実行中の処理は取り消される |
 | 処理が失敗を投げたとき | `onLoadMore` / `.refreshable` は投げない型なので、失敗は VM の中で扱うしかない | `onLoadMore` / `onRefresh` が投げた例外をライブラリは捕まえない。失敗は VM の中で捕まえて状態にする |
 | 「配列の中身が変わった」の見分け (待ち方の解除) | 配列を同値比較で比べる | 配列の参照が変わった回だけ中身を比べる |
+| 色を指定した Pull to Refresh のインジケータ | 色みは指定した色で、2 つの読み込み中より薄い。下地は無い | 矢印が指定した色そのもので、丸い下地はテーマの色 |
 | 「末尾へ」のスクロール命令の行き先 | 最後の項目の下端 | 最後の lazy 要素 (ルートのフッターの枠。失敗・終端の表示を含む) の末尾 |
 
 1 行目の差は、iOS が配列を中身で比べるため「失敗して配列がそのまま」と「前と同じ中身の成功」を見分けられず、後者で先頭を表示する手当てが前者にも効くことから来る。そろえるには公開 API に合図を足す必要があり、項目や操作は壊れないため差として受け入れた (出典: kasane/changes/archive/2026-09-29-paging-state-machine/deviation.md)。
@@ -271,5 +289,5 @@ iOS で上の `contentPadding` に安全領域の分を入れた一覧では、�
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) / [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — 一覧全体の実現
 - core/ADR-0005 (5 状態の外形と責務の分担)、core/ADR-0019 (失敗の状態と再試行)、core/ADR-0020 (発火の条件としきい値)、core/ADR-0022 (非同期の処理と待ち方)、core/ADR-0023 (Pull to Refresh)
 - core/ADR-0021 (表示範囲の置き方。0018 を一部改訂)、core/ADR-0024 (6 つの表示と差し替え口。0005 を一部改訂)、core/ADR-0025 (重ねる表示と安全領域。0017 を一部改訂)
-- core/ADR-0011 (不正入力の release 挙動)、core/ADR-0017 (安全領域)、core/ADR-0018 (端を表示中の端への挿入)、core/ADR-0034 (並べ替えのドラッグ中は判定しない。0020 を一部改訂)
-- 出典: kasane/changes/archive/2026-09-29-paging-state-machine/ (design.md・deviation.md)
+- core/ADR-0011 (不正入力の release 挙動)、core/ADR-0017 (安全領域)、core/ADR-0018 (端を表示中の端への挿入)、core/ADR-0034 (並べ替えのドラッグ中は判定しない。0020 を一部改訂)、core/ADR-0035 (読み込み中の表示の色)
+- 出典: kasane/changes/archive/2026-09-29-paging-state-machine/ (design.md・deviation.md)、kasane/changes/archive/2026-10-04-paging-indicator-color/ (proposal.md・deviation.md)

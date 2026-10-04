@@ -45,3 +45,4 @@
 
 ## 2026-10-04
 - distilled: test-suite-speedup-and-pruning (ADR: cross/ADR-0008 を accepted / handbook: cross/test-execution.md に「全系統の合計は 10 分以内」の節を追加し、iOS Sample のテストがユニットテストと UI テストの 2 ターゲットになったことを反映 / concepts の変更なし)
+- distilled: paging-indicator-color (ADR: core/ADR-0035 を accepted。実装を経た視点で本文を書き直した (Pull to Refresh は色を指定しても標準の部品のままで、iOS は補正した色を渡す。自前のくるくるを描く案・色をそのまま渡す案を却下) / handbook の変更なし / concepts: core/core-model/collection-paging.md に「読み込み中の表示の色」の節を追加し、「色を指定する設定は持たない」の記述・公開 API の表・両プラットフォームの差の表を追随。ios/architecture/paging-engine.md に「UIRefreshControl には補正した色を渡す」の節を追加 (標準の部品は渡した色を 2 回掛けて最大 約 57% で描く。iOS 18.6・27.0 で確認、16・17 は未確認) / lessons: verify-external-api-visibility-before-writing-it-into-design を spec-review.md [L-002] に昇格、inbox の既存 1 件に加算 / deviation 4 件 (iOS の Pull to Refresh は色みは指定どおり・濃さは標準と同じ、iOS のダーク 約 2.9・ライト 約 2.1 のコントラスト比の受け入れ、Android で全引数を括弧内に位置で並べる呼び出しが壊れることの受け入れ))

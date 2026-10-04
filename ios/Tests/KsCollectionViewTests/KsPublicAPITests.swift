@@ -371,12 +371,26 @@ final class KsPublicAPITests: XCTestCase {
 
     func test差し替えていない読み込み中は既定の表示で失敗と終端と空は何も出さない() {
         let displays = KsPagingDisplays()
-        XCTAssertNotNil(displays.content(for: .appendingIndicator, retry: {}))
-        XCTAssertNotNil(displays.content(for: .loadingPlaceholder, retry: {}))
-        XCTAssertNil(displays.content(for: .failedFooter, retry: {}))
-        XCTAssertNil(displays.content(for: .endReachedFooter, retry: {}))
-        XCTAssertNil(displays.content(for: .failedPlaceholder, retry: {}))
-        XCTAssertNil(displays.content(for: .emptyPlaceholder, retry: {}))
+        XCTAssertNotNil(displays.content(for: .appendingIndicator, retry: {}, loadingIndicatorColor: nil))
+        XCTAssertNotNil(displays.content(for: .loadingPlaceholder, retry: {}, loadingIndicatorColor: nil))
+        XCTAssertNil(displays.content(for: .failedFooter, retry: {}, loadingIndicatorColor: nil))
+        XCTAssertNil(displays.content(for: .endReachedFooter, retry: {}, loadingIndicatorColor: nil))
+        XCTAssertNil(displays.content(for: .failedPlaceholder, retry: {}, loadingIndicatorColor: nil))
+        XCTAssertNil(displays.content(for: .emptyPlaceholder, retry: {}, loadingIndicatorColor: nil))
+    }
+
+    func test読み込み中の表示の色を指定すると構成に入り指定しなければ無い() {
+        let base = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        XCTAssertNil(base.configuration.loadingIndicatorColor)
+        // ページングを付けない一覧にも付けられる。
+        XCTAssertEqual(base.loadingIndicatorColor(.red).configuration.loadingIndicatorColor, UIColor(Color.red))
+        // ページングの前後どちらに付けても同じ。
+        let before = base.loadingIndicatorColor(.red).paging(.idle) {}
+        let after = base.paging(.idle) {}.loadingIndicatorColor(.red)
+        XCTAssertEqual(before.configuration.loadingIndicatorColor, UIColor(Color.red))
+        XCTAssertEqual(after.configuration.loadingIndicatorColor, UIColor(Color.red))
     }
 
     // MARK: - 並べ替え

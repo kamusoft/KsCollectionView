@@ -1957,9 +1957,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // 高さだけになる。
     private func configurePagingFooter(_ view: KsHostingSupplementaryView) {
         let display = currentPagingFooterDisplay
-        let pagingContent = display.flatMap {
-            configuration.pagingDisplays.content(for: $0, retry: pagingRetryAction)
-        }
+        let pagingContent = display.flatMap { pagingDisplayContent(for: $0) }
         let footer = configuration.footer?()
         let padding = configuration.contentPadding
         view.configure(
@@ -2014,7 +2012,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
         }()
         guard
             let display,
-            let content = configuration.pagingDisplays.content(for: display, retry: pagingRetryAction)
+            let content = pagingDisplayContent(for: display)
         else {
             displayedPagingPlaceholder = nil
             pagingPlaceholderView?.clear()
@@ -2069,7 +2067,7 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
             else {
                 return nil
             }
-            return configuration.pagingDisplays.content(for: display, retry: pagingRetryAction)
+            return pagingDisplayContent(for: display)
         }()
         guard let content else {
             hidePagingIndicator()
@@ -2126,6 +2124,15 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     private func updatePagingIndicatorPosition() {
         guard let indicator = pagingIndicatorView else { return }
         indicator.setBottomDistance(collectionView.safeAreaInsets.bottom + Self.pagingIndicatorBottomSpacing)
+    }
+
+    // ページングの表示の中身。失敗の表示には再試行の操作を、既定の読み込み中の表示には一覧に指定した色を渡す。
+    private func pagingDisplayContent(for display: KsPagingDisplay) -> AnyView? {
+        configuration.pagingDisplays.content(
+            for: display,
+            retry: pagingRetryAction,
+            loadingIndicatorColor: configuration.loadingIndicatorColor
+        )
     }
 
     // 失敗の表示に渡す再試行の操作。
@@ -2219,8 +2226,10 @@ internal final class KsCollectionViewController<Item: Equatable>: UICollectionVi
     // 引っ張りの部品を付け外しする (core/ADR-0023)。取り直しの処理が無ければ外す。ページングの状態が
     // 追加読み込み中の間と、次ページ要求の処理の実行中は、引っ張って始めた取り直しのインジケータを
     // 出していなければ外して引っ張れなくする。
+    // 部品の色も、一覧に指定した読み込み中の表示の色にここで合わせる (core/ADR-0035)。
     private func syncPullRefreshControl() {
         pullRefreshControl.emptyTopSpace = configuration.contentPadding.top
+        pullRefreshControl.indicatorColor = configuration.loadingIndicatorColor
         guard configuration.refresh != nil else {
             if collectionView.refreshControl != nil {
                 finishPullRefresh()

@@ -278,6 +278,41 @@ public struct KsCollectionView<Item: Equatable>: View {
         return copy
     }
 
+    /// 一覧が出す読み込み中の表示の色を設定します。
+    ///
+    /// 色は次の 3 つの表示に同時に効きます。
+    ///
+    /// - 次のページの読み込み中の表示 (``pagingAppendingIndicator(_:)`` で差し替えていない場合)
+    /// - 項目が 1 件も無いときの読み込み中の表示 (``pagingLoadingPlaceholder(_:)`` で差し替えていない場合)
+    /// - Pull to Refresh (`.refreshable`) のインジケータ
+    ///
+    /// ``paging(_:threshold:onLoadMore:)`` を付けていない一覧でも、Pull to Refresh のインジケータに効きます。
+    /// 差し替えた表示には効きません。差し替えた表示の色は、その表示の中で決めてください。
+    ///
+    /// 指定しない場合は、3 つとも標準の色のままです。読み込み中の表示は親の View に付けた `tint` の色、
+    /// Pull to Refresh のインジケータはシステムの標準の色で描かれます。
+    ///
+    /// Pull to Refresh のインジケータは、システムの標準のインジケータの描き方に従うため、指定した色の
+    /// 色みのまま、読み込み中の表示より薄く出ます (濃さは、色を指定しないときの Pull to Refresh と同じです)。
+    ///
+    /// ```swift
+    /// KsCollectionView(model.items) { item in
+    ///     Row(item: item)
+    /// }
+    /// .paging(model.pagingState) {
+    ///     await model.loadNextPage()
+    /// }
+    /// .loadingIndicatorColor(.secondary)
+    /// .refreshable {
+    ///     await model.reload()
+    /// }
+    /// ```
+    public func loadingIndicatorColor(_ color: Color) -> KsCollectionView<Item> {
+        var copy = self
+        copy.configuration.loadingIndicatorColor = UIColor(color)
+        return copy
+    }
+
     /// もうすぐ表示される項目の画像を、表示より前に取得しておくことを宣言します。
     ///
     /// クロージャには項目を渡し、その項目の表示に必要なリモート画像を ``KsResource`` の配列で

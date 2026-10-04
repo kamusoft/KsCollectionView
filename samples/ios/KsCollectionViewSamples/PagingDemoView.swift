@@ -98,6 +98,8 @@ struct PagingDemoView: View {
         .pagingEmptyPlaceholder {
             PagingMessageView(message: PagingDemoText.empty)
         }
+        // 読み込み中の表示 (最初の読み込み中・次のページの読み込み中・Pull to Refresh) を補助の文字の色でそろえる。
+        .loadingIndicatorColor(SampleTheme.secondaryText)
         .refreshable {
             await model.refresh()
         }
