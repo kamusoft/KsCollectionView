@@ -57,7 +57,7 @@ fun ListDemoScreen(modifier: Modifier = Modifier) {
             },
             onItemTap = { lastInteraction = "${it.title} をタップ" },
             onItemLongTap = { lastInteraction = "${it.title} を長押し" },
-            touchFeedbackColor = SampleTheme.accent,
+            touchFeedbackColor = SampleTheme.accent.copy(alpha = 0.1f),
         ) {
             template { item -> DemoListRow(item) }
         }

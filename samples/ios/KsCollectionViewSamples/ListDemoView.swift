@@ -36,7 +36,7 @@ struct ListDemoView: View {
         .listSeparators(separatorChoice != .hidden)
         .onItemTap { lastInteraction = "\($0.title) をタップ" }
         .onItemLongTap { lastInteraction = "\($0.title) を長押し" }
-        .touchFeedback(color: SampleTheme.accent.opacity(0.15))
+        .touchFeedback(color: SampleTheme.accent.opacity(0.1))
 
         guard separatorChoice == .accent else { return view }
         return view.listSeparatorColor(SampleTheme.accent)

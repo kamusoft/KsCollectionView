@@ -5,6 +5,7 @@ import android.content.res.Resources
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +44,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
@@ -86,8 +88,13 @@ import kotlin.math.min
  * @param modifier このコンポーネントに適用する modifier
  * @param contentDescription アクセシビリティのための画像の説明
  * @param contentMode 画像を表示枠にどう当てはめるか
- * @param loading 読み込み中の表示。未指定なら既定の表示になります
- * @param failure 失敗したときの表示。未指定なら既定の表示になります
+ * @param loading 読み込み中の表示。未指定なら既定の表示 (無地) になります。既定の表示の色はライト用と
+ *   ダーク用があり、画面の構成の夜間モード (`isSystemInDarkTheme()` が返す値。通常は端末の表示モードに
+ *   追随し、アプリが画面の構成を上書きしたときはその値) で選ばれ、表示中に切り替わるとその場で追随します。
+ *   Material のテーマの配色は見ないため、画面の構成を変えずに Material の配色だけでダークにするアプリは
+ *   表示を差し替えてください。差し替えた表示には色を当てません
+ * @param failure 失敗したときの表示。未指定なら既定の表示 (下地と印) になります。既定の表示の色の選ばれ方と、
+ *   差し替えた表示に色を当てないことは [loading] と同じです
  */
 @Composable
 public fun KsImage(
@@ -147,8 +154,13 @@ private fun Modifier.imageSemantics(contentDescription: String?): Modifier =
  * @param contentMode 画像を表示枠にどう当てはめるか
  * @param key 画像を見分けるキー。[KsImageSource.Remote] の `key` と同じ意味です。省略すると URL で
  *   見分けます。名前を付けて渡してください
- * @param loading 読み込み中の表示。未指定なら既定の表示になります
- * @param failure 失敗したときの表示。未指定なら既定の表示になります
+ * @param loading 読み込み中の表示。未指定なら既定の表示 (無地) になります。既定の表示の色はライト用と
+ *   ダーク用があり、画面の構成の夜間モード (`isSystemInDarkTheme()` が返す値。通常は端末の表示モードに
+ *   追随し、アプリが画面の構成を上書きしたときはその値) で選ばれ、表示中に切り替わるとその場で追随します。
+ *   Material のテーマの配色は見ないため、画面の構成を変えずに Material の配色だけでダークにするアプリは
+ *   表示を差し替えてください。差し替えた表示には色を当てません
+ * @param failure 失敗したときの表示。未指定なら既定の表示 (下地と印) になります。既定の表示の色の選ばれ方と、
+ *   差し替えた表示に色を当てないことは [loading] と同じです
  */
 @Composable
 public fun KsImage(
@@ -269,6 +281,8 @@ private fun KsLoaderImageContent(
  *
  * 読み込み中の表示は、利用者の指定があれば中身として組み立てておき、画面に出た最初の描画から描く。
  * 指定が無ければ部品が既定の表示を直接描く (組み立てるものが無いので外す組み立て直しも要らない)。
+ * 既定の表示の色は表示モードで変わる。表示中に表示モードが切り替わったときは色だけを部品へ渡し直し、
+ * 部品は作り直さない (進行中の取得を取り消さず、取得し直さない。core/ADR-0036)。
  */
 @Composable
 private fun KsDeferredImageContent(
@@ -300,12 +314,18 @@ private fun KsDeferredImageBody(
     imageReady: MutableState<Boolean>,
     failed: MutableState<Boolean>,
 ) {
-    val element = remember(prepared, context, contentScale, loading == null) {
+    // 既定の読み込み中を部品が直接描くときだけ、画面の構成を読んで色を 1 つ渡す。利用者の表示には
+    // 色を当てない。
+    val defaultLoadingColor =
+        if (loading == null) KsImageDefaults.loadingColor(isSystemInDarkTheme()) else Color.Unspecified
+    // 表示モードが切り替わると色の違う宣言に置き換わるが、部品 ([KsDeferredNode]) は作り直されずに
+    // 宣言だけを受け取り直す。進行中の取得と描いている画像は部品が持ち続ける。
+    val element = remember(prepared, context, contentScale, defaultLoadingColor) {
         KsDeferredElement(
             prepared = prepared,
             context = context,
             contentScale = contentScale,
-            drawsDefaultLoading = loading == null,
+            defaultLoadingColor = defaultLoadingColor,
             lookupOnShown = lookupOnShown,
             onImageReady = { if (!imageReady.value) imageReady.value = true },
             onFailure = { failed.value = true },
@@ -329,7 +349,8 @@ private class KsDeferredElement(
     val prepared: KsPreparedImageRequest,
     val context: Context,
     val contentScale: ContentScale,
-    val drawsDefaultLoading: Boolean,
+    // 部品が直接描く既定の読み込み中の色。利用者の表示を中身として描くときは未指定の色にする。
+    val defaultLoadingColor: Color,
     val lookupOnShown: () -> Image?,
     val onImageReady: () -> Unit,
     val onFailure: () -> Unit,
@@ -403,7 +424,7 @@ private class KsDeferredNode(
         when {
             // 画像を描けるなら、中身 (利用者の読み込み中の表示) は描かない。
             current != null -> drawScaled(current, element.contentScale)
-            element.drawsDefaultLoading -> drawRect(KsImageDefaultLoadingColor)
+            element.defaultLoadingColor.isSpecified -> drawRect(element.defaultLoadingColor)
             else -> drawContent()
         }
     }
@@ -509,14 +530,17 @@ private fun KsResourceImageContent(
 /** 読み込み中の既定の表示。枠全体を無地で塗るだけで、文字や図形は置かない。 */
 @Composable
 internal fun KsImageDefaultLoading() {
-    Box(modifier = Modifier.fillMaxSize().background(KsImageDefaultLoadingColor))
+    Box(modifier = Modifier.fillMaxSize().background(KsImageDefaults.loadingColor(isSystemInDarkTheme())))
 }
 
 /** 失敗の既定の表示。無地の上に画像が無いことを示す小さな印だけを置く。 */
 @Composable
 internal fun KsImageDefaultFailure() {
+    val isDarkTheme = isSystemInDarkTheme()
+    val backgroundColor = KsImageDefaults.failureBackgroundColor(isDarkTheme)
+    val markColor = KsImageDefaults.failureMarkColor(isDarkTheme)
     Canvas(modifier = Modifier.fillMaxSize()) {
-        drawRect(color = KsImageDefaultFailureColor)
+        drawRect(color = backgroundColor)
 
         // 印は枠の短辺に対する割合で描き、どの大きさの枠でも同じ見え方にする。
         val shortSide = min(size.width, size.height)
@@ -524,23 +548,56 @@ internal fun KsImageDefaultFailure() {
         val strokeWidth = (shortSide * 0.03f).coerceAtLeast(1f)
         val topLeft = Offset((size.width - markSide) / 2f, (size.height - markSide) / 2f)
         drawRect(
-            color = KsImageDefaultMarkColor,
+            color = markColor,
             topLeft = topLeft,
             size = Size(markSide, markSide),
             style = Stroke(width = strokeWidth),
         )
         drawCircle(
-            color = KsImageDefaultMarkColor,
+            color = markColor,
             radius = markSide * 0.12f,
             center = topLeft + Offset(markSide * 0.32f, markSide * 0.32f),
         )
     }
 }
 
-// 既定表示の無彩色。プラットフォーム標準の灰に寄せた固定値で、テーマには依存しない。
-internal val KsImageDefaultLoadingColor = Color(0xFFE0E0E0)
-private val KsImageDefaultFailureColor = Color(0xFFBDBDBD)
-private val KsImageDefaultMarkColor = Color(0xFF757575)
+/**
+ * 読み込み中・失敗の既定の表示の色。
+ *
+ * どの色もライト用とダーク用の 2 つの固定値で持ち、iOS 版と同じ値にする (core/ADR-0036)。表示モードは
+ * [KsImage] が置かれた画面の構成の夜間モード (`isSystemInDarkTheme()`) で決め、Material のテーマの
+ * 配色は判定に使わない。
+ */
+internal object KsImageDefaults {
+    /** 読み込み中の表示の無地 (ライト)。 */
+    val loadingLightColor: Color = Color(0xFFE5E5EA)
+
+    /** 読み込み中の表示の無地 (ダーク)。 */
+    val loadingDarkColor: Color = Color(0xFF2C2C2E)
+
+    /** 失敗の表示の下地 (ライト)。 */
+    val failureBackgroundLightColor: Color = Color(0xFFD1D1D6)
+
+    /** 失敗の表示の下地 (ダーク)。 */
+    val failureBackgroundDarkColor: Color = Color(0xFF3A3A3C)
+
+    /** 失敗の表示の印 (ライト)。 */
+    val failureMarkLightColor: Color = Color(0xFF8E8E93)
+
+    /** 失敗の表示の印 (ダーク)。ライトと同じ値である。 */
+    val failureMarkDarkColor: Color = Color(0xFF8E8E93)
+
+    /** 表示モードに応じた読み込み中の表示の色。組み立てる表示と、描く段階で塗る処理の両方が使う。 */
+    fun loadingColor(isDarkTheme: Boolean): Color = if (isDarkTheme) loadingDarkColor else loadingLightColor
+
+    /** 表示モードに応じた失敗の表示の下地の色。 */
+    fun failureBackgroundColor(isDarkTheme: Boolean): Color =
+        if (isDarkTheme) failureBackgroundDarkColor else failureBackgroundLightColor
+
+    /** 表示モードに応じた失敗の表示の印の色。 */
+    fun failureMarkColor(isDarkTheme: Boolean): Color =
+        if (isDarkTheme) failureMarkDarkColor else failureMarkLightColor
+}
 
 /** ローダーへ渡す取得元。同梱リソースはローダーを通らないため、そのままの ID を返す。 */
 internal fun KsImageSource.loaderModel(): Any = when (this) {

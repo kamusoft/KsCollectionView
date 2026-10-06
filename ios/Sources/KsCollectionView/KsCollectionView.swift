@@ -258,7 +258,23 @@ public struct KsCollectionView<Item: Equatable>: View {
     }
 
     /// タッチ中に表示する背景色を設定します。
+    ///
+    /// 指定した色を、不透明度を含めてそのまま項目の前面に塗ります。不透明な色を指定すると、タッチ中は
+    /// 項目の中身が隠れます。中身を見せたまま色を付けるには、半透明の色を指定してください。
+    ///
+    /// ```swift
+    /// KsCollectionView(items) { item in
+    ///     Row(item)
+    /// }
+    /// .onItemTap { item in open(item) }
+    /// .touchFeedback(color: .accentColor.opacity(0.1))
+    /// ```
+    ///
+    /// Android 版の同じ設定 (`touchFeedbackColor`) は、指定した色の色みだけを使い、濃さはプラットフォーム
+    /// 標準の波紋が決めます (指定した色の不透明度は濃さに効きません)。両方のプラットフォームで近い見え方に
+    /// するには、半透明の色を指定してください。
     public func touchFeedback(color: Color) -> KsCollectionView<Item> {
+        // 指定した色は加工せずに持つ。両プラットフォームの濃さをそろえる加工はしない (core/ADR-0037)。
         var copy = self
         copy.configuration.touchFeedbackColor = UIColor(color)
         return copy
@@ -271,7 +287,13 @@ public struct KsCollectionView<Item: Equatable>: View {
         return copy
     }
 
-    /// list の区切り線の色を設定します。指定しない場合は既定の色で描かれます。
+    /// list の区切り線の色を設定します。
+    ///
+    /// 指定しない場合は既定の色で描かれます。既定の色は、一覧が置かれた場所の外観 (ライト / ダーク。
+    /// アプリが上書きした外観を含む) で変わり、表示中に外観が切り替わるとその場で切り替わります。
+    ///
+    /// 指定した色はそのまま使います。外観に合わせて別の色へ差し替えることも、既定の色へ置き換えることも
+    /// しません。
     public func listSeparatorColor(_ color: Color) -> KsCollectionView<Item> {
         var copy = self
         copy.configuration.separatorColor = UIColor(color)

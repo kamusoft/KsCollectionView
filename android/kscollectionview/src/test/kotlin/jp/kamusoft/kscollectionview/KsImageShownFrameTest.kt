@@ -43,6 +43,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.util.concurrent.atomic.AtomicInteger
@@ -139,10 +140,29 @@ internal class KsImageShownFrameTest {
 
         val firstFrame = showOneFrame(shown)
 
-        assertEquals("画面に出た最初の描画で既定の読み込み中を描いていません", KsImageDefaultLoadingColor.toArgb(), firstFrame)
+        assertEquals("画面に出た最初の描画で既定の読み込み中を描いていません", KsImageDefaults.loadingLightColor.toArgb(), firstFrame)
         composeTestRule.mainClock.autoAdvance = true
         composeTestRule.waitForIdle()
-        assertEquals("組み立て直しの後に既定の読み込み中を描いていません", KsImageDefaultLoadingColor.toArgb(), drawCenterPixel())
+        assertEquals("組み立て直しの後に既定の読み込み中を描いていません", KsImageDefaults.loadingLightColor.toArgb(), drawCenterPixel())
+    }
+
+    /**
+     * ダークの表示モードでは、引き当てが外れた最初の描画から、既定の読み込み中をダーク用の色で描く。
+     * 画面に出る前に組み立てた表示でも、ライト用の色が 1 フレームも挟まらない。
+     */
+    @Test
+    fun defaultLoadingIsDrawnInTheDarkColorInTheFirstFrameInNightMode() {
+        RuntimeEnvironment.setQualifiers("+night")
+        val source = KsImageSource.Remote("https://example.com/shown-miss-default-night.jpg")
+        registerPendingPrefetch(source)
+        val shown = precomposeThenShow(source, slotDraws = null)
+
+        val firstFrame = showOneFrame(shown)
+
+        assertEquals("画面に出た最初の描画でダーク用の既定の読み込み中を描いていません", KsImageDefaults.loadingDarkColor.toArgb(), firstFrame)
+        composeTestRule.mainClock.autoAdvance = true
+        composeTestRule.waitForIdle()
+        assertEquals("組み立て直しの後にダーク用の既定の読み込み中を描いていません", KsImageDefaults.loadingDarkColor.toArgb(), drawCenterPixel())
     }
 
     /** 読み込み中の表示を指定していなくても、引き当てが当たれば最初の描画からその項目を描く。 */

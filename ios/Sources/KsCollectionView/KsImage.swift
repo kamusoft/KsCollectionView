@@ -20,6 +20,11 @@ import SwiftUI
 ///
 /// 読み込み中と失敗の表示は片方だけを指定でき、指定しなかった側は既定の表示になります。
 ///
+/// 既定の表示の色は、この画像が置かれた場所の外観 (ライト / ダーク。アプリが上書きした外観を含む) で
+/// 変わります。表示中に外観が切り替わると、出ている既定の表示の色もその場で切り替わります。外観の
+/// 切り替えで画像を読み込み直すことはありません。指定した読み込み中・失敗の表示には色を当てず、
+/// そのまま表示します。
+///
 /// メモリに表示枠と大きく違わない大きさの同じ画像があれば、デコードし直さずにそれで表示します
 /// (読み込み中の表示を経由しません)。無ければ表示枠の大きさに縮小してデコードするため、表示のために
 /// 元の大きさの画像をメモリへ展開しません。表示枠の大きさが決まるまでは読み込みを始めません。
@@ -325,9 +330,10 @@ extension KsImageContentMode {
 }
 
 // 読み込み中の既定の表示。枠全体を無地で塗るだけで、文字や図形は置かない。
+// 色はライブラリが持つライト用とダーク用の値で、置かれた場所の外観で解決される (core/ADR-0036)。
 internal struct KsImageDefaultLoadingView: View {
     var body: some View {
-        Color(uiColor: .systemGray5)
+        Color(uiColor: KsDefaultColors.imageLoading)
             // この表示自体を読み上げの単位にする。利用者が KsImage に付けた説明は状態が
             // 変わってもここへ引き継がれ、説明が無ければ読み上げる名前を持たない。
             .accessibilityElement(children: .ignore)
@@ -338,14 +344,15 @@ internal struct KsImageDefaultLoadingView: View {
 }
 
 // 失敗の既定の表示。無地の上に画像が無いことを示す小さな印だけを置く。
+// 下地と印の色はライブラリが持つライト用とダーク用の値で、置かれた場所の外観で解決される (core/ADR-0036)。
 internal struct KsImageDefaultFailureView: View {
     var body: some View {
         GeometryReader { proxy in
-            Color(uiColor: .systemGray4)
+            Color(uiColor: KsDefaultColors.imageFailureBackground)
                 .overlay {
                     Image(systemName: "photo")
                         .font(.system(size: min(proxy.size.width, proxy.size.height) * 0.3))
-                        .foregroundStyle(Color(uiColor: .systemGray))
+                        .foregroundStyle(Color(uiColor: KsDefaultColors.imageFailureMark))
                 }
         }
         // 印は画像が無いことを目で示すための飾りで、名前を読み上げても利用者の役に立たない。

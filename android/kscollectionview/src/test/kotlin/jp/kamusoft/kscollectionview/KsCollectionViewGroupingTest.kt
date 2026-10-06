@@ -565,7 +565,7 @@ internal class KsCollectionViewGroupingTest {
         setGroupedContent(foods("果物" to 2, "野菜" to 2), itemBackground = Color.White)
 
         val image = collectionPixels()
-        val color = KsListSeparatorDefaults.color
+        val color = KsListSeparatorDefaults.lightColor
         // 0-30: 果物の見出し / 30-80, 80-130: 果物 / 130-160: 野菜の見出し / 160-210, 210-260: 野菜
         assertEquals("果物の先頭行の上端", color, image[10, 30])
         assertEquals("果物の行の間", color, image[10, 79])
@@ -581,7 +581,7 @@ internal class KsCollectionViewGroupingTest {
         setGroupedContent(foods("果物" to 2, "野菜" to 2), withHeader = false, itemBackground = Color.White)
 
         val image = collectionPixels()
-        val color = KsListSeparatorDefaults.color
+        val color = KsListSeparatorDefaults.lightColor
         // 0-50, 50-100: 果物 / 100-150, 150-200: 野菜
         assertEquals("最初のグループの先頭行の上端", color, image[10, 0])
         assertEquals("境目の線 (果物の最終行の下端)", color, image[10, 99])

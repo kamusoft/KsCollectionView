@@ -58,6 +58,20 @@ final class KsPublicAPITests: XCTestCase {
         XCTAssertEqual(view.configuration.observedValue, AnyHashable(Set([1, 2])))
     }
 
+    func testtouchFeedbackに半透明の色を指定すると不透明度を含めてそのまま持つ() {
+        let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
+            Text(item.title)
+        }
+        .touchFeedback(color: Color(.sRGB, red: 0.2, green: 0.4, blue: 0.8, opacity: 0.1))
+
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        XCTAssertEqual(view.configuration.touchFeedbackColor?.getRed(&red, green: &green, blue: &blue, alpha: &alpha), true)
+        XCTAssertEqual(red, 0.2, accuracy: 0.005)
+        XCTAssertEqual(green, 0.4, accuracy: 0.005)
+        XCTAssertEqual(blue, 0.8, accuracy: 0.005)
+        XCTAssertEqual(alpha, 0.1, accuracy: 0.005)
+    }
+
     func test観測する値を渡さなければ宣言なしのままになる() {
         let view = KsCollectionView([Item(id: 1, kind: .message, title: "A")]) { item in
             Text(item.title)

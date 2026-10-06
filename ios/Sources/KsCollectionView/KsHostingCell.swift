@@ -1,13 +1,10 @@
 import UIKit
 
 internal final class KsHostingCell: UICollectionViewCell {
-    /// 区切り線の色を指定しなかったときに使う色。
-    static let defaultSeparatorColor = UIColor(
-        red: 217 / 255,
-        green: 217 / 255,
-        blue: 222 / 255,
-        alpha: 1
-    )
+    // 区切り線の色を指定しなかったときに使う色。ライト用とダーク用の値を持ち、線が置かれた場所の外観で
+    // OS が解決する (core/ADR-0036)。表示中に外観が切り替わると、線は書き込み直さなくても追随する。
+    // 書き込みの省略 (同じオブジェクトなら書かない) が既定色でも効くよう、1 つのオブジェクトに固定する。
+    static let defaultSeparatorColor: UIColor = KsDefaultColors.separator
 
     /// タッチ時の背景色を指定しなかったときに使う色。プラットフォーム標準のハイライト相当の半透明色。
     /// `.systemFill` は参照のたびに同じオブジェクトを返す保証が無いため、1 つに固定して

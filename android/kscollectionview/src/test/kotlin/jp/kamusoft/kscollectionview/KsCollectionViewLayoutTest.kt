@@ -378,10 +378,10 @@ internal class KsCollectionViewLayoutTest {
         setSeparatorContent(separators = true, color = null)
 
         val pixels = capturedPixels()
-        assertEquals(KsListSeparatorDefaults.color, pixels.topLine)
-        assertEquals(KsListSeparatorDefaults.color, pixels.betweenLine)
-        assertEquals(KsListSeparatorDefaults.color, pixels.bottomLine)
-        assertNotEquals(KsListSeparatorDefaults.color, pixels.insideItem)
+        assertEquals(KsListSeparatorDefaults.lightColor, pixels.topLine)
+        assertEquals(KsListSeparatorDefaults.lightColor, pixels.betweenLine)
+        assertEquals(KsListSeparatorDefaults.lightColor, pixels.bottomLine)
+        assertNotEquals(KsListSeparatorDefaults.lightColor, pixels.insideItem)
     }
 
     /** 不透明な背景を持つテンプレートでも、区切り線は content に隠れず 3 本とも見える。 */
@@ -390,9 +390,9 @@ internal class KsCollectionViewLayoutTest {
         setSeparatorContent(separators = true, color = null, itemBackground = Color.White)
 
         val pixels = capturedPixels()
-        assertEquals("先頭行の上端の線が content の背景に隠れない", KsListSeparatorDefaults.color, pixels.topLine)
-        assertEquals("行間の線が content の背景に隠れない", KsListSeparatorDefaults.color, pixels.betweenLine)
-        assertEquals("最終行の下端の線が content の背景に隠れない", KsListSeparatorDefaults.color, pixels.bottomLine)
+        assertEquals("先頭行の上端の線が content の背景に隠れない", KsListSeparatorDefaults.lightColor, pixels.topLine)
+        assertEquals("行間の線が content の背景に隠れない", KsListSeparatorDefaults.lightColor, pixels.betweenLine)
+        assertEquals("最終行の下端の線が content の背景に隠れない", KsListSeparatorDefaults.lightColor, pixels.bottomLine)
         assertEquals("項目の内側は content の背景色のまま", Color.White, pixels.insideItem)
     }
 
@@ -402,9 +402,9 @@ internal class KsCollectionViewLayoutTest {
         setSeparatorContent(separators = false, color = null)
 
         val pixels = capturedPixels()
-        assertNotEquals(KsListSeparatorDefaults.color, pixels.topLine)
-        assertNotEquals(KsListSeparatorDefaults.color, pixels.betweenLine)
-        assertNotEquals(KsListSeparatorDefaults.color, pixels.bottomLine)
+        assertNotEquals(KsListSeparatorDefaults.lightColor, pixels.topLine)
+        assertNotEquals(KsListSeparatorDefaults.lightColor, pixels.betweenLine)
+        assertNotEquals(KsListSeparatorDefaults.lightColor, pixels.bottomLine)
     }
 
     /** listSeparatorColor で色だけを変えられる (位置・本数は既定と同じ)。 */
@@ -448,8 +448,8 @@ internal class KsCollectionViewLayoutTest {
         }
 
         val image = composeTestRule.onNodeWithTag(CollectionTag).readPixels()
-        assertNotEquals(KsListSeparatorDefaults.color, image[10, 0])
-        assertNotEquals(KsListSeparatorDefaults.color, image[10, 49])
+        assertNotEquals(KsListSeparatorDefaults.lightColor, image[10, 0])
+        assertNotEquals(KsListSeparatorDefaults.lightColor, image[10, 49])
     }
 
     /** ヘッダーはコンテンツと一緒にスクロールして画面外へ出る。 */

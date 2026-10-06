@@ -135,9 +135,15 @@ internal object KsTapFeedback {
  *   配列全体を 1 続きで表示する。グループの値の型と見出しの書き方は [KsGroups] を参照
  * @param onItemTap 要素がタップされたときに呼ばれるラムダ
  * @param onItemLongTap 要素が長押しされたときに呼ばれるラムダ。[reorder] のスイッチが有効の間は呼ばれない
- * @param touchFeedbackColor タップ中のフィードバックの色。省略すると標準の色を使う
+ * @param touchFeedbackColor タップ中のフィードバック (波紋) の色。省略すると標準の色を使う。使われるのは
+ *   渡した色の色みだけで、濃さは標準の波紋が決める (渡した色の不透明度は濃さに効かない)。iOS 版は渡した色を
+ *   不透明度を含めてそのまま塗るため、両プラットフォームで近い見え方にするには半透明の色を渡す
  * @param listSeparators リストの区切り線を表示するかどうか。グリッドでは表示しない
- * @param listSeparatorColor 区切り線の色。省略するとライブラリ既定の色を使う
+ * @param listSeparatorColor 区切り線の色。指定した色はそのまま使う (表示モードで別の色に差し替えない)。
+ *   省略するとライブラリ既定の色を使う。既定の色はライト用とダーク用の 2 つがあり、画面の構成の夜間モード
+ *   (`isSystemInDarkTheme()` が返す値。通常は端末の表示モードに追随し、アプリが画面の構成を上書きした
+ *   ときはその値) で選ばれ、表示中に切り替わるとその場で追随する。Material のテーマの配色は見ないため、
+ *   画面の構成を変えずに Material の配色だけでダークにするアプリは色を指定する
  * @param scrollController 外からスクロールさせるためのコントローラ
  * @param prefetchResources もうすぐ表示される要素の画像を、表示より前に取得しておくための宣言。
  *   要素を受け取り、その要素の表示に必要なリモート画像を [KsResource] の配列で返す。先読みする
@@ -428,7 +434,12 @@ public fun <Item> KsCollectionView(
         }
     }
 
-    val separatorColor = listSeparatorColor ?: KsListSeparatorDefaults.color
+    // ライブラリが値を持つ既定の色 (区切り線とスクロールインジケータ) は、一覧が置かれた画面の構成の
+    // 夜間モードで選ぶ。Material のテーマの配色は判定に使わない (core/ADR-0036)。読むのは一覧ごとに
+    // 1 回で、項目ごとには読まない。
+    val isDarkTheme = isSystemInDarkTheme()
+    // 利用者が指定した色はそのまま使い、指定が無いときだけ表示モードの側の既定の色にする。
+    val separatorColor = listSeparatorColor ?: KsListSeparatorDefaults.color(isDarkTheme)
     val showsSeparators = listSeparators && layout.isList
 
     // タップのフィードバックはハンドラを宣言した場合だけ出す。色の指定がなければ標準の ripple。
@@ -436,6 +447,8 @@ public fun <Item> KsCollectionView(
     // (core/ADR-0031)。
     val hasTapHandler = onItemTap != null || (onItemLongTap != null && !reorderEnabled)
     val itemLongTap = if (reorderEnabled) null else onItemLongTap
+    // 指定した色は加工せずに標準の波紋へ渡す。波紋は色みだけを使い、濃さは標準の波紋が決める
+    // (core/ADR-0037)。
     val defaultIndication = remember(touchFeedbackColor) {
         if (touchFeedbackColor != null) ripple(color = touchFeedbackColor) else ripple()
     }
@@ -448,7 +461,7 @@ public fun <Item> KsCollectionView(
     val scrollIndicatorVisibility = rememberKsScrollIndicatorVisibility(gridState, overlayDragInteractions)
     // 端で伸びる効果 (オーバースクロール)。一覧と、一覧に重ねた表示から始めたドラッグで同じ実体を使う。
     val overscrollEffect = rememberOverscrollEffect()
-    val scrollIndicatorColor = KsScrollIndicatorDefaults.color(isSystemInDarkTheme())
+    val scrollIndicatorColor = KsScrollIndicatorDefaults.color(isDarkTheme)
 
     val positionKeeper = remember { KsPositionKeeper<Item>() }
     val appearing = positionKeeper.appearing
@@ -730,7 +743,7 @@ public fun <Item> KsCollectionView(
                     val item = displayedItems[start + local]
                     val templateKey = template?.invoke(item) ?: KsSingleTemplateKey
                     val cellWidth = if (fillsLastLine && local == count - 1) {
-                        cellWidths?.getOrNull(local % columns)
+                        cellWidths.getOrNull(local % columns)
                     } else {
                         null
                     }
