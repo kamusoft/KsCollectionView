@@ -51,4 +51,5 @@
 - distilled: ios-hosting-content-reuse (ios/ADR-0012 起票 (amends ios/ADR-0002) / ios/architecture/collection-engine.md 更新 / handbook ios/performance-verification.md 改訂)
 
 ## 2026-10-06
+- distilled: list-separator-blur-on-fast-scroll (handbook: cross/scroll-performance-gate.md に「区切り線が密に見えるのは合否に混ぜない」の節を追加し、適用のきっかけに「区切り線の既定の太さ・色を変えるとき」を足した / 探索だけで閉じた change でコードの変更なし / ADR の起票なし / concepts の変更なし)
 - distilled: library-default-colors-dark-mode (ADR: core/ADR-0036 を accepted (amends core/ADR-0010 の色の項)、core/ADR-0037 を accepted。core/ADR-0010 に amended-by、android/ADR-0003 に関連の行 / concepts: core/styling/collection-layout.md の区切り線の既定の色を 2 組にし、Android の表示モードの判定元を画面の構成の夜間モードに訂正。core/core-model/image-loading.md に「既定の表示の色」の節を追加。core/core-model/collection-interaction.md の「既知の非対称」を「指定した色の濃さの決まり方」に書き換え。ios/architecture/collection-engine.md・android/architecture/compose-wrapper.md・android/architecture/image-pipeline.md に既定の色の置き場と切り替えで作り直さない仕組みを追記 / handbook: cross/test-execution.md に失敗時の診断の待ちの避け方、cross/local-development-setup.md に worktree での SDK の指定を追記 / lessons: 捕捉 1 件 (bundle-local-fix-instead-of-recommending-deferral)、昇格なし / deviation: 付随修正 1 件)
