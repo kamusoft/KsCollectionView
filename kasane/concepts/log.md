@@ -49,3 +49,6 @@
 
 ## 2026-10-05
 - distilled: ios-hosting-content-reuse (ios/ADR-0012 起票 (amends ios/ADR-0002) / ios/architecture/collection-engine.md 更新 / handbook ios/performance-verification.md 改訂)
+
+## 2026-10-06
+- handbook: cross/scroll-performance-gate.md に「区切り線が密に見えるのは合否に混ぜない」の節を追加し、適用のきっかけに「区切り線の既定の太さ・色を変えるとき」を足した (list-separator-blur-on-fast-scroll の探索の結論。コードの変更なし・ADR の起票なし・concepts の変更なし)

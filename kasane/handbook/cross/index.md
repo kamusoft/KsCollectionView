@@ -9,6 +9,6 @@
 | [Sample の操作は本体の表示を変えない](sample-debug-controls.md) | `samples/` を触るとき — Sample のデモ画面に操作 (パネル・切り替え・ボタン) を置く・変えるとき、Sample の画面の brief・mock を書くとき | rule |
 | [テスト実行規約](test-execution.md) | テストを実行するとき・テスト結果を報告するとき・テストを追加するとき | rule |
 | [実行時挙動の検証規約](runtime-behavior-verification.md) | 実行時挙動の不具合を調査するとき・不具合修正の完了を判定するとき | rule |
-| [スクロール性能の体感ゲート](scroll-performance-gate.md) | スクロール性能の完了を判定するとき・手動フリック計測を行うとき・性能の証跡を書くとき | rule |
+| [スクロール性能の体感ゲート](scroll-performance-gate.md) | スクロール性能の完了を判定するとき・手動フリック計測を行うとき・性能の証跡を書くとき・区切り線の既定の太さ・色を変えるとき | rule |
 | [公開識別子と配布座標](public-identifiers.md) | 公開識別子・配布座標を決めるとき (ビルド定義・パッケージ宣言を触るとき) | rule |
 | [ローカル開発環境と Sample の実行](local-development-setup.md) | 環境構築・Sample の起動・本体のビルド・本体 source へのステップインをするとき | guide |
