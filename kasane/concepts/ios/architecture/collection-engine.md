@@ -197,7 +197,7 @@ iOS 18 以降では、state を変えたセルが最初に再利用されると�
 
 ### 区切り線はセルのサブビュー
 
-システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを content の前面に持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。上線を出すのはグループの先頭の塊の先頭の項目で、見出しを宣言しないときは最初のグループだけ (core/ADR-0016)。判定は塊の表から引く。色は `listSeparatorColor` 未指定なら固定値 (core/ADR-0010)。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
+システム list の `separatorConfiguration` は使えない (システム list を使わないため)。`KsHostingCell` が上下 1pt の線ビューを content の前面に持ち、既定を非可視に倒して list かつ表示 ON のときだけ先頭行の上線と全セルの下線を可視化する。上線を出すのはグループの先頭の塊の先頭の項目で、見出しを宣言しないときは最初のグループだけ (core/ADR-0016)。判定は塊の表から引く。色は `listSeparatorColor` 未指定なら既定の色 `KsHostingCell.defaultSeparatorColor` (core/ADR-0036)。既定の色は、ライト用とダーク用の値を持ち外観で解決される色を 1 つのオブジェクトで持つ。同じ色の書き込みを省く判定は同じオブジェクトかどうかで行うので、外観が切り替わっても線の色は書き込み直さず、OS が解決し直す。区切り線と画像の既定の表示の色のライト / ダークの値は `KsDefaultColors` が 1 か所に持つ。`NSCollectionLayoutDecorationItem` を使わないのは、将来のセクション装飾と座を取り合うため。
 
 ### 位置依存の表示とタッチ feedback の揃え直し
 
@@ -314,7 +314,7 @@ iOS 18 以降では、state を変えたセルが最初に再利用されると�
 - [項目モデルと差分更新](../../core/core-model/collection-items.md)、[レイアウト語彙](../../core/styling/collection-layout.md)、[操作とスクロール制御](../../core/core-model/collection-interaction.md)
 - [iOS 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の iOS 側の実現 (契約は [画像の先読みと KsImage](../../core/core-model/image-loading.md))
 - ios/ADR-0001〜0012 (0007: セル content の配置、0008: 観測する値、0009: 内部の塊、0010: 塊とグループ・見出しの固定、0011: UIKit 標準の並べ替え、0012: 再利用でのホスティングの使い回し)
-- core/ADR-0010 (区切り線の既定外観)、core/ADR-0015・0016 (グループの宣言・グループごとの区切り線)、cross/ADR-0006 (性能の完了判定)
+- core/ADR-0010 (区切り線の既定外観)、core/ADR-0036 (既定の色はライト / ダーク 2 組)、core/ADR-0015・0016 (グループの宣言・グループごとの区切り線)、cross/ADR-0006 (性能の完了判定)
 - core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)
 - [iOS ページングと Pull to Refresh の実現](paging-engine.md) — ページングと Pull to Refresh の部品と罠対策 (契約は [ページングと Pull to Refresh](../../core/core-model/collection-paging.md))
 - [iOS 並べ替えの実現](reorder-engine.md) — 並べ替えの部品と罠対策 (契約は [並べ替え](../../core/core-model/collection-reorder.md))

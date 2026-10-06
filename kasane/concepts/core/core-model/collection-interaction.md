@@ -69,11 +69,19 @@ KsCollectionView(
 
 - スクロール命令を「反映前のデータで実行してほしい」と期待しない。命令は常に反映後に解決される。
 - `KsScrollController` の API をメインスレッド以外から呼ばない (iOS は MainActor、Android はメインスレッドで debug assertion)。
-- `touchFeedbackColor` に同じ生値を渡せば両プラットフォームで同じ見え方になると期待しない (下記の既知の非対称)。
+- `touchFeedbackColor` に同じ生値を渡せば両プラットフォームで同じ見え方になると期待しない (「指定した色の濃さの決まり方」の節)。
 
-## 既知の非対称: `touchFeedbackColor` の意味論
+## 指定した色の濃さの決まり方 (core/ADR-0037)
 
-iOS は渡された色をそのままセル全面の塗りにする。Android は material3 の `ripple` が渡された色に自前で不透明度を掛けるため、iOS で使う半透明の色をそのまま渡すと見えなくなる。Sample「リスト」は描画結果を揃えるために別の生値を渡している (iOS は accent の 15%、Android は accent そのまま)。統一の方向は未決で、後続の変更で扱う (出典: kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md 4 件目)。
+`touchFeedback(color:)` / `touchFeedbackColor` に指定した色の濃さは、プラットフォームごとに決まり方が違う。ライブラリは両プラットフォームの濃さをそろえる加工をしない。
+
+| | iOS | Android |
+|---|---|---|
+| 指定した色の使われ方 | 不透明度を含めてそのまま、セル全面の塗りにする | material3 の `ripple` に渡す。色みだけが使われる |
+| 濃さを決めるもの | 利用者が渡した色の不透明度 | 標準の波紋。渡した色の不透明度は濃さに効かない (不透明な色と半透明の色で、押している間の見え方は同じになる) |
+| 不透明な色を渡したとき | 押している間、項目の中身が隠れる | 中身は読めるまま |
+
+両プラットフォームで近い見え方にしたいときは、半透明の色を渡す。Sample「リスト」は両プラットフォームにアクセントの 10% を渡しており、iOS は 10% のまま、Android は約 8〜9% の濃さで出る (Android 16 のエミュレータの画素。Android 10・11 では測っておらず、濃さは Material と OS の版で違いうる)。
 
 ## 用語
 
@@ -88,4 +96,4 @@ iOS は渡された色をそのままセル全面の塗りにする。Android �
 - [collection-reorder](collection-reorder.md) — 並べ替えのスイッチが有効の間の長押しと、ドラッグ中のスクロール命令の扱い
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — hitTest による操作要素判定と、apply completion で flush するコマンドキュー
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — `combinedClickable` + ripple と、コンポジション後に最新配列で解決するコマンドキュー
-- core/ADR-0007 (スクロール制御)、core/ADR-0009 (タップ・ハイライト)、core/ADR-0031 (並べ替えのスイッチと長押し)、android/ADR-0003 (material3 依存と ripple)
+- core/ADR-0007 (スクロール制御)、core/ADR-0009 (タップ・ハイライト)、core/ADR-0031 (並べ替えのスイッチと長押し)、core/ADR-0037 (タップしたときの色の濃さの決まり方)、android/ADR-0003 (material3 依存と ripple)

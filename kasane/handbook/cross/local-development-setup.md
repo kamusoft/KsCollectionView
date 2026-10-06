@@ -72,6 +72,9 @@ Android SDK の場所は、ビルドルートごとの `local.properties` に `s
 「設定できた」と読み違える落とし穴は翻案元でも実際に起きている
 (参考: `../KsSettingsView/kasane/handbook/cross/local-development-setup.md`)。
 
+git worktree は clone と同じく `local.properties` を持たない。worktree でファイルを置かずに流すときは、
+Gradle の呼び出しに `ANDROID_HOME=<Android SDK の場所>` を前置きする (両方のビルドルートで同じ)。
+
 既定の JDK が 17 より古い環境では、Gradle を呼ぶコマンドに `JAVA_HOME=$(/usr/libexec/java_home -v 17+)` を前置きする。
 実機・エミュレータが複数つながっている環境では、導入先を 1 台に絞るのに `ANDROID_SERIAL=<端末の識別子>` を使う
 (指定しないと接続中の全端末へ導入される)。

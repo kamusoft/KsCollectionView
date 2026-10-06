@@ -53,7 +53,7 @@ KsCollectionView(
 | グループとグループの間の間隔 / 見出しとそのグループの先頭行の間の間隔 (いずれも既定 0) | `.list` / `.grid` の `groupSpacing:` / `headerItemSpacing:` | `KsLayout.List` / `Grid` の `groupSpacing` / `headerItemSpacing` |
 | グループの見出しと固定の有無 (固定は既定 true) | `.groups(by:pinnedHeaders:header:)` | `groups = KsGroups(by, pinnedHeaders, header)` |
 | 本体とコンテンツの間の内側余白 (4 辺個別、既定 0) | `contentPadding:` | `contentPadding =` |
-| 区切り線の表示 (既定 true) / 色 (既定は固定値) | `.listSeparators(_:)` / `.listSeparatorColor(_:)` | `listSeparators =` / `listSeparatorColor =` |
+| 区切り線の表示 (既定 true) / 色 (既定はライト / ダーク 2 組の固定値) | `.listSeparators(_:)` / `.listSeparatorColor(_:)` | `listSeparators =` / `listSeparatorColor =` |
 
 向き別列数は端末の物理向きではなく、コンポーネント自身の高さ > 幅なら portrait 側を使う (分割画面・タブレット・折りたたみで両プラットフォームの列数が揃う)。adaptive の余剰幅はアイテム幅へ均等配分し、列間は指定値のまま。列の利用可能幅は「コンポーネント幅 − contentPadding 左右 − columnSpacing × (列数 − 1)」。
 
@@ -124,17 +124,19 @@ iOS で 1 つのグループが内部の塊に割れても、見出しはグル�
 - **静定時は content へ行の高さを与えない** (SwiftUI では提案しない、Compose では制約として渡さない)。grid で背の低いセルは行高いっぱいに広がらず、余りは背景として見える。Android の高さ補間中だけが例外 (「してはいけないこと」)。両プラットフォームで見え方が一致することを Sample「大量件数」で確認済み。
 - **行の高さが変わるときはアニメーションする**。展開する項目自身の高さ変化と、それに押される他の項目の移動が中間フレームを通る。iOS は UICollectionView の標準挙動、Android はライブラリ既定の高さ補間 (android/ADR-0004)。
 
-### list の区切り線 (core/ADR-0010)
+### list の区切り線 (core/ADR-0010・0036)
 
 | 項目 | 契約 |
 |---|---|
 | 位置 | 先頭行の上端・各行の間・最終行の下端。リスト全体の上下境界を同じ線で示す。グループがあるときはグループごとに引く (下記) |
 | 幅と太さ | セルの左右いっぱい (インセットなし)、1pt / 1dp |
-| 色 | 既定はライブラリ内部の固定値 `#D9D9DE`。`listSeparatorColor` で変更できる |
+| 色 | 既定はライブラリが持つ固定値で、ライト `#D9D9DE`・ダーク `#38383A` (両プラットフォームで同じ値)。`listSeparatorColor` で変更できる |
 | 描画順 | content の前面。不透明な背景を持つテンプレートでも隠れない |
 | 既定と opt-out | 既定で表示。`listSeparators(false)` で全て消す。グリッドには描かない |
 
 グループを持つ list では、各グループの先頭行の上端・行の間・最終行の下端に線を引き、見出しは前のグループの最終行の下線と自分のグループの先頭行の上線の間に置かれる (core/ADR-0016)。見出しを宣言しない場合は、2 つめ以降のグループの先頭行の上線を出さない。出すと、グループの境目に前のグループの下線と合わせて 2 本の線が並ぶためである。線は余白 (行間・グループ間・見出しの下の間隔) を除いたセルの範囲に対して引く。
+
+既定の色は、色を指定していないときだけ、描くときの表示モードの側の値になる (core/ADR-0036)。一覧を出したまま表示モードが切り替わると、その場で切り替わった側の色になり、線の位置と本数は変わらない。表示モードの決め方は「スクロールインジケータ」の節の表の判定元と同じである。`listSeparatorColor` で指定した色にライブラリは手を加えない: 表示モードによって別の色に差し替えず、既定と同じ値を指定しても指定した色として扱う。
 
 ### スクロールインジケータ
 
@@ -150,10 +152,12 @@ iOS は `UICollectionView` の既定のインジケータをそのまま使う�
 
 | 項目 | iOS | Android |
 |---|---|---|
-| 表示モードの判定元 | trait (`overrideUserInterfaceStyle` / `preferredColorScheme` で上書きできる) | 端末の表示モード (`isSystemInDarkTheme()`)。Compose の中だけでテーマをライトに固定したアプリでは、端末がダークだとバーが白になる |
+| 表示モードの判定元 | 一覧が置かれた場所の外観 (trait。`overrideUserInterfaceStyle` / `preferredColorScheme` で上書きできる) | 一覧が置かれた画面の構成の夜間モード (`isSystemInDarkTheme()`)。通常は端末の表示モードに追随し、アプリが画面の構成を上書きしたときはその値になる。Material の配色だけの切り替えには追随しない |
 | 長さの見積もり方 | 測り終えた行の実測と、未測定の行の見積もり (直近の実測の最頻値) の合計。進むほど落ち着く | 見えている行の平均の高さ × ライブラリが数えた全体の行数。ルートのヘッダー / フッターとグループの見出しを 1 行、各グループの項目を列数で切り上げた行数として数える |
 
 どちらも `KsScrollController` の命令によるスクロールではインジケータを出さない。表示モードを固定せずに背景だけを明るい固定色で描くと、ダークモードでは両プラットフォームともバーが見えにくい。
+
+区切り線の既定の色と、画像の既定の表示の色 ([image-loading](../core-model/image-loading.md)) も、この表の判定元で表示モードを決める (core/ADR-0036)。Android で、画面の構成を変えずに Material の配色だけでライトやダークに固定するアプリでは、この 3 つがアプリの見た目とずれる (端末がダークで配色だけライトなら、バーは白、区切り線と画像の既定の表示はダーク用の色になる)。そのようなアプリは、区切り線の色を `listSeparatorColor` で指定し、画像の読み込み中・失敗の表示を差し替える。スクロールインジケータの色を変える設定は無い。
 
 ## してはいけないこと
 
@@ -182,5 +186,6 @@ iOS は `UICollectionView` の既定のインジケータをそのまま使う�
 - [collection-reorder](../core-model/collection-reorder.md) — 並べ替えのドラッグ中の端での自動スクロール
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 自前 compositional レイアウト・区切り線サブビュー・自己サイズと推定高さ
 - [Android Compose ラッパー](../../android/architecture/compose-wrapper.md) — `LazyVerticalGrid` 統一・`BoxWithConstraints` による向き判定・項目単位の区切り線描画・高さ補間
-- core/ADR-0006 (layout 値の語彙)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0015 (グループの宣言と見出し)、core/ADR-0016 (グループごとの区切り線)、core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0025 (重ねる表示も安全領域に合わせる。0017 を一部改訂)
+- core/ADR-0006 (layout 値の語彙)、core/ADR-0010 (区切り線の既定外観)、core/ADR-0036 (既定の色はライト / ダーク 2 組)
+- core/ADR-0015 (グループの宣言と見出し)、core/ADR-0016 (グループごとの区切り線)、core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0025 (重ねる表示も安全領域に合わせる。0017 を一部改訂)
 - ios/ADR-0010 (塊と見出しの固定)、ios/ADR-0003 (自前レイアウトの統一)、ios/ADR-0007 (セル content の配置)、android/ADR-0001、android/ADR-0004

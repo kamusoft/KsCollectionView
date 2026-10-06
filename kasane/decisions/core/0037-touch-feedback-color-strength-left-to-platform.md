@@ -1,7 +1,7 @@
 ---
 id: 0037
 title: タップしたときの色は両プラットフォームで意味をそろえず、濃さの決まり方を各プラットフォームの標準の部品に任せる
-status: proposed
+status: accepted
 date: 2026-10-06
 ---
 
@@ -43,5 +43,5 @@ date: 2026-10-06
 - 両プラットフォームの濃さの違いが、目視または利用者の報告で受け入れられないと判断されたとき (次の候補は「両プラットフォームとも色みだけを指定する」)
 - 前提 (Context) が崩れたとき
 
-出典: kasane/changes/library-default-colors-dark-mode/exploration.md (タップしたときの色の調査・検討した選択肢 論点 5) / kasane/changes/library-default-colors-dark-mode/evidence/proposal-probes.md (Android の波紋の実測)
+出典: kasane/changes/archive/2026-10-06-library-default-colors-dark-mode/exploration.md (タップしたときの色の調査・検討した選択肢 論点 5) / kasane/changes/archive/2026-10-06-library-default-colors-dark-mode/evidence/proposal-probes.md (Android の波紋の実測) / kasane/changes/archive/2026-10-06-library-default-colors-dark-mode/evidence/android-touch-feedback-opacity.md (最終のコードでの実測)
 関連: android/ADR-0003 (帰結に書かれた意味の統一を、本決定が「そろえない」と決める) / core/ADR-0035 (標準の部品を保ち、濃さの違いを受け入れた先例)

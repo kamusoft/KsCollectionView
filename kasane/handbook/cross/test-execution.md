@@ -63,6 +63,7 @@ timestamp: 2026-10-04
 - UIKit のセル・レイアウト・Renderer に関わる検証はガードされた側に集まるため、`swift test` だけで完了と判断すると変更の中核が 1 件も検証されないまま「全 pass」と報告されうる
 - `ios/` で `xcodebuild test -scheme KsCollectionView -destination 'platform=iOS Simulator,name=<利用可能な機種名>,OS=<利用可能な版>' -configuration Debug` を実行する
 - Release は `ENABLE_TESTABILITY=YES` を付ける。付けないと `@testable import KsCollectionView` を解決できず、テストバンドルのコンパイル前に失敗する
+- 新しく作った Simulator でテストが失敗すると、`xcodebuild` が診断の収集で約 10 分待つことがある (成功時は待たない)。失敗の中身を早く見たいときは `-collect-test-diagnostics never` を付ける
 - 実行件数は `xcodebuild` 出力末尾の `Executed N tests, with M failures` で確認できる。Simulator の機種名は `xcrun simctl list devices available` で得る
 
 ### iOS: Sample のテストと計測ドライバを分けて実行する

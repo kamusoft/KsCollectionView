@@ -75,7 +75,7 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | `KsGroups` / `resolveGroups` / `KsGroupPlan` (`KsGroupPlan.kt`) | 配列を走査して同じグループの値が続く範囲をグループにし、離れて現れた同じ値と Bundle に載らないグループの値を診断に集める。構成表は項目の位置 ⇄ lazy の index の写像と、`KsGroupRows` (行の数え方) を持つ。表の大きさはグループの数に比例し、項目の数には比例しない。並べ替えの仮の並びでは、項目 1 件を別のグループへ移した構成表を `movingItem` で作る |
 | `KsGroupHeaderKey` / `KsRootSlotKey` | グループの見出しとルートのヘッダー / フッターの lazy のキー。ライブラリ内部の `Parcelable` で包み、項目の `key` と衝突させない (後述) |
 | `KsGroupSpacing` / `ksItemSpacing` | 行間・見出しの下の間隔・グループ間の間隔を、項目の上下の余白として置く (後述) |
-| `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) にグループの先頭行の上端と全項目の下端の線を全幅 1dp で描く。見出しが無ければ上端の線は最初のグループだけ (core/ADR-0016)。色は `listSeparatorColor` 未指定なら `#D9D9DE` |
+| `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) にグループの先頭行の上端と全項目の下端の線を全幅 1dp で描く。見出しが無ければ上端の線は最初のグループだけ (core/ADR-0016)。色は `listSeparatorColor` 未指定なら `KsListSeparatorDefaults` の既定の色 (ライト用とダーク用の 2 つ。core/ADR-0036) |
 | 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003)。並べ替えのスイッチが有効の間は `onItemLongTap` をハンドラに数えず、`onLongClick` も渡さない |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
 | `ksAnimateItem` / `KsAnimatedItemBox` / `KsFullSpanBox` | 項目・グループの見出し・ルートのヘッダー / フッターに `animateItem` を付け、配列の差し替えによる移動と出入りをアニメーションで見せる (android/ADR-0006。後述)。並べ替えで持ち上げた項目は配置のアニメーションを外し、pin でコンポジションに留める |
@@ -99,6 +99,10 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 ### 区切り線は content の前面に描く
 
 `drawBehind` (背面) では不透明な背景を持つテンプレートで線が 1 本も見えず、iOS 側 (区切り線は content の前面 — [iOS コレクションエンジン](../../ios/architecture/collection-engine.md)) と食い違う。`drawWithContent { drawContent(); … }` で content の後に描く。項目単位の描画は `LazyVerticalGrid` の再利用と両立し、行間に区切り線用の item を挿入する形 (項目数が倍になり index 解決が複雑化) を避けられる。
+
+### 既定の色は一覧ごとに 1 回読んだ夜間モードで選ぶ (core/ADR-0036)
+
+`KsCollectionView` は画面の構成の夜間モード (`isSystemInDarkTheme()`) を一覧ごとに 1 回だけ読み、その値を区切り線の既定の色 (`KsListSeparatorDefaults.color(isDarkTheme)`) とスクロールインジケータの色の両方に使う。項目ごとには読まないので、項目ごとの線を描く処理の仕事量は色を指定したときと変わらない。Material のテーマの配色 (`MaterialTheme.colorScheme`) は読まない。Material のテーマを置かないアプリでも端末の表示モードに追随させるためである。画面の構成の値が変わると、一覧は作り直されずに再コンポーズされ、線は切り替わった側の色で描き直される。
 
 ### 行の高さ変化は自前の補間で、補間中だけ測り直しと切り取りを行う
 
@@ -221,6 +225,6 @@ Compose の Lazy 系は重複 `key` と Bundle に載らない `key` を例外�
 - [Android 画像の先読みと KsImage の実現](image-pipeline.md) — 画像の先読み・`KsImage`・キャッシュ操作の Android 側の実現 (契約は [image-loading](../../core/core-model/image-loading.md))
 - [iOS コレクションエンジン](../../ios/architecture/collection-engine.md) — 同じ契約の iOS 側の実現
 - [Android 性能検証の手順](../../../handbook/android/performance-verification.md)、[スクロール性能の体感ゲート](../../../handbook/cross/scroll-performance-gate.md) — 性能の手順と合否の判定規則 (cross/ADR-0006)
-- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)、android/ADR-0007 (並べ替えは自前で作る)
+- android/ADR-0001 (LazyVerticalGrid 統一)、android/ADR-0002 (単一モジュールと版方針)、android/ADR-0003 (material3 と ripple)、android/ADR-0007 (並べ替えは自前で作る)、core/ADR-0036 (既定の色はライト / ダーク 2 組)
 - android/ADR-0004 (行の高さ変化の補間)、android/ADR-0006 (差分の移動・挿入・削除を `animateItem` で見せる。0004 を一部改訂)、core/ADR-0015 (グループの宣言)、core/ADR-0016 (グループごとの区切り線)
 - core/ADR-0007、core/ADR-0011、core/ADR-0017 (固定中の見出しを安全領域の境目で止める)、core/ADR-0018 (端を表示中の端への挿入)、ios/ADR-0007

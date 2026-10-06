@@ -34,3 +34,4 @@ Android のラッパーは薄く保つ (android/ADR-0001)。ライブラリの�
 - `touchFeedbackColor` の意味論を両プラットフォームで統一する決定を下すとき (ripple の色の扱いが本決定の帰結にある)
 
 出典: kasane/changes/archive/2026-09-05-android-wrapper-foundation/design.md (Decision 6・ADR 候補) / kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: 論点 5 セルの装飾と入力) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md (`touchFeedbackColor` の非対称、2026-09-05) / android/ADR-0001 / android/ADR-0002
+関連: core/ADR-0037 (帰結に残していた `touchFeedbackColor` の意味の統一を、そろえずに濃さを各プラットフォームの標準の部品に任せると決めた)

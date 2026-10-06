@@ -1,7 +1,7 @@
 ---
 id: 0036
 title: ライブラリが値を持つ既定の色はライト / ダーク 2 組の固定値にし、利用者が指定しないときだけ表示モードで選ぶ
-status: proposed
+status: accepted
 date: 2026-10-06
 amends: 0010
 ---
@@ -56,5 +56,5 @@ core/ADR-0010 の決定のうち「色: 既定はライブラリ内部の固定�
 - Android で、Material の配色だけでダークにするアプリから既定の色のずれが報告されたとき (表示モードを渡す入口を足すかを決める)
 - 前提 (Context) が崩れたとき
 
-出典: kasane/changes/library-default-colors-dark-mode/exploration.md (検討した選択肢・決定事項)
+出典: kasane/changes/archive/2026-10-06-library-default-colors-dark-mode/exploration.md (検討した選択肢・決定事項)
 関連: core/ADR-0010 (本決定が色の項を置き換える) / cross/ADR-0007 (Sample のライト / ダーク) / `../KsSettingsView/kasane/decisions/core/0030-theme-dark-appearance-library-owned-light-dark-defaults.md` (参考にした先行の決定)
