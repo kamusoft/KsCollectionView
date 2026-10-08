@@ -51,9 +51,9 @@ Requirement の名前は `specs/verification-ci/spec.md` (以下 CI) と `specs/
 
 順番は design.md の Decision 8。実行したコマンドと読み直しの結果は、識別子を伏せて証跡に残す。
 
-- [ ] 7.1 承認を得て、GitHub に非公開でリポジトリを作り、remote を足して `main` だけを push する。GitHub の `main` の先端が手元と同じ commit の ID であることを確かめる (→ 公開: 履歴をそのまま公開する)
-- [ ] 7.2 オーナーが GitHub の画面で中身を確かめる。承認を得て public に切り替える (→ 公開: 履歴をそのまま公開する「public にする前にオーナーが確かめる」)
-- [ ] 7.3 承認を得て、機能の設定・Pull Request を作れる人の制限・secret の検査と push の保護・依存の脆弱性の通知を入れ、ラベル 3 つがあることを確かめる。読み直して design.md の Decision 9 の表と突き合わせる (→ 公開: 公開リポジトリの機能の設定 / Pull Request を作れる人の制限)
+- [x] 7.1 承認を得て、GitHub に非公開でリポジトリを作り、remote を足して `main` だけを push する。GitHub の `main` の先端が手元と同じ commit の ID であることを確かめる (→ 公開: 履歴をそのまま公開する)
+- [x] 7.2 オーナーが GitHub の画面で中身を確かめる。承認を得て public に切り替える (→ 公開: 履歴をそのまま公開する「public にする前にオーナーが確かめる」)
+- [x] 7.3 承認を得て、機能の設定・Pull Request を作れる人の制限・secret の検査と push の保護・依存の脆弱性の通知を入れ、ラベル 3 つがあることを確かめる。読み直して design.md の Decision 9 の表と突き合わせる (→ 公開: 公開リポジトリの機能の設定 / Pull Request を作れる人の制限)
 - [ ] 7.4 `develop` を push し、3 つの検査が成功で終わることを確かめる。実行の件数を証跡に書く。落ちたら `develop` の上で直す (→ CI: 検証 CI の起動条件「develop への push で起動する」/ プラットフォームの検証の再利用「検査が決めた名前で報告される」)
 - [ ] 7.5 承認を得て、`main` と `develop` の保護を入れ、読み直して design.md の Decision 9 の表と突き合わせる (→ 公開: ブランチの保護)
 - [ ] 7.6 承認を得て、`develop` から `main` 宛ての Pull Request を作る。3 つの必須の検査が成功で終わってから merge commit でマージする。lint の記録に、出どころを確かめた結果 (同じリポジトリの `develop`) が出ていることを確かめる (→ 公開: ブランチの保護「main には検査を通った develop が入る」/ CI: 検証 CI の起動条件「main 宛ての Pull Request では絞り込まない」/ main 宛ての Pull Request の出どころの制限「develop からの Pull Request は通る」)
