@@ -26,8 +26,8 @@ jobs:
     # Xcode 27 を持つのは、専用のイメージ xcode-27 である。
     runs-on: xcode-27
     # 既定の 360 分は長すぎる。xcodebuild の停止で、macOS のランナーを占有し続けないための上限。
-    # 暫定の値で、ランナーでの所要時間を測ってから決め直す。
-    timeout-minutes: 40
+    # ランナーでの所要時間は 2 分半〜4 分ほどなので、依存の取得の遅れを見込んだ値を置く。
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
