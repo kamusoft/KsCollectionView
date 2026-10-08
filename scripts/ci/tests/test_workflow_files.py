@@ -1,7 +1,7 @@
 """検証 CI の workflow が、決めた形を保っているかのテスト。
 
 確かめるのは、崩れても平時の緑では気付けない形だけにする: 起動の条件、検査の名前、
-検証が走らせる範囲、件数の検査が必ず走る条件。
+検証が走らせる範囲、iOS がテストを実行しないこと、Android の件数の検査が必ず走る条件。
 道具の固定と権限、ジョブの時間の上限は check-workflows.py が確かめるので、ここでは確かめない。
 """
 
@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import re
 import unittest
+from xml.etree import ElementTree
 
 import support
 
@@ -165,54 +166,105 @@ class PlatformWorkflowTest(unittest.TestCase):
 
 
 class IosWorkflowTest(unittest.TestCase):
+    LIBRARY = "Build library and library tests"
+    SAMPLE = "Build sample and sample tests"
+    SAMPLE_SCHEME = (
+        "samples",
+        "ios",
+        "KsCollectionViewSamples.xcodeproj",
+        "xcshareddata",
+        "xcschemes",
+        "KsCollectionViewSamples.xcscheme",
+    )
+
     def setUp(self) -> None:
         self.nodes = nodes_of("verify-ios.yml")
         self.steps = steps_of("verify-ios.yml")
 
-    def test_決めた版のXcodeが無ければテストの前に止まる(self) -> None:
+    def commands(self) -> str:
+        """workflow のうち、コメントの行を除いた本文を返す。"""
+        lines = read("verify-ios.yml").splitlines()
+        return "\n".join(line for line in lines if not line.strip().startswith("#"))
+
+    def test_決めた版のXcodeが無ければビルドの前に止まる(self) -> None:
         self.assertRegex(value_at(self.nodes, "env", "KS_XCODE_VERSION") or "", r"^\d+\.\d+$")
         names = list(self.steps)
-        self.assertLess(names.index("Select Xcode"), names.index("Test library"))
+        self.assertLess(names.index("Select Xcode"), names.index(self.LIBRARY))
         step = self.steps["Select Xcode"]
         self.assertIn("Xcode_${KS_XCODE_VERSION}*.app", step)
         self.assertIn("exit 1", step)
         self.assertIsNone(condition_of(step))
 
-    def test_本体のテストをSimulatorで絞り込みなしに流す(self) -> None:
-        step = self.steps["Test library"]
-        self.assertIn("run-logged.py", step)
-        self.assertIn("xcodebuild test", step)
-        self.assertIn("-scheme KsCollectionView\n", step.replace(" \\", ""))
-        self.assertIn("platform=iOS Simulator,id=${KS_SIMULATOR_UDID}", step)
-        self.assertNotIn("-only-testing", step)
-        self.assertNotIn("-skip-testing", step)
-
-    def test_Sampleはユニットテストのターゲットだけを流す(self) -> None:
-        step = self.steps["Build sample and test sample units"]
-        self.assertIn("run-logged.py", step)
-        self.assertIn("-scheme KsCollectionViewSamples ", step)
-        self.assertEqual(re.findall(r"-only-testing:(\S+)", step), ["KsCollectionViewSamplesTests"])
-        self.assertNotIn("UITests", step)
-        self.assertNotIn("Performance", step)
-
-    def test_本体のテストが落ちてもSampleの検証は走る(self) -> None:
-        condition = condition_of(self.steps["Build sample and test sample units"])
-        self.assertEqual(condition, "${{ !cancelled() && steps.simulator.outcome == 'success' }}")
-
-    def test_件数の検査はテストが失敗しても走り同じ記録を読む(self) -> None:
-        pairs = (
-            ("Test library", "library", "Check library test count", "iOS 本体", "ios-library.log"),
-            ("Build sample and test sample units", "sample", "Check sample test count", "iOS Sample", "ios-sample.log"),
+    def test_stepは決めた5つだけである(self) -> None:
+        self.assertEqual(
+            list(self.steps), ["Checkout", "Select Xcode", "Show toolchain", self.LIBRARY, self.SAMPLE]
         )
-        for test_step, step_id, check_step, label, log in pairs:
-            with self.subTest(check=check_step):
-                self.assertRegex(self.steps[test_step], rf"(?m)^\s+id: {step_id}$")
-                self.assertIn(f'--log "${{RUNNER_TEMP}}/{log}"', self.steps[test_step])
-                check = self.steps[check_step]
-                self.assertEqual(
-                    condition_of(check), f"${{{{ !cancelled() && steps.{step_id}.outcome != 'skipped' }}}}"
-                )
-                self.assertIn(f'check-ios-test-count.py --label "{label}" --log "${{RUNNER_TEMP}}/{log}"', check)
+
+    def test_テストを実行しない(self) -> None:
+        commands = self.commands()
+        # xcodebuild の呼び出しは、テストのコードまでをビルドして止まる形の 2 つだけ。
+        self.assertEqual(re.findall(r"xcodebuild (?!-version)(\S+)", commands), ["build-for-testing"] * 2)
+        self.assertNotIn("test-without-building", commands)
+        self.assertNotIn("swift test", commands)
+
+    def test_Simulatorを選ばず総称の行き先でビルドする(self) -> None:
+        commands = self.commands()
+        self.assertEqual(
+            re.findall(r"-destination (.+?)(?: \\)?$", commands, flags=re.MULTILINE),
+            ['"generic/platform=iOS Simulator"'] * 2,
+        )
+        for word in ("simctl", "SIMULATOR_UDID", "boot"):
+            with self.subTest(word=word):
+                self.assertNotIn(word, commands)
+
+    def test_本体と本体のテストのコードをビルドする(self) -> None:
+        step = self.steps[self.LIBRARY]
+        self.assertIn("working-directory: ios\n", step)
+        self.assertIn("xcodebuild build-for-testing", step)
+        self.assertIn("-scheme KsCollectionView\n", step.replace(" \\", ""))
+        self.assertIsNone(condition_of(step))
+        # パッケージのスキームは、パッケージが宣言するテストのターゲットをビルドの対象に持つ。
+        with open(os.path.join(support.REPOSITORY_ROOT, "ios", "Package.swift"), encoding="utf-8") as f:
+            package = f.read()
+        self.assertRegex(package, r'\.testTarget\(\s*name: "KsCollectionViewTests"')
+
+    def test_SampleのアプリとユニットテストとUIテストのコードをビルドする(self) -> None:
+        step = self.steps[self.SAMPLE]
+        self.assertIn("working-directory: samples/ios\n", step)
+        self.assertIn("xcodebuild build-for-testing", step)
+        self.assertIn("-project KsCollectionViewSamples.xcodeproj ", step)
+        self.assertIn("-scheme KsCollectionViewSamples ", step)
+        # スキームが、アプリと 2 つのテストのターゲットをビルドの対象に持つこと。
+        scheme = ElementTree.parse(os.path.join(support.REPOSITORY_ROOT, *self.SAMPLE_SCHEME)).getroot()
+        built = {
+            entry.find("BuildableReference").get("BuildableName")
+            for entry in scheme.iter("BuildActionEntry")
+            if entry.get("buildForTesting") == "YES"
+        }
+        self.assertEqual(built, {"KsCollectionViewSamples.app"})
+        testables = {
+            testable.find("BuildableReference").get("BuildableName"): testable.get("skipped")
+            for testable in scheme.iter("TestableReference")
+        }
+        self.assertEqual(
+            testables,
+            {"KsCollectionViewSamplesTests.xctest": "NO", "KsCollectionViewSamplesUITests.xctest": "NO"},
+        )
+
+    def test_本体のビルドが落ちてもSampleのビルドは走る(self) -> None:
+        self.assertRegex(self.steps[self.LIBRARY], r"(?m)^\s+id: library$")
+        condition = condition_of(self.steps[self.SAMPLE])
+        self.assertEqual(condition, "${{ !cancelled() && steps.library.outcome != 'skipped' }}")
+
+    def test_ビルドの失敗を見逃さない(self) -> None:
+        self.assertNotIn("continue-on-error", self.commands())
+        for name in (self.LIBRARY, self.SAMPLE):
+            with self.subTest(step=name):
+                command = self.steps[name].split("run: |", 1)[1]
+                # 合否は xcodebuild の終了コードで決まる。後ろに別のコマンドをつなぐと、
+                # つないだ側の終了コードが step の合否になる。
+                for token in ("|", ";", "&&"):
+                    self.assertNotIn(token, command)
 
 
 class AndroidWorkflowTest(unittest.TestCase):

@@ -1,13 +1,14 @@
 # 検証 CI の入口
 #
 # 走る時点は 2 つ (cross/ADR-0010、cross/ADR-0013)。
-# - develop への push: lint と、iOS / Android の検証
+# - develop への push: lint と、iOS / Android の検証。iOS はビルドできることだけを確かめ
+#   (テストは実行しない)、Android はユニットテストまでを走らせる
 # - main 宛ての Pull Request: 同じ 3 つ。main に入れる前の必須の検査になる
 #
 # main 宛ての Pull Request では、変更したパスで絞り込まない。絞り込むと、必須の検査が
 # 走らないまま通る経路ができる。develop は必須の検査を持たないのでその心配が無く、
 # 開発の記録・Issue のフォーム・貢献の案内だけを変えた push では起動しない。
-# これらはビルドと iOS / Android のテストには入力されないが、lint は読む (開発の記録は
+# これらは iOS / Android のビルドとテストには入力されないが、lint は読む (開発の記録は
 # 個人を特定する値とローカル絶対パスの検査の対象で、Issue のフォームと貢献の案内は
 # スクリプトのテストが読む)。これらだけを変えた push で入った違反は、次に起動した回か、
 # main 宛ての Pull Request で見つかる。

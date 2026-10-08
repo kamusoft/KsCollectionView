@@ -127,3 +127,51 @@ gitleaks のチェックサムを、公式のリリースの記録と突き合�
 - 1 周目のレビューの指摘の修正の後、スクリプトのテストは 115 件から 123 件になった (失敗 0・スキップ 0。macOS で実行)。足した 8 件は、Android のテストのクラスの導き方 5 件と、版を読み取れないランナー名 3 件。修正後の Linux のコンテナでの再実行はしていない
 - 2 周目のレビューの指摘の修正の後、スクリプトのテストは 123 件から 128 件になった (失敗 0・スキップ 0。macOS で実行)。足した 5 件は、Android のテストの印の書き方 (ほかの注釈の後ろ・クラスの宣言と同じ行・行頭) の回帰テストで、修正前のスクリプトに掛けると落ちることを確かめてある。実物のソースから導かれるクラスは本体 31・Sample 21 のまま。修正後の Linux のコンテナでの再実行はしていない
 - 時間の上限の検査を足した後 (deviation.md の付随修正)、スクリプトのテストは 128 件から 133 件になった (6 件を足し、重なる 1 件を消した。失敗 0・スキップ 0。macOS で実行)。workflow の定義の検査は 3 本で違反なし。Linux のコンテナでの再実行はしていない
+
+## iOS の検証をビルドだけにした後の確認 (2026-10-08)
+
+`deviation.md` の 2026-10-08 の乖離 (検証 CI では Simulator を使うテストを走らせない) に合わせて、`ios / verify` を「テストを実行せず、ビルドできることだけを確かめる」形に変えた。上の 5.1〜5.4 と「確かめていないこと」のうち、iOS のテストの実行・Simulator の選択・件数の検査に関わる記述は、変える前の形についてのものである。
+
+### workflow と同じ 2 つのコマンド
+
+手元の Xcode 27.0 (27A266a) で流した。行き先は総称の指定 (`generic/platform=iOS Simulator`) で、特定の Simulator を指していない。
+
+| 対象 | コマンド (作業ディレクトリ) | 結果 | 所要 (出力が何も無い状態から) | 所要 (差分ビルド) |
+|---|---|---|---:|---:|
+| 本体と本体のテストのコード | `xcodebuild build-for-testing -scheme KsCollectionView -destination "generic/platform=iOS Simulator" -configuration Debug` (`ios/`) | 成功 (0)。`** TEST BUILD SUCCEEDED **` | 14 秒 | 10 秒 |
+| Sample のアプリとテストのコード | `xcodebuild build-for-testing -project KsCollectionViewSamples.xcodeproj -scheme KsCollectionViewSamples -destination "generic/platform=iOS Simulator" -configuration Debug` (`samples/ios/`) | 成功 (0)。`** TEST BUILD SUCCEEDED **` | 18 秒 | 13 秒 |
+
+- 「出力が何も無い状態から」は、ビルドの出力先を一時の場所に変えて (`-derivedDataPath` を足して) 測った。依存 (Nuke) の取得は、手元のキャッシュが効いた状態である。ランナーの上での所要時間は測っていない
+- ビルドの記録から、コンパイルされたモジュールを確かめた。本体のコマンドは `KsCollectionView`・`KsCollectionViewTests` (と依存の `Nuke`・`NukeUI`)、Sample のコマンドは `KsCollectionViewSamples`・`KsCollectionViewSamplesTests`・`KsCollectionViewSamplesUITests` (と本体・依存)。出力先には、アプリと UI テストのランナーのアプリができた。arm64 と x86_64 の両方がビルドされた
+- テストは実行されていない。4 つの記録のどれにも、テストの実行の行 (`Test Case`・`Executed`) は 0 件
+- Simulator は起動していない。流す前と後で、起動中の Simulator は同じ 1 台 (ほかの作業のもの) のままで、Simulator の総数も変わらなかった。この確認のために Simulator は作っていない
+
+### ビルドを壊すと失敗で終わること
+
+テストのコードの末尾に、型の合わない宣言を 1 行ずつ足して、同じ 2 つのコマンドを流した。確かめた後に手で元に戻し、SHA-256 が足す前と同じであることと、2 つのコマンドがもう一度成功することを確かめた。
+
+| 壊したもの | コマンド | 結果 |
+|---|---|---|
+| 本体のテストのコード (1 ファイル) | 本体の `build-for-testing` | 失敗 (65)。`** TEST BUILD FAILED **`。記録に `error:` の行と場所が出た |
+| Sample の UI テストのコード (1 ファイル) | Sample の `build-for-testing` | 失敗 (65)。同上 |
+
+本体・Sample のアプリのコードを壊す場合と、Sample のユニットテストのコードを壊す場合は流していない (同じビルドの中でコンパイルされることは、上の記録で確かめた)。
+
+### スクリプトと workflow の検査
+
+| 確認 | 結果 |
+|---|---|
+| `python3 scripts/ci/run-tests.py` | 実行 111 件 / 失敗 0 件 / スキップ 0 件 |
+| `python3 scripts/ci/check-workflows.py` | workflow 3 本、違反なし |
+| `actionlint` | 指摘なし (終了コード 0) |
+| `python3 scripts/local-path-lint.py` | 違反なし (終了コード 0) |
+| `python3 scripts/identity-lint.py` | 違反なし (終了コード 0) |
+| `python3 scripts/comment-policy-lint.py` | 禁止 0 件 (検査の対象 494 ファイル) |
+
+スクリプトのテストは 133 件から 111 件になった。取り除いたのは、iOS の実行件数の検査 9 件・Simulator の選択 8 件・出力の記録 8 件と、workflow のテストのうち Simulator でテストを流す前提の 5 件 (計 30 件)。足したのは、iOS の workflow の新しい形を確かめる 8 件。macOS で流した。Linux のコンテナでは流していない。
+
+### 確かめていないこと
+
+- GitHub のランナー (`xcode-27`) の上での、この 2 つのビルド。署名なしでの Sample のビルド、依存の取得、所要時間は、次の `develop` への push で分かる
+- 時間の上限 (40 分) は暫定の値のままである
+

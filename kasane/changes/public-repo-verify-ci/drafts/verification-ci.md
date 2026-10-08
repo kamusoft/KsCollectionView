@@ -3,9 +3,10 @@
 > - 置き先の案: `kasane/handbook/cross/verification-ci.md` (新設)
 > - index に足す行の案: 適用のきっかけ「`.github/workflows/`・`scripts/ci/` を触るとき・検証 CI の失敗を調べるとき・検証 CI に検査を足す / 外すとき・CI の緑を完了の根拠に使うとき」、種別 guide
 > - 文書の中のリンクは、置き先から見た相対パスで書いてある (この草稿の場所からは辿れない)
-> - 中身は、2026-10-08 時点の `.github/workflows/` と `scripts/ci/` の実物、手元と Linux のコンテナでの確認の記録 (`evidence/ci-local-verification.md`) から書いた。GitHub のランナーの上での実行は、この草稿を書いた時点でまだ 1 度も無い
+> - 中身は、2026-10-08 時点の `.github/workflows/` と `scripts/ci/` の実物、手元と Linux のコンテナでの確認の記録 (`evidence/ci-local-verification.md`) から書いた。GitHub のランナーの上での最初の実行 (2026-10-08) の後に、iOS の節を直した。ランナーでの実測が要る箇所は、下の印のとおりまだ空けてある
 > - ランナーの上での実測が要る箇所は、`【公開の実施後に記入】` の印を付けて空けてある。tasks 7.4・8.1〜8.3 の後に指揮側が埋める
 > - `timestamp` は、蒸留で置く日にする
+> - iOS の検証は、最初の実行の後に「テストを実行せず、ビルドできることだけを確かめる」形に変わった (`deviation.md` の 2026-10-08 の乖離)。iOS に関する記述は、変えた後の形に合わせてある。冒頭のリンク先の cross/ADR-0013 は、蒸留で同じ内容に直してから accepted にする (ファイルの名前が変わるなら、この文書のリンクも直す)
 
 ---
 kind: guide
@@ -75,14 +76,15 @@ timestamp: 【蒸留で置く日】
 
 ### ios / verify
 
-1. 決めた版の Xcode を選ぶ。無ければ、テストを始める前に失敗で終わる
-2. 使える iPhone の Simulator のうち、OS が最も新しいものを選ぶ (機種の名前は固定していない)
-3. 本体のテストを、絞り込みなしで全件流す
-4. 本体の実行の件数を確かめる
-5. Sample を、通常の検証のスキームをユニットテストのターゲットだけに絞って流す。UI テストは走らない
-6. Sample の実行の件数を確かめる
+1. 決めた版の Xcode を選ぶ。無ければ、ビルドを始める前に失敗で終わる
+2. 本体と、本体のテストのコードをビルドする (`ios/` で `xcodebuild build-for-testing -scheme KsCollectionView`)
+3. Sample のアプリと、Sample のテストのコード (ユニットテストと UI テストの両方のターゲット) をビルドする (`samples/ios/` で、通常の検証のスキームに `xcodebuild build-for-testing`)
 
-本体のテストが落ちても、Sample の検証は走る。
+本体のビルドが落ちても、Sample のビルドは走る。合否は `xcodebuild` の終了コードで決まる。
+
+**iOS のテストは、CI では 1 件も走らない。** テストのコードがコンパイルできることまでを確かめ、実行はしない。Simulator も選ばず、起動もしない。ビルドの行き先は、特定の端末を指さない総称の指定 (`generic/platform=iOS Simulator`) である。iOS のテストの実行と実行件数の確認は、手元の完了判定 ([テスト実行規約](test-execution.md)) が本命である。
+
+走らせない理由: `develop` での最初の実行で、手元では通る本体のテスト 1 件が、ランナーの Simulator の上で落ちた。CI の上で Simulator を使うテストを続けると、テストの中身と関係の無い不安定さで検査が落ち続けると判断し、やめた。Simulator を使うテストを CI に戻すときは、この判断を先に見直す。
 
 ### android / verify
 
@@ -98,33 +100,33 @@ timestamp: 【蒸留で置く日】
 
 | 緑が言えること | 緑では言えないこと (手元の完了条件に残る) |
 |---|---|
-| iOS 本体のテストが Simulator で全件通った | Sample の UI テストが通った |
-| Android 本体のデバッグのユニットテストが全件通った | 端末をつないで走らせるテストが通った |
-| iOS / Android の Sample がビルドでき、ユニットテストが通った | 性能検証を通った |
-| 実行の件数が、本体と Sample のそれぞれで 0 でなかった | Xcode 27 以外でビルドできる |
-| Android は、テストのソースにあるテストのクラスがすべて結果に現れた | iOS で、テストのクラスがすべて走った (クラスごとの突き合わせは合否にしていない) |
+| iOS 本体と、本体のテストのコードがビルドできた | iOS のテストが通った (本体の全件・Sample のユニットテスト・Sample の UI テストのどれも、CI では走らない) |
+| iOS の Sample のアプリと、Sample のテストのコード (ユニットテスト・UI テスト) がビルドできた | 端末をつないで走らせるテストが通った |
+| Android 本体のデバッグのユニットテストが全件通った | 性能検証を通った |
+| Android の Sample がビルドでき、デバッグのユニットテストが通った | Xcode 27 以外でビルドできる |
+| Android は、実行の件数が本体と Sample のそれぞれで 0 でなく、テストのソースにあるテストのクラスがすべて結果に現れた | iOS の実機向けにビルドできる (Simulator 向けのビルドだけを確かめている) |
 | lint の 5 つの検査に違反が無かった | Android のリリースのユニットテストが通る (デバッグだけを流している) |
 
-CI の緑は、手元の完了判定の緑と同じ意味ではない。完了の判定には、[テスト実行規約](test-execution.md) の 4 系統の全件実行を使う。
+CI の緑は、手元の完了判定の緑と同じ意味ではない。とくに iOS は、緑でもテストは 1 件も走っていない。完了の判定には、[テスト実行規約](test-execution.md) の 4 系統の全件実行を使う。iOS の 2 系統 (本体・Sample) は、手元で流さなければどこでも走らない。
 
 ### 件数の読み方
 
-iOS Sample の件数は、CI と手元で違う。CI はユニットテストだけを流し、手元の通常の検証のスキームは UI テストも流すためである。
+CI が件数を出すのは Android だけである。iOS はテストを実行しないので、件数が無い。
 
 | 系統 | CI の件数 | 手元の全件実行の件数 |
 |---|---:|---:|
-| iOS 本体 | 567 | 567 |
-| iOS Sample | 37 (ユニットテストだけ) | 48 (ユニットテスト 37 + UI テスト 11) |
+| iOS 本体 | なし (ビルドだけ) | 567 |
+| iOS Sample | なし (ビルドだけ) | 48 (ユニットテスト 37 + UI テスト 11) |
 | Android 本体 | 512 (31 クラス) | 512 |
 | Android Sample | 163 (21 クラス) | 163 |
 
-件数は 2026-10-08 時点の手元の実測で、テストの増減で動く。CI の列は、workflow と同じコマンドを手元で流した結果である。iOS Sample の 37 を見て「11 件が走っていない」と読まない。
+件数は 2026-10-08 時点の手元の実測で、テストの増減で動く。CI の列の Android は、workflow と同じコマンドを手元で流した結果である。
 
 ランナーの上での最初の実行の件数: 【公開の実施後に記入: tasks 7.4 の結果。手元の件数と一致したか】
 
 ## 失敗したときの見方
 
-実行の結果のページの概要に、件数の内訳が出る。失敗の理由は注釈として出る。まず、どの step が落ちたかを見る。
+まず、どの step が落ちたかを見る。Android は、実行の結果のページの概要に件数の内訳が出て、失敗の理由が注釈として出る。iOS は、落ちた step の記録に `xcodebuild` の出力がそのまま出る。
 
 打ち切られた実行 (新しい push で古い実行が止まったもの) は、失敗ではない。
 
@@ -144,11 +146,12 @@ iOS Sample の件数は、CI と手元で違う。CI はユニットテストだ
 | 落ちた step | 意味 |
 |---|---|
 | Select Xcode / Show toolchain | 決めた版の Xcode がランナーに無い、または選んだ Xcode の版が違う。ランナーのイメージが更新された可能性がある |
-| Select simulator | 使える iPhone の Simulator が無い |
-| Test library / Build sample and test sample units | テストの失敗、またはビルドの失敗。記録に `xcodebuild` の出力がそのまま出る |
-| Check library test count / Check sample test count | 記録が無い・集計の行が無い・実行が 0 件・全件がスキップのどれか |
+| Build library and library tests | 本体、または本体のテストのコードがビルドできない。依存の取得の失敗もここに出る |
+| Build sample and sample tests | Sample のアプリ、ユニットテストのコード、UI テストのコードのどれかがビルドできない |
 
-件数の検査は、テストが失敗した回でも走る。テストの step まで進まなかった回では走らない。
+`ios / verify` は、テストの失敗では落ちない (テストを実行していない)。落ちるのは、ビルドできないとき、その前の準備 (チェックアウト・Xcode の選択と版の確認) が失敗したとき、時間の上限を超えたときである。ビルドの失敗は、記録の中の `error:` の行を探す。同じコマンドを手元で流すと、ビルドの誤りを切り分けられる (下の「手元で確かめる」)。ランナーに固有の失敗は、手元では再現しないことがある。
+
+Sample のビルドは、本体のビルドが落ちた回でも走る。本体のビルドの step まで進まなかった回 (Xcode を選べなかった回) では走らない。
 
 ### android / verify
 
@@ -170,10 +173,19 @@ python3 scripts/ci/check-workflows.py
 actionlint
 ```
 
-- スクリプトのテストは数秒で終わる。2026-10-08 時点で 128 件。テスト 4 系統とは別に数える
+- スクリプトのテストは数秒で終わる。2026-10-08 時点で 111 件。テスト 4 系統とは別に数える
 - actionlint は、リポジトリのルートで流すと `.github/actionlint.yaml` を読む。この設定は、ランナーの名前 `xcode-27` を登録している。actionlint が持つ名前の一覧にこの名前がまだ無く、登録が無いと知らない名前として弾かれる
 - actionlint は検証 CI では流していない。手元で流すだけである
-- プラットフォームの検証は、workflow の step と同じコマンドを手元で流して確かめられる。Simulator は作業専用のものを指定する
+- プラットフォームの検証は、workflow の step と同じコマンドを手元で流して確かめられる。iOS の 2 つのビルドは Simulator を使わないので、Simulator を用意しなくてよい
+
+iOS の検証と同じコマンド:
+
+```bash
+(cd ios && xcodebuild build-for-testing -scheme KsCollectionView -destination "generic/platform=iOS Simulator" -configuration Debug)
+(cd samples/ios && xcodebuild build-for-testing -project KsCollectionViewSamples.xcodeproj -scheme KsCollectionViewSamples -destination "generic/platform=iOS Simulator" -configuration Debug)
+```
+
+成功すると、出力の末尾に `** TEST BUILD SUCCEEDED **` が出る。総称の行き先では、Simulator 向けの 2 つの CPU の種類 (arm64・x86_64) の両方をビルドする。手元の所要時間 (2026-10-08、Xcode 27.0): ビルドの出力が何も無い状態から、本体 14 秒・Sample 18 秒 (依存の取得は、手元のキャッシュが効いた状態)。ランナーの上では、依存の取得とイメージの速さの分だけ長くなる。
 
 ### gitleaks の step は macOS では流せない
 
@@ -251,12 +263,13 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 
 | 検査していないこと | 代わりに守っているもの | 届かない範囲 |
 |---|---|---|
-| 失敗の見逃しの指定 (`continue-on-error`) が無いこと | スクリプトのテストが、lint の step について確かめる | iOS と Android の検証の step は確かめていない |
+| 失敗の見逃しの指定 (`continue-on-error`) が無いこと | スクリプトのテストが、lint の step と iOS の検証の workflow について確かめる | Android の検証の step は確かめていない |
 
 ### 確かめ方の限界
 
 - lint の 4 つの検査 (secret・ローカル絶対パス・個人を特定する値・コメントの規約) が違反で落ちることは、自動のテストを持たない。違反を 1 つだけ置いた一時のツリーで、workflow と同じコマンドが失敗で終わることを、macOS と Linux のコンテナで実測して確かめた
-- iOS と Android の「テストが落ちるとジョブが落ちる」は、失敗する実行を実際には見ていない。step の失敗がジョブの失敗になるという GitHub の挙動と、コマンドの失敗をそのまま返すスクリプト (`scripts/ci/run-logged.py`) のテストに依る
+- iOS の「ビルドできないとジョブが落ちる」と、Android の「テストが落ちるとジョブが落ちる」は、ランナーの上で失敗する実行を見て確かめたものではない。step の失敗がジョブの失敗になるという GitHub の挙動に依る。iOS は、テストのコードをわざと壊すと、workflow と同じコマンドが失敗の終了コードで終わることを、手元で確かめた: 本体のテストのコードと、Sample の UI テストのコードのそれぞれで、終了コード 65 (`** TEST BUILD FAILED **`)
+- iOS の 2 つのビルドは、`xcodebuild` を step から直に呼んでいる。後ろに別のコマンドをつなぐと、つないだ側の終了コードが step の合否になる。スクリプトのテストが、つないでいないことを確かめる
 - 異常系は、公開リポジトリに壊れた commit を push したり、確かめるための Pull Request を作ったりして確かめない (閉じても公開リポジトリに残るため)。スクリプトのテストと、一時のツリーで確かめる
 - Android SDK がランナーに無いときの取得の手順は、手元でもコンテナでも流していない: 【公開の実施後に記入: 最初の実行で、ランナーに SDK があったか・取得の枝を通ったか】
 
@@ -273,7 +286,9 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 - 黙って空振りする経路を作らない。実行 0 件・走査の対象が空・期待した結果のファイルが無い、はどれも失敗にする
 - 外部の action は commit の ID で指定し、対応する版をコメントに書く。ID がタグの指す commit と一致することを `git ls-remote` で確かめる
 - gitleaks の版を上げるときは、チェックサムを同時に直し、公式のリリースの記録と突き合わせる
-- コマンドの出力を記録に残すときは `scripts/ci/run-logged.py` を使う。`コマンド | tee 記録` は、コマンドが失敗しても成功に見える
+- コマンドの出力を記録に残すために `コマンド | tee 記録` と書かない。コマンドが失敗しても成功に見える。記録を後の step が読む必要が出たら、コマンドの終了コードをそのまま返す包みをスクリプトにして、テストを付ける
+- iOS の検証に、Simulator を使うテストを足さない (上の「走らせる範囲」の理由)。足すと決めたときは、実行の件数を確かめる検査 (0 件・読み取れないときは失敗) も同時に足す。テストが 1 件も実行されなくても `xcodebuild` は成功で終わる
+- iOS の検証の step を足す・名前を変えるときも、スクリプトのテストが持つ step の一覧を直す
 - ジョブを足すときは、時間の上限を置く (無ければ workflow の定義の検査が落ちる)。workflow のファイルを足すときは、失敗の見逃しの指定を自分で確かめる (上の「workflow の定義の検査が読める書き方」)
 - プラットフォームの検証の workflow に、入力を足さない。リリースの workflow が、同じ検証を入力なしで呼ぶ前提である
 - lint のジョブの step を足す・名前を変えるときは、スクリプトのテスト (`scripts/ci/tests/test_workflow_files.py`) が持つ step の一覧も直す
@@ -286,4 +301,4 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 - [テスト実行規約](test-execution.md) — 手元の完了判定と、件数の読み方
 - [ソースコメント規約](comment-policy.md) — Comment policy lint が確かめる規約
 
-出典: kasane/changes/archive/【蒸留の日付】-public-repo-verify-ci/design.md (Decision 1〜7) / 同 evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / 同 review-003.md (Android のテストのクラスの導き方の、残した制限)
+出典: kasane/changes/archive/【蒸留の日付】-public-repo-verify-ci/design.md (Decision 1〜7) / 同 deviation.md (iOS の検証をビルドだけにした指示) / 同 evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / 同 review-003.md (Android のテストのクラスの導き方の、残した制限)
