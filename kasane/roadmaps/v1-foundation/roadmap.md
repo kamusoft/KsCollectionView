@@ -61,7 +61,7 @@ graph LR
 | phase-4-sections-grouping | completed | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | [sections-grouping](../../changes/archive/2026-09-26-sections-grouping/proposal.md) |
 | phase-5-paging-state-machine | completed | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | [paging-state-machine](../../changes/archive/2026-09-29-paging-state-machine/proposal.md) |
 | phase-6-drag-reorder | completed | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | [drag-reorder](../../changes/archive/2026-10-01-drag-reorder/proposal.md) |
-| phase-7-1-public-repo-verify-ci | in-progress | change | [agenda](phases/phase-7-1-public-repo-verify-ci/agenda.md) | [public-repo-verify-ci](../../changes/public-repo-verify-ci/proposal.md) |
+| phase-7-1-public-repo-verify-ci | completed | change | [agenda](phases/phase-7-1-public-repo-verify-ci/agenda.md) | [public-repo-verify-ci](../../changes/archive/2026-10-08-public-repo-verify-ci/proposal.md) |
 | phase-7-2-package-distribution | in-progress | change | [agenda](phases/phase-7-2-package-distribution/agenda.md) | — |
 | phase-7-3-user-docs | in-progress | change | [agenda](phases/phase-7-3-user-docs/agenda.md) | — |
 | phase-7-4-release-pipeline | in-progress | change | [agenda](phases/phase-7-4-release-pipeline/agenda.md) | — |

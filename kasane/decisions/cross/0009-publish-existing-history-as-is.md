@@ -1,7 +1,7 @@
 ---
 id: 0009
 title: 公開リポジトリには既存の履歴を書き換えずにそのまま載せる
-status: proposed
+status: accepted
 date: 2026-10-08
 ---
 
@@ -53,3 +53,4 @@ SwiftPM と Maven で配布するには、リポジトリを GitHub に公開す
 - 前提 (Context) が崩れたとき
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: 今の履歴をそのまま公開するか) / ../KsSettingsView/kasane/decisions/cross/0021-public-repository-fresh-start.md (兄弟ライブラリの決定とその理由)
+現行照合: 2026-10-08 確認。GitHub の公開リポジトリ `kamusoft/KsCollectionView` の `main` は、手元の履歴をそのまま push したもの (最初の push の先端が手元と同じ commit)。公開の前に、履歴に残る画像 104 件の目視と、gitleaks による全履歴の走査を行った (kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/pre-publication-checks.md)。gitleaks は検証 CI の lint (`.github/workflows/ci.yml`) で走り続ける。判定: 維持
