@@ -160,3 +160,57 @@ Scenario「develop への push で起動する」「検査が決めた名前で�
 表に無い値は、兄弟ライブラリと同じにした。`strict` を false にしたのは、true にすると、`main` にしか無い merge commit を `develop` に取り込むまで次の Pull Request をマージできなくなるため (オーナーに示して承認を得た)。
 
 Scenario「main の保護に必須の検査が入っている」「develop は強制 push と削除だけを禁じる」: 読み直しで確かめた。
+
+## 7.6 develop から main 宛ての Pull Request (2026-10-08)
+
+### Pull Request の作成と、必須の検査
+
+タイトルと本文の案をオーナーに示し、承認 (「実行して」) を得て、指揮側が実行した。
+
+| 順 | 実行した内容 | 結果 |
+|---|---|---|
+| 1 | 7.4・7.5 の記録を commit (`7c6fd10`) し、`git push origin develop` | push できた。変えたのは `kasane/` の下だけで、push による検証の実行は作られなかった (実行の一覧に、この commit の push の実行が無い) |
+| 2 | `gh pr create --repo kamusoft/KsCollectionView --base main --head develop --title "公開リポジトリの体裁と検証 CI を追加" --body-file <本文>` | Pull Request 1 番ができた |
+
+Pull Request で起動した検証 (実行の ID は 37775531543、対象は `7c6fd10`):
+
+| 検査 | 結果 | 所要 |
+|---|---|---|
+| `lint` | 成功 | 7 秒 |
+| `ios / verify` | 成功 | 2 分 28 秒 |
+| `android / verify` | 成功 | 4 分 0 秒 |
+
+- lint の step「Pull request head restriction」の記録: `出どころは kamusoft/KsCollectionView の develop`
+- Pull Request の状態 (`gh pr view 1 --json mergeable,mergeStateStatus,isCrossRepository`): マージできる (`MERGEABLE`・`CLEAN`)、別のリポジトリからではない
+
+Scenario「main 宛ての Pull Request では絞り込まない」: この Pull Request の先端の commit は `kasane/` の下だけを変えたものだが、3 つの検査が走った。Scenario「develop からの Pull Request は通る」: 出どころの確認が通り、結果が記録に出た。Scenario「開発の記録だけの push では起動しない」: 順 1 の push で確かめた (検証が走っている間の push での確認は tasks 8.1)。
+
+### マージ
+
+3 つの必須の検査の成功と、出どころの確認の記録をオーナーに示し、承認 (「OK です」) を得て、指揮側が実行した。
+
+- 実行した内容: `gh pr merge 1 --repo kamusoft/KsCollectionView --merge` (終了コード 0。ブランチの削除の指定は付けていない)
+
+読み直し:
+
+| 確かめたこと | 読み方 | 結果 |
+|---|---|---|
+| Pull Request の状態 | `gh pr view 1 --json state,mergeCommit` | `MERGED`。merge commit は `479fcdc` |
+| `main` の先端が merge commit である | `git fetch origin` の後に `git rev-list --parents -1 origin/main` | 親が 2 つ (`a76c380` = マージの前の `main`、`7c6fd10` = `develop` の先端) |
+| `main` に本変更の内容が入った | `git ls-tree --name-only origin/main` | ルートに `LICENSE`・`README.md`・`README_ja.md`・`.github` がある |
+| `develop` が残っている | `git ls-remote origin` | `develop` は `7c6fd10` のまま |
+| `main` への push で検証が起動しない | `gh run list` | マージの後に新しい実行は無い |
+
+Scenario「main には検査を通った develop が入る」: 確かめた。
+
+## 7.7 Issue のフォームの確認 (2026-10-08)
+
+GitHub にログインした画面でしか見られないので、オーナーに確認を依頼した (送信はしない)。オーナーが Issue を新しく作る画面のスクリーンショットを示し、「問題なさそう」と報告した。
+
+| 確かめたこと | 結果 |
+|---|---|
+| 選べるフォーム | `Bug report`・`Feature request`・`Question` の 3 本が並ぶ (スクリーンショットで確認) |
+| 空の Issue | `Blank issue` の行が `Maintainers only` の印つきで出ている。管理する側 (オーナー) の画面にだけ出る GitHub の表示で、空の Issue を作れなくする設定 (`blank_issues_enabled: false`) は効いている。管理する側でない人の画面は、今回は見ていない |
+| 必須の項目が空だと送れない | オーナーの報告 (「問題なさそう」) による。指揮側は画面を見ていない |
+
+Scenario「3 本のフォームだけが選べる」: 管理する側の画面で 3 本を確かめた。管理する側には空の Issue の行も出る点が、Scenario の文面 (「空の Issue は選べない」) と違う。Scenario「必須の項目が空だと送れない」: オーナーの報告による。

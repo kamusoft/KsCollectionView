@@ -56,8 +56,8 @@ Requirement の名前は `specs/verification-ci/spec.md` (以下 CI) と `specs/
 - [x] 7.3 承認を得て、機能の設定・Pull Request を作れる人の制限・secret の検査と push の保護・依存の脆弱性の通知を入れ、ラベル 3 つがあることを確かめる。読み直して design.md の Decision 9 の表と突き合わせる (→ 公開: 公開リポジトリの機能の設定 / Pull Request を作れる人の制限)
 - [x] 7.4 `develop` を push し、3 つの検査が成功で終わることを確かめる。実行の件数を証跡に書く。落ちたら `develop` の上で直す (→ CI: 検証 CI の起動条件「develop への push で起動する」/ プラットフォームの検証の再利用「検査が決めた名前で報告される」)
 - [x] 7.5 承認を得て、`main` と `develop` の保護を入れ、読み直して design.md の Decision 9 の表と突き合わせる (→ 公開: ブランチの保護)
-- [ ] 7.6 承認を得て、`develop` から `main` 宛ての Pull Request を作る。3 つの必須の検査が成功で終わってから merge commit でマージする。lint の記録に、出どころを確かめた結果 (同じリポジトリの `develop`) が出ていることを確かめる (→ 公開: ブランチの保護「main には検査を通った develop が入る」/ CI: 検証 CI の起動条件「main 宛ての Pull Request では絞り込まない」/ main 宛ての Pull Request の出どころの制限「develop からの Pull Request は通る」)
-- [ ] 7.7 Issue を新しく作る画面で、3 本のフォームだけが選べることと、必須の項目が空だと送れないことを確かめる。送信はしない (→ 公開: Issue のフォームの必須項目)
+- [x] 7.6 承認を得て、`develop` から `main` 宛ての Pull Request を作る。3 つの必須の検査が成功で終わってから merge commit でマージする。lint の記録に、出どころを確かめた結果 (同じリポジトリの `develop`) が出ていることを確かめる (→ 公開: ブランチの保護「main には検査を通った develop が入る」/ CI: 検証 CI の起動条件「main 宛ての Pull Request では絞り込まない」/ main 宛ての Pull Request の出どころの制限「develop からの Pull Request は通る」)
+- [x] 7.7 Issue を新しく作る画面で、3 本のフォームだけが選べることと、必須の項目が空だと送れないことを確かめる。送信はしない (→ 公開: Issue のフォームの必須項目)
 
 ## 8. 公開の後の実地確認 (指揮側が行う)
 
