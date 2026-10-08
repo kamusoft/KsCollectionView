@@ -42,7 +42,12 @@ graph LR
     P8 --> P4[phase-4<br/>セクション/グループ化]
     P4 --> P5[phase-5<br/>ページング状態機械]
     P5 --> P6[phase-6<br/>D&D並べ替え]
-    P6 --> P7[phase-7<br/>配布/ドキュメント]
+    P6 --> P71[phase-7-1<br/>公開の準備/検証CI]
+    P71 --> P72[phase-7-2<br/>配布物の形]
+    P6 --> P73[phase-7-3<br/>利用者ドキュメント]
+    P72 -.->|インストール例| P73
+    P72 --> P74[phase-7-4<br/>リリースの手順/基準]
+    P73 --> P74
 ```
 
 ## フェーズ一覧
@@ -56,4 +61,7 @@ graph LR
 | phase-4-sections-grouping | completed | change | [agenda](phases/phase-4-sections-grouping/agenda.md) | [sections-grouping](../../changes/archive/2026-09-26-sections-grouping/proposal.md) |
 | phase-5-paging-state-machine | completed | change | [agenda](phases/phase-5-paging-state-machine/agenda.md) | [paging-state-machine](../../changes/archive/2026-09-29-paging-state-machine/proposal.md) |
 | phase-6-drag-reorder | completed | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | [drag-reorder](../../changes/archive/2026-10-01-drag-reorder/proposal.md) |
-| phase-7-samples-distribution | pending | change | [agenda](phases/phase-7-samples-distribution/agenda.md) | — |
+| phase-7-1-public-repo-verify-ci | in-progress | change | [agenda](phases/phase-7-1-public-repo-verify-ci/agenda.md) | [public-repo-verify-ci](../../changes/public-repo-verify-ci/proposal.md) |
+| phase-7-2-package-distribution | in-progress | change | [agenda](phases/phase-7-2-package-distribution/agenda.md) | — |
+| phase-7-3-user-docs | in-progress | change | [agenda](phases/phase-7-3-user-docs/agenda.md) | — |
+| phase-7-4-release-pipeline | in-progress | change | [agenda](phases/phase-7-4-release-pipeline/agenda.md) | — |

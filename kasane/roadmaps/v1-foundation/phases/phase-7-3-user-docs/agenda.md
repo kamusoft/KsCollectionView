@@ -1,27 +1,12 @@
-# 配布 / ドキュメント
+# 利用者ドキュメント
 
-パッケージ配布・利用者ドキュメントの整備。サンプルアプリは各フェーズの完了条件で育つため本フェーズの対象外 (roadmap 前提参照)。
+skills/ と README を制作し、源泉 (kasane/ とコード) に追従させる仕組みを決める。
 
 ## 論点
 
-- 配布: SPM / Maven のパッケージング (翻案元 `../KsSettingsView/kasane/decisions/cross/` の 0018 SPM 配信リポジトリ・0019 lockstep 単一バージョン・0020 dispatch リリース/tag 後置/version CI 注入は翻案元でも proposed — 本フェーズで自リポジトリの ADR として判断する)
-- 検証 CI の構成と保証範囲 (翻案元 cross/0025・0026: platform 別再利用 workflow + 入口、パス絞り込みなし、テスト 0 件は緑でも失敗)
 - skills/ 方式の利用者ドキュメントの実制作 (方針は [cross/ADR-0005](../../../../decisions/cross/0005-user-docs-as-agent-skills-and-root-readme.md) で accepted 済み)
-- 大量件数の性能検証をリリース基準に含めるか (実機・件数・計測手順)
-
-### phase-2 からの申し送り (2026-09-03)
-
-- 性能検証の手順と合格基準は [handbook/ios/performance-verification.md](../../../../handbook/ios/performance-verification.md) に昇格済み
-- リリース基準に含めるかを決める際は iOS の未実施分を扱う: 基準機 iPhone 11 での hitch 計測 (phase-2 は iPhone 15 で代替)、メモリ絶対値 (Simulator で約 610 MB、内訳未解明) の実機確認
-- 推定高さ (`KsEstimatedHeight`) の既知の乖離を長いスクロールで観測する: grid では行高 = 列内最大セル高に対し実測がセル単位のため平均でも過小、直近 32 件の移動平均のため大量件数のスクロール中に contentSize が揺れうる (インジケータ・オフセットの安定性は未測定)
-- CI での性能自動化 (XCUITest + `XCTOSSignpostMetric`) は実機の受け皿ができた時点で再訪 (ios-engine-foundation design Decision 6 の代替案)
-
-### phase-3 からの申し送り (2026-09-05)
-
-- Android の性能検証は [handbook/android/performance-verification.md](../../../../handbook/android/performance-verification.md) に昇格済み。基準機 Pixel 4a で実測済み (代替機ではない)
-- Android は Macrobenchmark で人の操作なしに再実行できるため、リリース基準に含める場合は CI の実機の受け皿だけが課題
-- 相対基準 (素の Compose との差 10% 以内) は比較対象にライブラリと同じ既定機能を付けた条件で測るもので、ラッパーそのものの薄さより緩い側にある。リリース基準として引くときは規約の但し書きを読む
-- maven-publish の設定は基盤では行っていない (composite build の明示 substitution で Sample が本体を参照)。配布座標 `jp.kamusoft:kscollectionview` は cross/ADR-0003 どおり Sample で実地確認済み
+- `skills/` を源泉 (`kasane/` とコード) に追従させる仕組み (cross/ADR-0005 が本フェーズに委ねた。翻案元は対応表 `skills/.manifest.json` と、オーナーの依頼で動かす docs-refresh)
+- インストール例の版の書き方 (翻案元 `../KsSettingsView/kasane/decisions/cross/` の 0029: 版を書かず `{version}` を置き、最新版は Release の一覧で案内する)
 
 ### phase-8 からの申し送り (2026-09-08)
 
@@ -33,9 +18,6 @@
 | iOS のディスクキャッシュ | 起動時に `KsImagePipeline.enableSharedDiskCache()` を一度呼ぶ。delegate を使うアプリは自分でパイプラインを組む |
 | iOS の `remove` | 消したソースはローダー付属ビューとキャッシュを共有しなくなる |
 | Android のキャッシュ操作 | androidx.startup の初期化が前提。無効化した構成では警告だけで何もしない |
-
-- 検証 CI の構成に、実機が接続されていないと実行できないテスト (`android/kscollectionview/src/androidTest/`、到達点メモリの実機分岐 3 件) の受け皿を含めるか決める。実機の受け皿は性能計測の CI 化 (phase-2 / phase-3 の申し送り) と同じ課題
-- iOS Sample にはユニットテストターゲットが無く、計測入口の土俵一致や観測ログの分類はテストで担保していない (Android は持つ)。ターゲット追加は project ファイルの変更を伴うため、配布・CI の構成を決めるときに併せて判断する
 
 ### phase-8 からの申し送り (2026-09-24、prefetch-display-size)
 
@@ -70,10 +52,6 @@
 - Pull to Refresh の取り直しのインジケータを出している間にスクロールして失敗し配列を変えずに状態を戻すと、iOS は先頭へ戻り、Android はその位置に残る (両プラットフォームの差として受け入れ済み)
 - Android では `onLoadMore` / `onRefresh` が投げた例外 (取り消し以外) をライブラリは握りつぶさず、コルーチンと同じく伝える
 
-確かめること:
-
-- 一覧に重ねた表示 (差し替えた読み込み中の表示・Sample の浮いたパネル) に隠れた項目が、iOS の UI テスト (XCUITest) の要素の検索で見つからない。VoiceOver の読み上げに同じ影響があるかは未確認 (paging-state-machine の実装中の観測)
-
 ### phase-6 からの申し送り (2026-10-01、drag-reorder)
 
 並べ替えの利用者向けガイド (Skill) に書く約束ごと。出典は ../../../../changes/archive/2026-10-01-drag-reorder/deviation.md と core/ADR-0026〜0034・ios/ADR-0011・android/ADR-0007、公開契約の現在の形は concepts の core/core-model/collection-reorder.md。
@@ -90,11 +68,6 @@
 - ソート中の 2 つの書き方: ソート中は並べ替えのスイッチを無効にする / 置いたときの処理で手動の並びへ切り替える
 - 両プラットフォームで動きが違う点: iOS は UIKit 標準の並べ替えの動きに従う (隙間は指を止めてから動く・別のグループの末尾へはいったん手前に入れてから最後の項目の上で止める・受け入れないときは置いた位置に収まってから戻る・取りやめは指を離したときに戻る・一覧の外ではプレビューが小さくなる)。Android は指の位置で決まり、見出しより上なら前のグループの末尾に直接置ける
 - Android は、テンプレートの根が背景を塗らないと、持ち上げた項目の影が透けて見える
-
-#### 確かめること (drag-reorder)
-
-- 実機の VoiceOver / TalkBack で「前へ移動 / 後ろへ移動」が出ること・動かした後の焦点・iOS で UIKit 標準のドラッグの操作と並ぶ紛らわしさ (基準機での目視は行っていない。自動テストと Simulator の書き出しまで)
-- iOS 16・17 での並べ替え (並べ替えハンドラが呼ばれること・隙間の予測・確定位置のずれの揃え方。確かめたのは iOS 18.6・26.5)
 
 ## 決定事項
 
