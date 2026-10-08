@@ -101,3 +101,62 @@ Scenario「設定が決めたとおりになっている」「設定が共同作
 | lint が Linux で手元と同じ結果になるか | 同じ (違反なし。スクリプトのテストは修正後の 133 件が Linux で通った) |
 | 検査の名前 | `lint`・`ios / verify`・`android / verify` で報告された |
 | 本体のテストが落ちても Sample の検証が走ること | 本体の step が失敗した後に、Sample のビルドとユニットテスト・件数の確認が走り、ジョブは失敗で終わった |
+
+### 2 回目の実行の結果: 成功 (iOS をビルドだけにした後)
+
+オーナーの判断で、検証 CI の iOS を「テストを実行せず、ビルドできることだけを確かめる」形に変えた (`deviation.md` の 2026-10-08 の乖離)。オーナーの承認 (「実行して」) を得て commit (`985f910`) し、`git push origin develop` で push した。実行の ID は 37773352416。
+
+| 検査 | 結果 | 所要 | 中身 |
+|---|---|---|---|
+| `lint` | 成功 | 8 秒 | gitleaks は検出なし。スクリプトのテストは実行 111 件・失敗 0・スキップ 0 (Linux)。workflow の定義の検査は違反なし |
+| `ios / verify` | 成功 | 4 分 8 秒 | 本体と本体のテストのビルド 1 分 56 秒、Sample のアプリとテストのビルド 1 分 53 秒。どちらも `TEST BUILD SUCCEEDED`。テストは実行していない |
+| `android / verify` | 成功 | 3 分 59 秒 | 本体は実行 512 件・スキップ 0・失敗 0・クラス 31 / 31。Sample は実行 163 件・スキップ 0・失敗 0・クラス 21 / 21 |
+
+検査の名前と出した側 (`gh api repos/kamusoft/KsCollectionView/commits/985f910/check-runs`): `lint`・`ios / verify`・`android / verify` の 3 つで、どれも GitHub Actions (アプリの ID は 15368) が出している。
+
+Scenario「develop への push で起動する」「検査が決めた名前で報告される」: 確かめた。Scenario「全件が通れば成功する」(Android): 確かめた。iOS は deviation のとおり、ビルドの成功を確かめた。
+
+所要時間の記録 (tasks 8.3 の材料):
+
+| ジョブ | 1 回目 (`e1c3d67`) | 2 回目 (`985f910`) |
+|---|---|---|
+| `lint` | 8 秒 | 8 秒 |
+| `android / verify` | 6 分 14 秒 | 3 分 59 秒 |
+| `ios / verify` | 13 分 10 秒 (テストを実行していた形) | 4 分 8 秒 (ビルドだけ) |
+
+## 7.5 main と develop の保護 (2026-10-08)
+
+入れる値を表にしてオーナーに示し (design の表に無い値を含む)、承認 (「実行して」) を得て、指揮側が実行した。
+
+| 順 | 実行した内容 | 結果 |
+|---|---|---|
+| 1 | `gh api -X PUT repos/kamusoft/KsCollectionView/branches/main/protection --input -` に、下の表の値の JSON を渡す | 終了コード 0 |
+| 2 | `gh api -X PUT repos/kamusoft/KsCollectionView/branches/develop/protection --input -` に、下の表の値の JSON を渡す | 終了コード 0 |
+
+`main` の読み直し (`gh api repos/kamusoft/KsCollectionView/branches/main/protection`) と、design の Decision 9 の表との突き合わせ:
+
+| 項目 | 決めた値 | 渡した値 | 読み直した値 | 一致 |
+|---|---|---|---|---|
+| Pull Request を必須にする | する | `required_pull_request_reviews` を置く | 置かれている | ○ |
+| 承認の必須の数 | 0 | `required_approving_review_count: 0` | 0 | ○ |
+| 必須の検査 | `lint`・`ios / verify`・`android / verify`。GitHub Actions が出したものに限る | 3 件、どれも `app_id: 15368` | 3 件、名前と `app_id` (15368) が同じ | ○ |
+| 強制 push | 禁じる | `allow_force_pushes: false` | false | ○ |
+| 削除 | 禁じる | `allow_deletions: false` | false | ○ |
+| 管理者に強制する | しない | `enforce_admins: false` | false | ○ |
+| `main` の最新を取り込んでいないとマージできない | (表に無い) | `strict: false` | false | — |
+| 古い承認の取り消し・コードオーナーの承認 | (表に無い) | どちらも false | どちらも false | — |
+| push できる人の限定 | (表に無い) | `restrictions: null` | 無い | — |
+
+`develop` の読み直し (`gh api repos/kamusoft/KsCollectionView/branches/develop/protection`):
+
+| 項目 | 決めた値 | 渡した値 | 読み直した値 | 一致 |
+|---|---|---|---|---|
+| 強制 push | 禁じる | `allow_force_pushes: false` | false | ○ |
+| 削除 | 禁じる | `allow_deletions: false` | false | ○ |
+| 必須の検査 | 持たない | `required_status_checks: null` | 無い | ○ |
+| Pull Request の必須 | (直接の push を受ける) | `required_pull_request_reviews: null` | 無い | ○ |
+| 管理者に強制する | しない | `enforce_admins: false` | false | ○ |
+
+表に無い値は、兄弟ライブラリと同じにした。`strict` を false にしたのは、true にすると、`main` にしか無い merge commit を `develop` に取り込むまで次の Pull Request をマージできなくなるため (オーナーに示して承認を得た)。
+
+Scenario「main の保護に必須の検査が入っている」「develop は強制 push と削除だけを禁じる」: 読み直しで確かめた。
