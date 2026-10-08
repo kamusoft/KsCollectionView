@@ -3,8 +3,10 @@
 > - 置き先の案: `kasane/handbook/cross/branch-and-github-settings.md` (新設)
 > - index に足す行の案: 適用のきっかけ「`develop` へ push するとき・`main` 宛ての Pull Request を作る / マージするとき・GitHub のリポジトリの設定やブランチの保護を変える / 確かめ直すとき」、種別 guide
 > - 文書の中のリンクは、置き先から見た相対パスで書いてある (この草稿の場所からは辿れない)
-> - GitHub のリポジトリは、この草稿を書いた時点でまだ作られていない。`gh` のコマンドは、どれも本リポジトリに対しては実行していない。フラグの名前は手元の `gh` 2.102.0 のヘルプで確かめ、保護の payload の形と `app_id` は兄弟ライブラリの手順 (`../KsSettingsView/kasane/handbook/cross/release-procedure.md`) から取った
-> - 実行した結果・読み直しの結果を書く箇所は、`【公開の実施後に記入】` の印を付けて空けてある。tasks 7・8 の後に指揮側が埋める。コマンドを変えて実行したときは、コマンドの側も実行したものに直す
+> - GitHub のリポジトリは 2026-10-08 に作り、public にした。「入れ方と確かめ方」のコマンドと結果は、公開の実施の記録 (`evidence/publication-log.md`) にある、実行したものに合わせてある。草稿の案と違う形で実行したものは、実行したほうに直した
+> - 実行していないコマンドは、実行していないと分かるように書いてある (値が最初から決めたとおりで、入れる必要が無かったもの)。フラグの名前は手元の `gh` 2.102.0 のヘルプで確かめただけである
+> - 保護の payload の形と `app_id` は、兄弟ライブラリの手順 (`../KsSettingsView/kasane/handbook/cross/release-procedure.md`) から取り、実行して読み直した
+> - `【公開の実施後に記入】` の印は、すべて埋めた。残る印は、蒸留で埋める `【蒸留で置く日】`・`【蒸留の日付】` だけである
 > - `timestamp` は、蒸留で置く日にする
 
 ---
@@ -49,11 +51,14 @@ timestamp: 【蒸留で置く日】
 `main` に入れるのは、リリース候補にする節目である。次の順で進める。
 
 1. `develop` の最新の検証 CI が成功で終わっていることを確かめる
-2. Pull Request を作る: `gh pr create --base main --head develop --title <タイトル> --body <本文>`
-3. 3 つの必須の検査 (`lint`・`ios / verify`・`android / verify`) が成功で終わるのを待つ: `gh pr checks <番号> --watch`
-4. merge commit でマージする: `gh pr merge <番号> --merge`
+2. Pull Request を作る: `gh pr create --repo kamusoft/KsCollectionView --base main --head develop --title <タイトル> --body-file <本文のファイル>`
+3. 3 つの必須の検査 (`lint`・`ios / verify`・`android / verify`) が成功で終わるのを待ち、マージできる状態を読む: `gh pr view <番号> --json mergeable,mergeStateStatus,isCrossRepository`
+4. merge commit でマージする: `gh pr merge <番号> --repo kamusoft/KsCollectionView --merge` (ブランチの削除の指定は付けない)
+5. 手元の `main` を GitHub の `main` まで早送りする: `git fetch origin main:main`
 
 `main` 宛ての Pull Request では、変更したパスに関わらず 3 つの検査が走る。`lint` は、出どころが同じリポジトリの `develop` であることを確かめ、結果を step `Pull request head restriction` の記録に出す。`develop` 以外のブランチや、別のリポジトリから作った Pull Request は、ここで落ちる。
+
+最初の Pull Request (1 番、2026-10-08) は、先端の commit が `kasane/` の下だけを変えたものだったが、3 つの検査が走って成功した。step の記録には `出どころは kamusoft/KsCollectionView の develop` と出た。状態は `MERGEABLE`・`CLEAN` で、マージの後に `main` への push による検証の実行は作られなかった。`develop` はマージの後も残っている。
 
 マージの方法は merge commit に決めてある。squash と rebase は使わない (`develop` の commit がそのまま `main` に入り、節目が merge commit として残る)。
 
@@ -75,6 +80,8 @@ timestamp: 【蒸留で置く日】
 | `main` の保護 | 下の節 |
 | `develop` の保護 | 下の節 |
 
+Pull Request を作れる人の設定は、API では `pull_request_creation_policy` という項目で、値は `collaborators_only` である。
+
 ### 保護の値
 
 | 項目 | `main` | `develop` |
@@ -84,6 +91,11 @@ timestamp: 【蒸留で置く日】
 | 強制 push | 禁止 | 禁止 |
 | 削除 | 禁止 | 禁止 |
 | 管理者への強制 | しない | しない |
+| `main` の最新を取り込んでいないとマージできない (`strict`) | しない | — |
+| 古い承認の取り消し・コードオーナーの承認 | どちらもしない | — |
+| push できる人の限定 | なし | なし |
+
+下の 3 行は design の表に無い値で、兄弟ライブラリと同じにした (オーナーに示して承認を得た)。
 
 必須の検査の名前は、検証 CI のジョブの名前と一致していなければならない。再利用 workflow を呼ぶジョブの検査の名前は「呼ぶ側のジョブの名前 / 呼ばれる側のジョブの名前」になる。ジョブの名前を変える・検査を足すときは、保護の側も同時に直す。
 
@@ -109,20 +121,32 @@ GitHub への操作は取り消せない外向きの操作なので、1 つず�
 ### リポジトリの作成と最初の push
 
 ```bash
-gh repo create kamusoft/KsCollectionView --private --source . --remote origin
+gh repo create kamusoft/KsCollectionView --private
+git remote set-url origin <GitHub の SSH の URL>
 git push origin main
 ```
 
+公開のときは、作成の後に読んだ時点で HTTPS の形の remote `origin` があった (作成のコマンドが足したのか、手で足したのかは確かめていない)。`origin` が無ければ `git remote add origin <URL>` で足す。オーナーの希望で、SSH の形 (GitHub の SSH の URL。ホストは `github.com`、パスは `kamusoft/KsCollectionView.git`) に変えてから push した。
+
 `--push` は付けない (付けると、手元の commit がまとめて push される)。push の前の検査 (`.githooks/pre-push`) は、まだどの remote にも無い commit をすべて検査するので、最初の push では全履歴が対象になる。
 
-確かめ方: GitHub の `main` の先端が、手元と同じ commit の ID であること。
+確かめ方: GitHub の `main` の先端が、手元と同じ commit の ID であること。あわせて、GitHub にあるブランチ・公開の範囲・既定のブランチ・検証の実行の数を読む。
 
 ```bash
 git rev-parse main
-gh api repos/kamusoft/KsCollectionView/git/ref/heads/main --jq .object.sha
+git ls-remote origin
+gh repo view kamusoft/KsCollectionView --json visibility,defaultBranchRef
+gh api repos/kamusoft/KsCollectionView/actions/runs
 ```
 
-結果: 【公開の実施後に記入: 実行した日・2 つの ID が一致したこと】
+結果 (2026-10-08): 実行はオーナーが手元の端末で行った。読み直しは次のとおりで、決めたとおりだった。
+
+| 確かめたこと | 結果 |
+|---|---|
+| GitHub の `main` の先端と手元の `main` | 2 つの ID が一致した (`a76c380…`) |
+| GitHub にあるブランチ | `main` だけ (`develop` は無い) |
+| 公開の範囲と既定のブランチ | private、既定のブランチは `main` |
+| 検証の実行 | 0 件 (`main` に workflow が無いため) |
 
 ### 公開の範囲
 
@@ -130,38 +154,57 @@ gh api repos/kamusoft/KsCollectionView/git/ref/heads/main --jq .object.sha
 gh repo edit kamusoft/KsCollectionView --visibility public --accept-visibility-change-consequences
 ```
 
-確かめ方: `gh api repos/kamusoft/KsCollectionView --jq .visibility` が `public` を返すこと。
+切り替えは、オーナーが GitHub の画面で中身 (ルートのファイルの並び・開発の記録・commit の一覧とメッセージ・過去の証跡) を見て、指示を出した後に行う。
 
-結果: 【公開の実施後に記入】
+確かめ方: `gh repo view kamusoft/KsCollectionView --json visibility,isPrivate` が public (`isPrivate` は false) を返すこと。`gh api repos/kamusoft/KsCollectionView` の `disabled` と `archived` がどちらも false であること。`git ls-remote origin` で `main` の先端が変わっていないこと。
+
+結果 (2026-10-08): 終了コード 0 で切り替わり、公開の範囲は public、既定のブランチは `main`、`disabled` と `archived` はどちらも false、`main` の先端は `a76c380…` のままだった。
+
+切り替えの直後の 1 回だけ、SSH での読み取りが「リポジトリが無効になっている」という応答で失敗した。数秒後にやり直すと 3 回続けて成功した。切り替えの直後の一時的な応答と見ている (原因は確かめていない)。
 
 ### 機能・検査・通知・Pull Request を作れる人
 
+入れる前にいまの値を読み、上の表と違う値だけを入れる。2026-10-08 に実行したのは、値が違っていた 4 つ (Projects・Pull Request を作れる人・secret の検査・push の保護) を変える次の 3 つである。
+
 ```bash
-gh repo edit kamusoft/KsCollectionView \
-  --default-branch main \
-  --enable-issues \
-  --enable-wiki=false \
-  --enable-discussions=false \
-  --enable-projects=false
-gh repo edit kamusoft/KsCollectionView --enable-secret-scanning
-gh repo edit kamusoft/KsCollectionView --enable-secret-scanning-push-protection
-gh api -X PUT repos/kamusoft/KsCollectionView/vulnerability-alerts
+gh repo edit kamusoft/KsCollectionView --enable-projects=false
 gh api -X PATCH repos/kamusoft/KsCollectionView -f pull_request_creation_policy=collaborators_only
+gh api -X PATCH repos/kamusoft/KsCollectionView --input - <<'JSON'
+{"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}}}
+JSON
 ```
 
-push の保護は、secret の検査を有効にした後でないと有効にできないので、2 回に分ける。Pull Request を作れる人の制限は、Pull Request の機能そのものは有効のまま、作れる人だけを絞る設定である (機能を無効にすると、`main` 宛ての Pull Request も作れなくなる)。
+secret の検査と push の保護は、1 回の PATCH で 2 つとも `enabled` になった。Pull Request を作れる人の制限は、Pull Request の機能そのものは有効のまま、作れる人だけを絞る設定である (機能を無効にすると、`main` 宛ての Pull Request も作れなくなる)。
 
-確かめ方:
+既定のブランチ・Issues・Wiki・Discussions・依存の脆弱性の通知は、最初から決めた値だったので、入れるコマンドは実行していない (`gh repo create --private` で作って public に切り替えた場合)。
+
+確かめ方: 次の 3 つを読み直し、上の表と突き合わせる。
 
 ```bash
-gh api repos/kamusoft/KsCollectionView --jq '{visibility, default_branch, has_issues, has_wiki, has_discussions, has_projects, pull_request_creation_policy, security_and_analysis}'
-gh api repos/kamusoft/KsCollectionView/vulnerability-alerts --silent && echo enabled
-gh label list --repo kamusoft/KsCollectionView --json name --jq '.[].name'
+gh api repos/kamusoft/KsCollectionView
+gh api repos/kamusoft/KsCollectionView/vulnerability-alerts
+gh api repos/kamusoft/KsCollectionView/labels
 ```
 
-依存の脆弱性の通知は、有効なら 2 つ目のコマンドが成功で終わる (無効なら失敗で終わる)。ラベルは 3 つがあることを確かめる。Issue のフォームは、無いラベルを自分では作らないので、欠けていたら `gh label create <名前> --repo kamusoft/KsCollectionView` で作る。
+1 つ目は `visibility`・`default_branch`・`has_issues`・`has_wiki`・`has_discussions`・`has_projects`・`pull_request_creation_policy`・`security_and_analysis` を読む。依存の脆弱性の通知は、有効なら 2 つ目の応答が 204 になる。ラベルは 3 つがあることを確かめる。
 
-結果: 【公開の実施後に記入: 読み直した値と表の突き合わせ。新しいリポジトリに 3 つのラベルが最初からあったか】
+結果 (2026-10-08): 読み直した値は、すべて表と一致した。
+
+| 設定 | 入れる前 | 読み直した値 |
+|---|---|---|
+| 公開の範囲 | public | `visibility: public` |
+| 既定のブランチ | `main` | `default_branch: main` |
+| Issues | 有効 | `has_issues: true` |
+| Wiki | 無効 | `has_wiki: false` |
+| Discussions | 無効 | `has_discussions: false` |
+| Projects | 有効 | `has_projects: false` |
+| Pull Request を作れる人 | 誰でも (`all`) | `pull_request_creation_policy: collaborators_only` |
+| secret の検査 | 無効 | `secret_scanning: enabled` |
+| push の保護 | 無効 | `secret_scanning_push_protection: enabled` |
+| 依存の脆弱性の通知 | 有効 | 応答 204 (有効) |
+| ラベル | ある | 9 つのラベルに 3 つとも含まれる |
+
+新しいリポジトリには、ラベル `bug`・`enhancement`・`question` が最初からあった (ほかに 6 つ)。ラベルを作るコマンドは実行していない。
 
 ### main の保護
 
@@ -203,7 +246,16 @@ JSON
 | `allow_force_pushes.enabled` | false |
 | `allow_deletions.enabled` | false |
 
-結果: 【公開の実施後に記入】
+結果 (2026-10-08): 終了コード 0 で入り、読み直した値は渡した値とすべて同じだった。
+
+| 項目 | 読み直した値 |
+|---|---|
+| Pull Request の必須 | `required_pull_request_reviews` が置かれている。承認の必須の数は 0 |
+| 必須の検査 | 3 件。名前と `app_id` (15368) が渡した値と同じ |
+| 強制 push・削除・管理者への強制 | どれも false |
+| `strict` | false |
+| 古い承認の取り消し・コードオーナーの承認 | どちらも false |
+| push できる人の限定 | 無い |
 
 ### develop の保護
 
@@ -222,24 +274,35 @@ JSON
 
 確かめ方: `gh api repos/kamusoft/KsCollectionView/branches/develop/protection` を読み直し、強制 push と削除が禁じられていること、必須の検査と Pull Request の必須が無いこと、管理者に強制しない設定であることを確かめる。
 
-結果: 【公開の実施後に記入】
+結果 (2026-10-08): 終了コード 0 で入った。読み直すと、強制 push と削除はどちらも false (禁止)、必須の検査と Pull Request の必須は無く、管理者への強制は false だった。
 
 ### Issue のフォーム
 
-Issue のフォームと、空の Issue を作れなくする指定は、リポジトリのファイル (`.github/ISSUE_TEMPLATE/`) が持つ。GitHub の側に入れる設定は無い。確かめ方は、Issue を新しく作る画面を開き、3 本のフォームだけが選べることと、必須の項目が空だと送れないことを見る。送信はしない。
+Issue のフォームと、空の Issue を作れなくする指定は、リポジトリのファイル (`.github/ISSUE_TEMPLATE/`) が持つ。GitHub の側に入れる設定は無い。確かめ方は、Issue を新しく作る画面を開き、3 本のフォームだけが選べることと、必須の項目が空だと送れないことを見る。送信はしない。GitHub にログインした画面でしか見られないので、オーナーが見る。
 
-結果: 【公開の実施後に記入】
+結果 (2026-10-08): オーナーが Issue を新しく作る画面のスクリーンショットを示し、「問題なさそう」と報告した。
+
+| 確かめたこと | 結果 |
+|---|---|
+| 選べるフォーム | `Bug report`・`Feature request`・`Question` の 3 本が並ぶ (スクリーンショットで確認) |
+| 空の Issue | 管理する側 (オーナー) の画面には、`Blank issue` の行が `Maintainers only` の印つきで出る |
+| 必須の項目が空だと送れない | オーナーの報告による。指揮側は画面を見ていない |
+
+`Blank issue (Maintainers only)` は、管理する側の画面にだけ出る GitHub の表示で、空の Issue を作れなくする指定 (`blank_issues_enabled: false`) は効いている。管理する側でない人の画面は見ていない。
 
 ## 実施の記録
 
 | 行ったこと | 日付 | 証跡 |
 |---|---|---|
-| リポジトリの作成と `main` の push | 【公開の実施後に記入】 | 【公開の実施後に記入: 証跡のファイル】 |
-| public への切り替え | 【公開の実施後に記入】 | 【公開の実施後に記入】 |
-| 機能・検査・通知・Pull Request を作れる人の設定 | 【公開の実施後に記入】 | 【公開の実施後に記入】 |
-| `develop` の push と、最初の検証 CI の成功 | 【公開の実施後に記入】 | 【公開の実施後に記入】 |
-| `main` と `develop` の保護 | 【公開の実施後に記入】 | 【公開の実施後に記入】 |
-| `develop` から `main` への最初の Pull Request のマージ | 【公開の実施後に記入】 | 【公開の実施後に記入】 |
+| リポジトリの作成と `main` の push | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.1 |
+| public への切り替え | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.2 |
+| 機能・検査・通知・Pull Request を作れる人の設定 | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.3 |
+| `develop` の push と、最初の検証 CI の成功 | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.4 |
+| `main` と `develop` の保護 | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.5 |
+| `develop` から `main` への最初の Pull Request のマージ | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.6 |
+| Issue のフォームの確認 | 2026-10-08 | 出典の変更の `evidence/publication-log.md` の 7.7 |
+
+`develop` の最初の検証 CI は、1 回目の実行で `ios / verify` だけが失敗し、iOS をビルドだけにした後の 2 回目の実行で 3 つとも成功した ([検証 CI](verification-ci.md))。保護は、2 回目の成功の後に入れた。
 
 ## 関連
 
@@ -249,4 +312,4 @@ Issue のフォームと、空の Issue を作れなくする指定は、リポ�
 - [検証 CI](verification-ci.md) — 3 つの検査の中身と、失敗したときの見方
 - [ローカル開発環境と Sample の実行](local-development-setup.md) — clone の後の準備と、手元の検査の有効化
 
-出典: kasane/changes/archive/【蒸留の日付】-public-repo-verify-ci/design.md (Decision 8・9) / ../KsSettingsView/kasane/handbook/cross/release-procedure.md (保護の payload の形と `app_id`)
+出典: kasane/changes/archive/【蒸留の日付】-public-repo-verify-ci/design.md (Decision 8・9) / 同 evidence/publication-log.md (公開の実施と読み直しの記録) / ../KsSettingsView/kasane/handbook/cross/release-procedure.md (保護の payload の形と `app_id`)
