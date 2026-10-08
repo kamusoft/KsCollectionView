@@ -1,0 +1,7 @@
+# actionlint の設定 (手元で workflow の定義を確かめるときに読まれる)。
+#
+# xcode-27 は GitHub が提供するランナーの名前だが、actionlint が持つ名前の一覧にまだ無い。
+# 知らない名前として弾かれないよう、ここに登録する。actionlint の一覧に入ったら、この登録を外す。
+self-hosted-runner:
+  labels:
+    - xcode-27

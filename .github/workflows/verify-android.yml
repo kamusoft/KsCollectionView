@@ -1,0 +1,119 @@
+# Android の検証 (再利用 workflow)
+#
+# 本体のデバッグのユニットテストを全件走らせ、続けて Sample のアプリの組み立てと
+# デバッグのユニットテストを走らせる (cross/ADR-0013)。Sample の計測用のモジュールは対象にしない。
+# 入力を取らないので、どの workflow からも同じ内容で呼べる。
+#
+# テストが 1 件も実行されなくても Gradle は成功で終わり、件数はコンソールに出ない。
+# 結果のファイルから実行件数を確かめるところまでを、ジョブの合否に含める。
+name: verify android
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    # ランナーは版を指定した名前で選ぶ。最新を指す名前は、指す実体が予告なく入れ替わる。
+    runs-on: ubuntu-24.04
+    # 既定の 360 分は長すぎる。暫定の上限で、ランナーでの所要時間を測ってから決め直す。
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ビルドを動かす JDK は 17 以上であればよく (android/ADR-0008)、確かめてある版の 21 に決める。
+      - name: Setup JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # 依存の解決の結果と、wrapper が取得する Gradle だけをキャッシュする。
+          # ビルドの出力とテストの結果 (build/) はキャッシュしない。復元された結果を、
+          # この実行の結果と取り違える経路を作らないため。
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper
+          key: gradle-deps-${{ runner.os }}-${{ hashFiles('android/gradle/libs.versions.toml', 'android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts', 'samples/android/gradle/sample.versions.toml', 'samples/android/gradle/wrapper/gradle-wrapper.properties', 'samples/android/**/*.gradle.kts') }}
+          restore-keys: |
+            gradle-deps-${{ runner.os }}-
+
+      - name: Show toolchain
+        run: |
+          java -version
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+
+      # コンパイル対象の Android SDK がランナーに無ければ取得する。版の宣言元は
+      # バージョンカタログ 1 箇所なので、ここには版を書かずに読む。
+      - name: Ensure Android SDK platform
+        id: sdk
+        run: |
+          # sdkmanager に同意の入力を流し続ける `yes` は、相手が終わると失敗で終わる。
+          # それをパイプ全体の失敗にしないため、ここでは pipefail を入れない。
+          set -eu
+          compile_sdk=$(sed -n 's/^compile-sdk = "\([0-9][0-9]*\)"[[:space:]]*$/\1/p' android/gradle/libs.versions.toml)
+          if [ -z "$compile_sdk" ]; then
+            echo "::error::コンパイル対象の Android SDK の版を、バージョンカタログから読み取れない"
+            exit 1
+          fi
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "::error::ANDROID_HOME が設定されていない (ランナーに Android SDK が無い)"
+            exit 1
+          fi
+          platform_dir="${ANDROID_HOME}/platforms/android-${compile_sdk}"
+          if [ -d "$platform_dir" ]; then
+            echo "Android SDK Platform ${compile_sdk} はランナーにある"
+            exit 0
+          fi
+          echo "Android SDK Platform ${compile_sdk} がランナーに無いので取得する"
+          sdkmanager="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager" ]; then
+            echo "::error::sdkmanager が見つからないため、Android SDK Platform ${compile_sdk} を取得できない"
+            exit 1
+          fi
+          yes | "$sdkmanager" --install "platforms;android-${compile_sdk}"
+          if [ ! -d "$platform_dir" ]; then
+            echo "::error::Android SDK Platform ${compile_sdk} を取得できなかった"
+            exit 1
+          fi
+
+      # 結果の置き場に前の実行の結果が残っていると、この実行の件数に混ざる。
+      # テストの前に、件数の検査が読む置き場を空にする。
+      - name: Clear test results
+        run: |
+          rm -rf \
+            android/kscollectionview/build/test-results/testDebugUnitTest \
+            samples/android/app/build/test-results/testDebugUnitTest
+
+      - name: Test library
+        id: library
+        working-directory: android
+        run: ./gradlew --no-daemon --console=plain :kscollectionview:testDebugUnitTest
+
+      # 本体のテストが落ちても、Sample の検証は走らせる (両方が壊れているとき、片方を直すまで
+      # もう片方が見えない状態にしない)。対象はアプリのモジュールだけにする。
+      - name: Assemble sample and test sample units
+        if: ${{ !cancelled() && steps.sdk.outcome == 'success' }}
+        working-directory: samples/android
+        run: ./gradlew --no-daemon --console=plain :app:assembleDebug :app:testDebugUnitTest
+
+      # テストが失敗したときも件数の内訳を残す。テストの step まで進まなかったときは流さない
+      # (その場合は、進まなかった理由だけを示す)。
+      # 確かめる組は明示して渡す。自動で導くと、導き方を誤ったときに集合が静かに縮む。
+      - name: Check test count
+        if: ${{ !cancelled() && steps.library.outcome != 'skipped' }}
+        run: |
+          python3 scripts/ci/check-android-test-count.py \
+            --target "Android 本体=android/kscollectionview:testDebugUnitTest" \
+            --target "Android Sample=samples/android/app:testDebugUnitTest"

@@ -1,0 +1,47 @@
+name: Question
+description: Ask for help using KsCollectionView
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your question. You may write your answers in English or Japanese.
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which version of KsCollectionView are you using?
+      placeholder: e.g. 0.1.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: Which platform is your question about? Select both if it concerns both.
+      multiple: true
+      options:
+        - iOS
+        - Android
+    validations:
+      required: true
+
+  - type: textarea
+    id: attempts
+    attributes:
+      label: What have you tried?
+      description: Describe what you tried and what happened, including error messages when useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: references_consulted
+    attributes:
+      label: Documentation sections consulted
+      description: List the sections of the README or other documentation you consulted, with links or headings when possible.
+    validations:
+      required: true
