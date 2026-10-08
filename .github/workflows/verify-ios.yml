@@ -1,0 +1,89 @@
+# iOS の検証 (再利用 workflow)
+#
+# 本体と本体のテストのコード、Sample のアプリと Sample のテストのコードがビルドできることを
+# 確かめる (cross/ADR-0013)。テストは実行しない。入力を取らないので、どの workflow からも
+# 同じ内容で呼べる。
+#
+# ランナーの Simulator の上では、手元で通るテストが落ちることがある。テストの実行と
+# 実行件数の確認は、手元の完了判定で行う。ここでは Simulator を選ばず、起動もしない。
+# ビルドの行き先は、特定の端末を指さない総称の指定にする。
+name: verify ios
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  # Xcode はメジャーとマイナーで決め、パッチはランナーのイメージにある版に任せる。
+  # 版を上げるときは、この値を変える。
+  KS_XCODE_VERSION: "27.0"
+
+jobs:
+  verify:
+    name: verify
+    # Xcode 27 を持つのは、専用のイメージ xcode-27 である。
+    runs-on: xcode-27
+    # 既定の 360 分は長すぎる。xcodebuild の停止で、macOS のランナーを占有し続けないための上限。
+    # 暫定の値で、ランナーでの所要時間を測ってから決め直す。
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
+          # 決めた版に当たる Xcode のうち、パッチが最も新しいものを選ぶ。
+          # 無ければ、別の版で黙って走らせずに、ここで止める。
+          app=$(find /Applications -maxdepth 1 -name "Xcode_${KS_XCODE_VERSION}*.app" | sort -V | tail -n 1)
+          if [ -z "$app" ]; then
+            echo "::error::Xcode ${KS_XCODE_VERSION} がランナーに無い"
+            find /Applications -maxdepth 1 -name "Xcode*.app" | sort
+            exit 1
+          fi
+          echo "DEVELOPER_DIR=${app}/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Show toolchain
+        run: |
+          set -euo pipefail
+          echo "DEVELOPER_DIR=${DEVELOPER_DIR}"
+          xcodebuild -version
+          swift --version
+          # 選んだ Xcode が、名前どおりの版であることを確かめる。
+          actual=$(xcodebuild -version | sed -n '1s/^Xcode //p')
+          case "$actual" in
+            "${KS_XCODE_VERSION}" | "${KS_XCODE_VERSION}".*) ;;
+            *)
+              echo "::error::選んだ Xcode の版が ${KS_XCODE_VERSION} でない (実際: ${actual:-不明})"
+              exit 1
+              ;;
+          esac
+
+      # テストのコードまでをビルドし、テストは実行しない。合否は xcodebuild の終了コードで決まる。
+      - name: Build library and library tests
+        id: library
+        working-directory: ios
+        run: |
+          xcodebuild build-for-testing \
+            -scheme KsCollectionView \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug
+
+      # 本体のビルドが落ちても、Sample のビルドは走らせる (両方が壊れているとき、片方を直すまで
+      # もう片方が見えない状態にしない)。本体のビルドの step まで進まなかったときは流さない。
+      # 通常の検証のスキームは、アプリ・ユニットテスト・UI テストの 3 つのターゲットを
+      # ビルドの対象に持つ。
+      - name: Build sample and sample tests
+        if: ${{ !cancelled() && steps.library.outcome != 'skipped' }}
+        working-directory: samples/ios
+        run: |
+          xcodebuild build-for-testing \
+            -project KsCollectionViewSamples.xcodeproj \
+            -scheme KsCollectionViewSamples \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug

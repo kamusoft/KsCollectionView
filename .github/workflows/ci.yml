@@ -1,0 +1,133 @@
+# 検証 CI の入口
+#
+# 走る時点は 2 つ (cross/ADR-0010、cross/ADR-0013)。
+# - develop への push: lint と、iOS / Android の検証。iOS はビルドできることだけを確かめ
+#   (テストは実行しない)、Android はユニットテストまでを走らせる
+# - main 宛ての Pull Request: 同じ 3 つ。main に入れる前の必須の検査になる
+#
+# main 宛ての Pull Request では、変更したパスで絞り込まない。絞り込むと、必須の検査が
+# 走らないまま通る経路ができる。develop は必須の検査を持たないのでその心配が無く、
+# 開発の記録・Issue のフォーム・貢献の案内だけを変えた push では起動しない。
+# これらは iOS / Android のビルドとテストには入力されないが、lint は読む (開発の記録は
+# 個人を特定する値とローカル絶対パスの検査の対象で、Issue のフォームと貢献の案内は
+# スクリプトのテストが読む)。これらだけを変えた push で入った違反は、次に起動した回か、
+# main 宛ての Pull Request で見つかる。
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - develop
+    paths-ignore:
+      - "kasane/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/CONTRIBUTING.md"
+      - ".github/CONTRIBUTING_ja.md"
+
+# 検証 CI は何も書き込まない。リポジトリの内容の読み取りだけにする。
+permissions:
+  contents: read
+
+# 同じブランチ、または同じ Pull Request の新しい実行は、走っている古い実行を打ち切る
+# (macOS のランナーを二重に積み上げないため)。まとまりは、Pull Request ではその番号、
+# push ではブランチで分ける。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 再利用 workflow を呼ぶジョブの検査の名前は「呼ぶ側のジョブの名前 / 呼ばれる側のジョブの名前」
+  # になる。main の保護の必須の検査がこの名前を参照するので、両側で名前を明示して固定する
+  # (ios / verify と android / verify)。
+  ios:
+    name: ios
+    uses: ./.github/workflows/verify-ios.yml
+
+  android:
+    name: android
+    uses: ./.github/workflows/verify-android.yml
+
+  lint:
+    name: lint
+    # ランナーは版を指定した名前で選ぶ。最新を指す名前は、指す実体が予告なく入れ替わる。
+    runs-on: ubuntu-24.04
+    # 既定の 360 分は長すぎる。暫定の上限で、ランナーでの所要時間を測ってから決め直す。
+    timeout-minutes: 10
+
+    env:
+      # secret の検査に使う gitleaks の版と、配布物 (linux_x64) の SHA-256。
+      # 版を上げるときは、チェックサムも同時に更新する。
+      KS_GITLEAKS_VERSION: "8.30.1"
+      KS_GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # main に入るのは、同じリポジトリの develop の内容だけに限る (cross/ADR-0010)。
+      # ブランチの保護は宛先しか縛らないので、出どころはここで確かめる。push での起動では、
+      # スクリプトが自分で対象外と判定する。確かめた結果は、この step の記録に出る。
+      - name: Pull request head restriction
+        env:
+          KS_PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: python3 scripts/ci/check-pr-head.py
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          archive="${RUNNER_TEMP}/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${KS_GITLEAKS_VERSION}/gitleaks_${KS_GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            --output "$archive"
+          # チェックサムが合わない配布物は、展開も実行もしない。
+          echo "${KS_GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          mkdir -p "${RUNNER_TEMP}/gitleaks"
+          tar -xzf "$archive" -C "${RUNNER_TEMP}/gitleaks" gitleaks
+          echo "${RUNNER_TEMP}/gitleaks" >> "$GITHUB_PATH"
+
+      - name: Secret scan (gitleaks)
+        run: |
+          # 取り出しのパイプの前段 (git archive) の失敗を握り潰すと、空のディレクトリに対する
+          # gitleaks が検出 0 件で成功し、無検査のまま緑になる。pipefail で前段の失敗を拾う。
+          set -euo pipefail
+          gitleaks version
+          # 追跡中の内容だけを取り出して走査する。作業ツリーをそのまま走査すると、
+          # ビルドの出力まで対象に入る。
+          scan_dir="${RUNNER_TEMP}/gitleaks-scan"
+          mkdir -p "$scan_dir"
+          git archive --format=tar HEAD | tar -x -C "$scan_dir"
+          # 取り出したファイルの数を、追跡中のファイルの数と突き合わせる。
+          # 少なければ、走査を始める前に止める。
+          tracked=$(git ls-files | wc -l | tr -d ' ')
+          # 追跡中の内容にはシンボリックリンクも含まれるので、通常のファイルと合わせて数える。
+          extracted=$(find "$scan_dir" \( -type f -o -type l \) | wc -l | tr -d ' ')
+          echo "走査の対象: ${extracted} ファイル (追跡中: ${tracked} ファイル)"
+          if [ "$extracted" -lt "$tracked" ]; then
+            echo "::error::走査の対象を取り出せていない (追跡中 ${tracked} ファイルに対し、取り出せたのは ${extracted} ファイル)"
+            exit 1
+          fi
+          gitleaks dir "$scan_dir" --no-banner --redact --verbose
+
+      - name: Local absolute path lint
+        run: python3 scripts/local-path-lint.py
+
+      - name: Identity lint
+        run: python3 scripts/identity-lint.py
+
+      - name: Comment policy lint
+        run: python3 scripts/comment-policy-lint.py
+
+      # 検査のスクリプトそのものの正しさは、平時の緑では分からない。正常と異常の両方を
+      # 確かめるテストを、ここで毎回流す。
+      - name: CI script tests
+        run: python3 scripts/ci/run-tests.py
+
+      # 道具の固定と権限の決まり (action は commit の ID で指定・ランナーは版を指定・
+      # 権限は読み取りだけ・ランナーで走るジョブは時間の上限を持つ) を、workflow の定義から確かめる。
+      - name: Workflow definition check
+        run: python3 scripts/ci/check-workflows.py
