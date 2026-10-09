@@ -38,7 +38,7 @@
 
 ### 検証 CI が走らせる範囲 (2026-10-08)
 
-- iOS 本体と Android 本体のテストは全件、Sample は両プラットフォームともビルドとユニットテストまでを走らせる ([cross/ADR-0013](../../../../decisions/cross/0013-ci-guarantees-library-tests-and-sample-build.md)、proposed)
+- iOS 本体と Android 本体のテストは全件、Sample は両プラットフォームともビルドとユニットテストまでを走らせる ([cross/ADR-0013](../../../../decisions/cross/0013-ci-runs-no-simulator-or-device-tests.md)、proposed)
 - Sample の UI テストは CI に載せず、手元の完了判定に残す。手元で 4 系統を全件流す決まりは変えない
 
 ### 実機が要るテストと性能計測 (2026-10-08)

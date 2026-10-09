@@ -79,3 +79,34 @@ iOS の写しと Android の発行物は、兄弟ライブラリと同じ形を�
 - [ ] iOS の利用者役のビルドの構成と行き先 (Simulator 向け・実機向け) を提案で決める。実機向けのビルドは、今どの検査も確かめていない
 - [ ] 必須の検査の名前を `main` の保護に登録する時点と手順を、提案に含める (handbook の検証 CI とブランチの設定の文書への追記も)
 - [ ] ksn-propose で変更提案を起こす
+
+## 実装結果 (2026-10-09 反映)
+
+変更 `package-distribution` で実装し、`main` に入れた。記録は `kasane/changes/archive/2026-10-09-package-distribution/` にある。
+
+- `ios/Package.swift` の宣言を Swift 6.4 に上げた。iOS の 2 系統のテストは、上げた後も全件通った
+- SwiftPM の写しを作る道具 (`scripts/distribution/sync-spm-snapshot.py`) を足した。行き先を写しの 5 点に置き換え、git を操作しない。配信用リポジトリの作業コピーを壊さないための確認は、相方レビューの指摘で 2 回足した
+- Android の本体のモジュールに、Maven の発行の設定を足した。公開のプラグインは、このリポジトリの AGP 9 系・Gradle 9.7 で動いた。開発中の版のままでは、Maven Central へ送るタスクが最初に失敗する
+- 公開 API に現れる型の依存の宣言は、決定事項「配布物の中身」から 1 点だけ形が変わった。注釈の依存 (`androidx.annotation`) は兄弟ライブラリに揃えて直接宣言し、色と長さの型を持つ成果物は Compose UI が届ける形のままにした (オーナーの決定。変更の deviation に記録)
+- 利用者役を `verification/` に置き、確認のスクリプトで、公開の前の成果物と公開済みの配布物を切り替えてビルドできるようにした。iOS は Simulator 向けと実機向け、Android はコード縮小を有効にしたリリースを組み立てる
+- コード縮小は、配布物にも利用者役にも規則を足さずに通った。手元で 1 回起動して、一覧が表示されることを確かめた
+- 再利用 workflow を 2 本足し、`main` 宛ての Pull Request のときだけ走らせる。`main` の必須の検査は 3 つから 5 つになった。Pull Request 2 番で 5 つとも成功し、merge commit で `main` に入った
+- SwiftPM の置き場所と、利用者役で確かめる形は、cross/ADR-0015・0016 として確定した
+- 手順と値は handbook の `cross/package-distribution.md`・`cross/consumer-build-check.md`・`cross/verification-ci.md`・`cross/branch-and-github-settings.md`・`cross/public-identifiers.md` にある
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| 配信用リポジトリ `KsCollectionView-SPM` の作成と設定 (Issue と Pull Request を閉じる)、写しを送って tag を付ける工程 | phase-7-4-release-pipeline の agenda (phase-7-2 からの申し送り) |
+| 実際に公開する workflow・署名の鍵の受け渡し・Maven Central への送信。本番の形の署名 (パスフレーズつきの鍵) は確かめていない | phase-7-4-release-pipeline の agenda (同上) |
+| リリースの workflow から、利用者の立場の確認を公開済みの形で呼ぶこと。公開済みの配布物の取得は、公開物が無いので確かめていない | phase-7-4-release-pipeline の agenda (同上) |
+| コード縮小を有効にした利用者役の起動を、リリースの節目ごとに確かめる決まりにするか | phase-7-4-release-pipeline の agenda (同上) |
+| 利用者の立場の確認は外部の依存の取得に頼るので、コードの誤りでない理由で必須の検査が止まり得る | phase-7-4-release-pipeline の agenda (同上。管理者が保護を迂回してよい条件の論点に合流) |
+| 本体をリリースの構成でビルドすると、並行性の警告が 2 か所で出る (簡易起票 `ios-release-build-concurrency-warnings`) | phase-7-4-release-pipeline の agenda (同上。初回リリースまでに片付ける範囲の論点に合流) |
+| README のインストール例 (Package URL・package の名前 `KsCollectionView-SPM`・Maven の座標)、Xcode 27 以上が要ることの案内、利用者役のソースを README の例と一致させる検査 | phase-7-3-user-docs の agenda (phase-7-2 からの申し送り) |
+| 写しを作る道具は、通常の clone・worktree でない作業コピー (オブジェクトの借用先が行き先の中にあるなど) までは確かめない | 見送り。通常の clone では起きず、取り直せば戻せる。道具の説明と handbook の `cross/package-distribution.md` に書いた |
+| 保存した Gradle のキャッシュが次の実行で復元されること、Android SDK を取得する枝は、確かめていない | 見送り。次の `main` 宛ての Pull Request で分かる。handbook の `cross/consumer-build-check.md` に書いた |
+| 新しい 2 本の workflow の時間の上限は、15 分のまま (実測は 1 回だけ) | 見送り。実測が上限に近づいたら見直す。handbook の `cross/consumer-build-check.md` に書いた |
+| 識別の lint が、Maven の発行先の指定の名前と SSH の形の GitHub の URL を誤検出する。許可に足す行そのものが書き込みの hook に止まる | 見送り。文書は名前をぼかして書いた。オーナーが `kasane/config.yaml` の許可を直せば、書き直せる |
+

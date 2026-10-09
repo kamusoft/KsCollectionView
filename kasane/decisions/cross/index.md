@@ -16,7 +16,7 @@
 | [0012](0012-mit-license.md) | ライセンスは MIT License とする | accepted | 名義は `kamusoft`。兄弟ライブラリと条件を揃え、利用者に求める条件を最小にする。Apache License 2.0 は採らない。 |
 | [0013](0013-ci-runs-no-simulator-or-device-tests.md) | 検証 CI では Simulator・エミュレータ・実機を使うテストを走らせず、iOS はビルドの確認、Android は JVM のテストの全件通過までを保証する | accepted | iOS は本体・Sample とそのテストのコードがビルドできることまで、Android は JVM のユニットテストの全件と Sample の組み立てまで。iOS のテストの実行・端末のテスト・性能検証は手元の完了条件に残す。 |
 | [0014](0014-ci-reusable-platform-workflows-and-fixed-check-names.md) | 検証 CI は、プラットフォーム別の再利用 workflow と入口 1 本で構成し、検査の名前を固定する | accepted | iOS / Android の検証は入力なしの再利用 workflow、入口が lint を持つ。検査の名前は `lint`・`ios / verify`・`android / verify`。`main` 宛ての Pull Request では変更したパスで絞り込まない。 |
-| [0015](0015-swiftpm-via-distribution-repository.md) | SwiftPM の配布物は、配信用の別リポジトリに本体の写しを置いて配る | proposed | 配信用の公開リポジトリ `KsCollectionView-SPM` のルートに `ios/` の本体の写しを置く。本リポジトリのルートにはマニフェストを置かず、`ios/Package.swift` を 1 枚のまま使う。ルートから直接配る案とバイナリで配る案を却下。 |
-| [0016](0016-consumer-build-check-on-main-pull-requests.md) | 配布物は、利用者と同じ書き方で参照する専用の利用者役を、main 宛ての Pull Request でビルドして確かめる | proposed | 専用の小さな利用者役が公開の前の成果物を参照してビルドする。`main` 宛ての Pull Request のときだけ走らせて必須の検査にし、起動はしない。Android はコード縮小を有効にする。Sample の流用・中身の照合だけ・必須にしない・push ごと・リリースのときだけを却下。 |
+| [0015](0015-swiftpm-via-distribution-repository.md) | SwiftPM の配布物は、配信用の別リポジトリに本体の写しを置いて配る | accepted | 配信用の公開リポジトリ `KsCollectionView-SPM` のルートに `ios/` の本体の写しを置く。本リポジトリのルートにはマニフェストを置かず、`ios/Package.swift` を 1 枚のまま使う。ルートから直接配る案とバイナリで配る案を却下。 |
+| [0016](0016-consumer-build-check-on-main-pull-requests.md) | 配布物は、利用者と同じ書き方で参照する専用の利用者役を、main 宛ての Pull Request でビルドして確かめる | accepted | 専用の小さな利用者役が公開の前の成果物を参照してビルドする。`main` 宛ての Pull Request のときだけ走らせて必須の検査にし、起動はしない。Android はコード縮小を有効にする。Sample の流用・中身の照合だけ・必須にしない・push ごと・リリースのときだけを却下。 |
 
 採番規則は [../index.md](../index.md) を参照。

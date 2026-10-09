@@ -70,9 +70,11 @@ wrapper とバージョンカタログがビルド時に取得する (版の宣�
 | Android Build-Tools | 36.0.0 (AGP が compileSdk から選ぶ既定) | SDK の `build-tools/` に `36.0.0` がある |
 
 既定の JDK が 17 より古い環境では、Gradle を呼ぶときに `JAVA_HOME=$(/usr/libexec/java_home -v 17+)` を
-前置きする。Xcode・Swift・Android Studio の版は下限を定めていない。
+前置きする。Android Studio の版は下限を定めていない。
 
-iOS の開発ツール側の要件 (Xcode・Swift の版) は、下限を定める必要が生じた時点でここへ追記する。
+iOS は Xcode 27 以上が要る。`ios/Package.swift` が Swift 6.4 のツールを要求するためで、それより古い Xcode では
+依存を解決できない。宣言の版を検証で確かめている Xcode の版に合わせる決まりは、
+[配布物の形と作り方](package-distribution.md) にある。
 
 ## 版の定義元
 

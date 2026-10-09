@@ -69,6 +69,12 @@ skills/ と README を制作し、源泉 (kasane/ とコード) に追従させ�
 - 両プラットフォームで動きが違う点: iOS は UIKit 標準の並べ替えの動きに従う (隙間は指を止めてから動く・別のグループの末尾へはいったん手前に入れてから最後の項目の上で止める・受け入れないときは置いた位置に収まってから戻る・取りやめは指を離したときに戻る・一覧の外ではプレビューが小さくなる)。Android は指の位置で決まり、見出しより上なら前のグループの末尾に直接置ける
 - Android は、テンプレートの根が背景を塗らないと、持ち上げた項目の影が透けて見える
 
+### phase-7-2 からの申し送り (2026-10-09、package-distribution)
+
+- インストール例に書く値が決まった。SwiftPM は、Package URL が配信用リポジトリ `KsCollectionView-SPM` で、利用者がマニフェストに書く package の名前も `KsCollectionView-SPM` になる (product の名前は `KsCollectionView`。cross/ADR-0015)。Android は座標 `jp.kamusoft:kscollectionview` の 1 行。値は handbook の `cross/public-identifiers.md` にある
+- マニフェストの宣言を Swift 6.4 に上げたので、利用者には Xcode 27 以上が要る。案内に書く
+- 利用者が書くのと同じ書き方でビルドできることは、利用者役 (`verification/ios/`・`verification/android/`) が確かめている。README のインストール例と、利用者役のソースを一致させる検査は、まだ無い。このフェーズで扱う
+
 ## 決定事項
 
 (議論で確定したらここに移動)

@@ -56,3 +56,6 @@
 
 ## 2026-10-08
 - distilled: public-repo-verify-ci (ADR: cross/ADR-0009〜0012 を accepted (本文は提案のときのまま。0009・0011・0012 に現行照合を追加)、cross/ADR-0013 を実装後の内容に書き直して accepted (検証 CI では Simulator・エミュレータ・実機を使うテストを走らせない)、cross/ADR-0014 を起票して accepted (検証 CI の構成と検査の名前の固定) / handbook: cross/branch-and-github-settings.md と cross/verification-ci.md を新設、cross/test-execution.md と cross/local-development-setup.md に追記 / concepts: 変更なし)
+
+## 2026-10-09
+- distilled: package-distribution (ADR: cross/ADR-0015 (SwiftPM の配布物は配信用の別リポジトリに本体の写しを置いて配る)・cross/ADR-0016 (配布物は専用の利用者役を main 宛ての Pull Request でビルドして確かめる) を accepted (本文は提案のときのまま。出典と現行照合を追加) / handbook: cross/package-distribution.md (配布物の形と作り方) と cross/consumer-build-check.md (利用者の立場のビルドの確認) を新設、cross/verification-ci.md・cross/branch-and-github-settings.md・cross/public-identifiers.md を 5 つの検査と配布の識別子に合わせて改訂、cross/local-development-setup.md に Xcode の下限を追記 / concepts: 変更なし / lessons: 捕捉 1 件 (verify-sibling-claims-against-source-before-asking)、昇格なし / deviation: 乖離 1 件)

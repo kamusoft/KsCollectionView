@@ -1,7 +1,7 @@
 ---
 id: 0015
 title: SwiftPM の配布物は、配信用の別リポジトリに本体の写しを置いて配る
-status: proposed
+status: accepted
 date: 2026-10-09
 ---
 
@@ -52,5 +52,6 @@ SwiftPM の配布物は、配信用の公開リポジトリ `KsCollectionView-SP
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-2-package-distribution/history.md (2026-10-09: 議論開始時の現状確認 / SwiftPM をどこから配るか) / ../KsSettingsView/kasane/decisions/cross/0018-distribution-public-channels-root-swiftpm-manifest.md (兄弟ライブラリの決定と、ルートに置く案をやめた経緯)
+出典: kasane/roadmaps/v1-foundation/phases/phase-7-2-package-distribution/history.md (2026-10-09: 議論開始時の現状確認 / SwiftPM をどこから配るか) / ../KsSettingsView/kasane/decisions/cross/0018-distribution-public-channels-root-swiftpm-manifest.md (兄弟ライブラリの決定と、ルートに置く案をやめた経緯) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 1: 写しを作る道具 / Decision 3: 利用者役の参照)
+現行照合: 2026-10-09 確認。`scripts/distribution/sync-spm-snapshot.py` が `ios/Package.swift` を書き換えずに写しを作り、行き先の作業コピーの origin を `KsCollectionView-SPM` に限る。`verification/ios/` の利用者役が、package の名前 `KsCollectionView-SPM` で product を指してビルドできる。ルートにマニフェストは無い。配信用リポジトリそのものと、写しを送って tag を付ける工程は、まだ作っていない。判定: 維持
 関連: cross/ADR-0002 (ルートにマニフェストを置かない決定) / cross/ADR-0003 (公開識別子と Android の配布座標) / ios/ADR-0005 (product を 1 本にする決定)
