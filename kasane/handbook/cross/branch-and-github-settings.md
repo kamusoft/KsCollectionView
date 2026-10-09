@@ -125,7 +125,7 @@ GitHub への操作は取り消せない外向きの操作なので、1 つず�
 
 ```bash
 gh repo create kamusoft/KsCollectionView --private
-git remote set-url origin <GitHub の SSH の URL>
+git remote set-url origin git@github.com:kamusoft/KsCollectionView.git
 git push origin main
 ```
 

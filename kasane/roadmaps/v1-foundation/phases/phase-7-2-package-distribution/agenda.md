@@ -108,5 +108,5 @@ iOS の写しと Android の発行物は、兄弟ライブラリと同じ形を�
 | 写しを作る道具は、通常の clone・worktree でない作業コピー (オブジェクトの借用先が行き先の中にあるなど) までは確かめない | 見送り。通常の clone では起きず、取り直せば戻せる。道具の説明と handbook の `cross/package-distribution.md` に書いた |
 | 保存した Gradle のキャッシュが次の実行で復元されること、Android SDK を取得する枝は、確かめていない | 見送り。次の `main` 宛ての Pull Request で分かる。handbook の `cross/consumer-build-check.md` に書いた |
 | 新しい 2 本の workflow の時間の上限は、15 分のまま (実測は 1 回だけ) | 見送り。実測が上限に近づいたら見直す。handbook の `cross/consumer-build-check.md` に書いた |
-| 識別の lint が、Maven の発行先の指定の名前と SSH の形の GitHub の URL を誤検出する。許可に足す行そのものが書き込みの hook に止まる | 見送り。文書は名前をぼかして書いた。オーナーが `kasane/config.yaml` の許可を直せば、書き直せる |
+| 識別の lint が、Maven の発行先の指定の名前と SSH の形の GitHub の URL を誤検出する。許可に足す行そのものが書き込みの hook に止まる | 解消 (2026-10-09)。オーナーが `kasane/config.yaml` の許可に 2 つの値を足し、handbook の `cross/package-distribution.md`・`cross/branch-and-github-settings.md` を、値そのものが読める形に直した。archive した変更の証跡と草稿は、ぼかした書き方のまま残る |
 

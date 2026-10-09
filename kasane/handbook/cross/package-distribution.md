@@ -87,7 +87,11 @@ python3 scripts/distribution/sync-spm-snapshot.py <行き先のディレクト�
 
 ### 行き先にできる作業コピー
 
-中身のある行き先は、配信用リポジトリの作業コピーだけを受け付ける。作業コピーと認めるのは、行き先が git の最上位で、`origin` が `github.com` の `kamusoft/KsCollectionView-SPM` を指すものである。`origin` は、HTTPS の形と、SSH の 2 つの形 (`ssh://` で始まる形と、ホストとパスを `:` で区切る形) を受け付ける。末尾の `/` と `.git` の有無は問わない。
+中身のある行き先は、配信用リポジトリの作業コピーだけを受け付ける。作業コピーと認めるのは、行き先が git の最上位で、`origin` が `github.com` の `kamusoft/KsCollectionView-SPM` を指すものである。`origin` は、次の 3 つの形を受け付ける。末尾の `/` と `.git` の有無は問わない。
+
+- `https://github.com/kamusoft/KsCollectionView-SPM`
+- `ssh://git@github.com/kamusoft/KsCollectionView-SPM`
+- `git@github.com:kamusoft/KsCollectionView-SPM`
 
 | 作業コピーの形 | 扱い |
 |---|---|
@@ -156,19 +160,19 @@ Coil の Compose 連携は、公開 API に型が現れないが、利用者が�
 `android/` で、手元への発行のタスクに、発行先のディレクトリを渡して流す。
 
 ```bash
-ANDROID_HOME=<Android SDK の場所> ./gradlew <発行先の指定> :kscollectionview:publishToMavenLocal
+ANDROID_HOME=<Android SDK の場所> ./gradlew -Dmaven.repo.local=<発行先のディレクトリ> :kscollectionview:publishToMavenLocal
 ```
 
-`<発行先の指定>` は、Maven の手元のリポジトリの場所を上書きするシステムプロパティを `-D<名前>=<ディレクトリ>` で渡すものである。プロパティの名前は、`scripts/ci/verify-consumer-android.py` の定数 `LOCAL_REPOSITORY_PROPERTY` が持つ。この文書に名前を文字で書かないのは、書くと、個人・個体を特定する値の lint (`scripts/identity-lint.py`) がホスト名と誤って判定して、書き込みを止めるためである。
+`-Dmaven.repo.local` は、Maven の手元のリポジトリの場所を上書きするシステムプロパティである。確認のスクリプトも同じ名前を使う (`scripts/ci/verify-consumer-android.py` の定数 `LOCAL_REPOSITORY_PROPERTY`)。`ANDROID_HOME` の前置きは、そのビルドルートに `local.properties` があれば要らない。
 
 発行する側と、発行物を取る側では、渡すものが違う。確認のスクリプト ([利用者の立場のビルドの確認](consumer-build-check.md)) を通せば、どちらも自分で渡さずに済む。
 
 | 側 | 渡すもの | 意味 |
 |---|---|---|
-| 発行する側 (`android/`) | Maven のシステムプロパティ (`-D<名前>=<ディレクトリ>`) | 手元への発行のタスクが、発行物を置くディレクトリ |
+| 発行する側 (`android/`) | Maven のシステムプロパティ `-Dmaven.repo.local=<ディレクトリ>` | 手元への発行のタスクが、発行物を置くディレクトリ |
 | 取る側 (利用者役 `verification/android/`) | Gradle のプロパティ `-PksCollectionViewRepository=<ディレクトリ>` | 利用者役が `jp.kamusoft` を取りに行くディレクトリ。発行する側に渡したのと同じ場所を渡す |
 
-- **発行先の指定を忘れると、利用者の既定の手元の Maven リポジトリ (`~/.m2/repository`) に発行される。** 手元の環境に発行物が残り、後で誤って参照し得る。確かめるための発行は、必ず発行先を渡す
+- **`-Dmaven.repo.local` を付け忘れると、利用者の既定の手元の Maven リポジトリ (`~/.m2/repository`) に発行される。** 手元の環境に発行物が残り、後で誤って参照し得る。確かめるための発行は、必ず発行先を渡す
 - 忘れて発行してしまったときは、`~/.m2/repository/jp/kamusoft/kscollectionview/` を消す
 - 版は、`-Pversion=<版>` で外から渡せる。渡さなければ、バージョンカタログの版 (2026-10-09 時点で `0.1.0-SNAPSHOT`) になる
 - 署名の鍵が無ければ、署名は飛ばされる (`signMavenPublication SKIPPED`)。鍵を Gradle のプロパティ `signingInMemoryKey` で渡すと署名が付く。環境変数なら `ORG_GRADLE_PROJECT_signingInMemoryKey` で渡せる

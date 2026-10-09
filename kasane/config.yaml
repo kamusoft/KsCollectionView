@@ -63,7 +63,7 @@ lint:
     # skills / samples はまだ存在しない (samples は各プラットフォームの基盤フェーズ、skills は
     # 配布・ドキュメントのフェーズで作られる予定) が、先に検査範囲へ入れておく。
     scope: [kasane, skills, samples]
-    allow: ["@kamusoft.jp"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
+    allow: ["@kamusoft.jp", "repo.local", "git@github.com"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
     disable: []                  # 無効化する検出群: device / developer / network / personal / secret
   internal-hosts: []             # 未公開サーバのホスト名
   doc-structure:                 # 育つ文書の構造 lint (references/doc-structure.md)。hook には登録しない
