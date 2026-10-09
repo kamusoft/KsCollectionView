@@ -43,6 +43,16 @@ coil = "3.5.0"
 # ここではそれを明示依存に格上げするだけなので、利用者へ届く依存の集合は変わらない。
 startup-runtime = "1.1.1"
 
+# androidx.annotation。公開 API の引数に付く `@DrawableRes` を持つ。Compose BOM の対象外のため
+# 個別に指定する。1.9.1 は Compose UI が既に推移で持ち込んでいる版で、ここではそれを明示依存に
+# するだけなので、利用者へ届く版は変わらない。
+androidx-annotation = "1.9.1"
+
+# Maven への発行のプラグイン。release の発行物 (AAR・sources jar・空の javadoc jar・POM) の構成、
+# 署名、Maven Central (Sonatype Central Portal) への送信の入口を持つ
+# (https://vanniktech.github.io/gradle-maven-publish-plugin/)。
+maven-publish = "0.37.0"
+
 # ライブラリの Maven 座標のバージョン。ルート build.gradle.kts が subprojects 一括で
 # `version` に使う。
 kscollectionview = "0.1.0-SNAPSHOT"
@@ -62,6 +72,7 @@ android-library = { id = "com.android.library", version.ref = "agp" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -76,6 +87,7 @@ compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4
 compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation-compose" }
 startup-runtime = { group = "androidx.startup", name = "startup-runtime", version.ref = "startup-runtime" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidx-annotation" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

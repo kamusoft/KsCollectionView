@@ -1,0 +1,121 @@
+# Android の利用者の立場のビルドの確認 (再利用 workflow)
+#
+# 配布物を、利用者と同じ書き方 (Maven の座標 1 行の依存) で取る利用者役 (verification/android/) の
+# リリースを、コード縮小を有効にして組み立て、実行時の依存に本ライブラリの座標が指定の版で
+# 現れることを確かめる。本体と Sample のテストは verify-android.yml が確かめる。Sample は本体の
+# ソースを直接参照するので、配布物だけが壊れたことには、ここでしか気付けない。
+#
+# 配布物をどこから取るかは、入力 mode で決まる。組み立てと成功の条件は、どちらでも同じである。
+# - local: 今の android/ を、一時のディレクトリの Maven リポジトリへ発行し、そこだけから取る。
+#   version が空なら、本体のバージョンカタログの版を使う
+# - published: version に渡した版を、Maven Central だけから取る
+#
+# 準備から確認までは scripts/ci/verify-consumer-android.py が行う。入力が範囲の外
+# (知らない mode・published で version が無い) のときも、スクリプトが何も始めずに失敗で終わる。
+#
+# エミュレータは使わず、利用者役を起動しない (cross/ADR-0013)。認証の情報と署名の鍵は受け取らず、
+# 何も書き込まない。
+name: verify consumer android
+
+on:
+  workflow_call:
+    inputs:
+      mode:
+        description: "配布物をどこから取るか (local | published)"
+        type: string
+        required: true
+      version:
+        description: "取る版 (published では必須。local で空なら本体のバージョンカタログの版)"
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    # ランナーは版を指定した名前で選ぶ。最新を指す名前は、指す実体が予告なく入れ替わる。
+    runs-on: ubuntu-24.04
+    # 既定の 360 分は長すぎる。手元での所要時間は 25 秒ほど (依存の取得が済んだ状態) で、
+    # ランナーでの所要時間を見て決め直す前の暫定の値である。
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # ビルドを動かす JDK は 17 以上であればよく (android/ADR-0008)、確かめてある版の 21 に決める。
+      # verify-android.yml と同じ値にする。
+      - name: Setup JDK
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache Gradle dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          # 依存の解決の結果と、wrapper が取得する Gradle だけをキャッシュする。
+          # ビルドの出力はキャッシュしない。復元された結果を、この実行の結果と取り違える
+          # 経路を作らないため。既定の手元の Maven リポジトリもキャッシュしない
+          # (確認はそこへ発行せず、そこから取りもしない)。
+          path: |
+            ~/.gradle/caches/modules-2
+            ~/.gradle/wrapper
+          key: gradle-consumer-${{ runner.os }}-${{ hashFiles('android/gradle/libs.versions.toml', 'android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts', 'verification/android/gradle/wrapper/gradle-wrapper.properties', 'verification/android/**/*.gradle.kts') }}
+          restore-keys: |
+            gradle-consumer-${{ runner.os }}-
+
+      - name: Show toolchain
+        run: |
+          java -version
+          python3 --version
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "ANDROID_HOME=${ANDROID_HOME:-}"
+
+      # コンパイル対象の Android SDK がランナーに無ければ取得する。版の宣言元は
+      # バージョンカタログ 1 箇所 (利用者役も同じカタログを読む) なので、ここには版を書かずに読む。
+      - name: Ensure Android SDK platform
+        run: |
+          # sdkmanager に同意の入力を流し続ける `yes` は、相手が終わると失敗で終わる。
+          # それをパイプ全体の失敗にしないため、ここでは pipefail を入れない。
+          set -eu
+          compile_sdk=$(sed -n 's/^compile-sdk = "\([0-9][0-9]*\)"[[:space:]]*$/\1/p' android/gradle/libs.versions.toml)
+          if [ -z "$compile_sdk" ]; then
+            echo "::error::コンパイル対象の Android SDK の版を、バージョンカタログから読み取れない"
+            exit 1
+          fi
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "::error::ANDROID_HOME が設定されていない (ランナーに Android SDK が無い)"
+            exit 1
+          fi
+          platform_dir="${ANDROID_HOME}/platforms/android-${compile_sdk}"
+          if [ -d "$platform_dir" ]; then
+            echo "Android SDK Platform ${compile_sdk} はランナーにある"
+            exit 0
+          fi
+          echo "Android SDK Platform ${compile_sdk} がランナーに無いので取得する"
+          sdkmanager="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager" ]; then
+            echo "::error::sdkmanager が見つからないため、Android SDK Platform ${compile_sdk} を取得できない"
+            exit 1
+          fi
+          yes | "$sdkmanager" --install "platforms;android-${compile_sdk}"
+          if [ ! -d "$platform_dir" ]; then
+            echo "::error::Android SDK Platform ${compile_sdk} を取得できなかった"
+            exit 1
+          fi
+
+      # 入力は、式を本文に直に埋めずに、環境変数を通して渡す (値がシェルの構文として読まれない)。
+      # version が空のときは空の文字列が渡り、スクリプトは渡していないのと同じに扱う。
+      # 合否はスクリプトの終了コードで決まる。後ろに別のコマンドをつなぐと、つないだ側の
+      # 終了コードが step の合否になるので、つながない。
+      - name: Verify consumer
+        env:
+          KS_MODE: ${{ inputs.mode }}
+          KS_VERSION: ${{ inputs.version }}
+        run: python3 scripts/ci/verify-consumer-android.py --mode "${KS_MODE}" --version "${KS_VERSION}"

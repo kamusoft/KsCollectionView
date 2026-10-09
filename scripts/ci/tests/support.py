@@ -17,10 +17,13 @@ def script_path(name: str) -> str:
     return os.path.join(SCRIPTS_DIR, name)
 
 
-def load_script(name: str):
-    """名前にハイフンを含むスクリプトを、モジュールとして読み込む。"""
+def load_script(name: str, directory: str = SCRIPTS_DIR):
+    """名前にハイフンを含むスクリプトを、モジュールとして読み込む。
+
+    directory を渡すと、検証 CI のスクリプトの置き場の外にあるスクリプトを読み込める。
+    """
     module_name = name.replace("-", "_").removesuffix(".py")
-    spec = importlib.util.spec_from_file_location(module_name, script_path(name))
+    spec = importlib.util.spec_from_file_location(module_name, os.path.join(directory, name))
     module = importlib.util.module_from_spec(spec)
     # dataclass は、定義したモジュールを sys.modules から引く。
     sys.modules[module_name] = module

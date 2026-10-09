@@ -1,0 +1,29 @@
+10-09 13:30:16.586   663   677 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=jp.kamusoft.kscollectionview.verification.android/.MainActivity} with LAUNCH_MULTIPLE from uid 2000 (BAL_ALLOW_PERMISSION) result code=0
+10-09 13:30:16.673  4729  4729 I ication.android: Using CollectorTypeCMC GC.
+10-09 13:30:16.680  4729  4729 E ication.android: Not starting debugger since process cannot load the jdwp agent.
+10-09 13:30:16.685  4729  4729 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+10-09 13:30:16.711  4729  4729 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+10-09 13:30:16.711  4729  4729 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.sidecar.jar
+10-09 13:30:16.720  4729  4729 D nativeloader: Configuring clns-9 for other apk /data/app/~~Rq0dbQHQAGq4UVmBhkEntQ==/jp.kamusoft.kscollectionview.verification.android-1MYA7WyIhcicFBeka5bM-A==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~Rq0dbQHQAGq4UVmBhkEntQ==/jp.kamus
+10-09 13:30:16.723  4729  4729 I ication.android: AssetManager2(0xb40000792b04eeb8) locale list changing from [] to [en-US]
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment: Currently set values for:
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment: jp.kamusoft.kscollectionview.verification.android is not listed in per-application setting
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment: jp.kamusoft.kscollectionview.verification.android is not listed in ANGLE allowlist or settings, returning default
+10-09 13:30:16.727  4729  4729 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+10-09 13:30:16.781  4729  4746 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+10-09 13:30:16.787  4729  4729 I ication.android: AssetManager2(0xb40000792b04f818) locale list changing from [] to [en-US]
+10-09 13:30:16.791  4729  4729 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+10-09 13:30:16.803  4729  4729 D CompatChangeReporter: Compat change id reported: 377864165; UID 10213; state: ENABLED
+10-09 13:30:16.803  4729  4729 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+10-09 13:30:16.806  4729  4746 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+10-09 13:30:16.806  4729  4746 I EGL_emulation: Opening libGLESv2_emulation.so
+10-09 13:30:16.815  4729  4746 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+10-09 13:30:16.816  4729  4746 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+10-09 13:30:16.838  4729  4729 W HWUI    : Unknown dataspace 0
+10-09 13:30:17.085   663   683 I ActivityTaskManager: Displayed jp.kamusoft.kscollectionview.verification.android/.MainActivity for user 0: +538ms
+10-09 13:30:17.139  4729  4729 D InsetsController: hide(ime(), fromIme=false)
+10-09 13:30:17.140  4729  4729 I ImeTracker: jp.kamusoft.kscollectionview.verification.android:33a3bd9c: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+10-09 13:30:22.276  4729  4791 D ProfileInstaller: Installing profile for jp.kamusoft.kscollectionview.verification.android
+10-09 13:30:39.999  4729  4734 I ication.android: Compiler allocated 4447KB to compile java.lang.Object e9.d(java.lang.Object, java.lang.Object)

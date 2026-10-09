@@ -1,0 +1,37 @@
+// swift-tools-version: 6.4
+// 配布物を利用者の立場でビルドして確かめるための、利用者役のマニフェストのひな形。
+//
+// このファイルは、そのままではマニフェストにならない。確認のスクリプト
+// (scripts/ci/verify-consumer-ios.py) が、作業用のディレクトリに写したうえで、dependencies の
+// 差し込み口を 1 行に置き換えて Package.swift として書き出す。差し込む行は、配布物をどこから
+// 取るかで決まる。
+//
+//   公開の前の成果物  .package(path: "../KsCollectionView-SPM")
+//   公開済みの配布物  .package(url: "https://github.com/kamusoft/KsCollectionView-SPM", exact: "<版>")
+//
+// SwiftPM は、参照先のパスや URL の末尾の名前を package の名前として扱う。どちらの行でも
+// 名前は KsCollectionView-SPM になるので、target の依存は、利用者が書くのと同じ 1 行で済む。
+
+import PackageDescription
+
+let package = Package(
+    name: "VerificationApp",
+    platforms: [
+        // 本体が対象にする最も古い iOS に合わせる。
+        .iOS(.v16),
+    ],
+    products: [
+        .library(name: "VerificationApp", targets: ["VerificationApp"]),
+    ],
+    dependencies: [
+        @KSCV_DEPENDENCY@
+    ],
+    targets: [
+        .target(
+            name: "VerificationApp",
+            dependencies: [
+                .product(name: "KsCollectionView", package: "KsCollectionView-SPM"),
+            ]
+        ),
+    ]
+)

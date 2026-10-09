@@ -3,7 +3,12 @@
 # 走る時点は 2 つ (cross/ADR-0010、cross/ADR-0013)。
 # - develop への push: lint と、iOS / Android の検証。iOS はビルドできることだけを確かめ
 #   (テストは実行しない)、Android はユニットテストまでを走らせる
-# - main 宛ての Pull Request: 同じ 3 つ。main に入れる前の必須の検査になる
+# - main 宛ての Pull Request: 同じ 3 つに加えて、iOS / Android の利用者の立場のビルドの確認。
+#   配布物を、利用者と同じ書き方で取る利用者役をビルドして確かめる。main に入れる前の
+#   必須の検査になる
+#
+# 利用者の立場のビルドの確認は、develop への push では走らせない (macOS のランナーを、
+# push のたびに起こさないため)。配布物だけが壊れたことには、main 宛ての Pull Request で気付く。
 #
 # main 宛ての Pull Request では、変更したパスで絞り込まない。絞り込むと、必須の検査が
 # 走らないまま通る経路ができる。develop は必須の検査を持たないのでその心配が無く、
@@ -49,6 +54,24 @@ jobs:
   android:
     name: android
     uses: ./.github/workflows/verify-android.yml
+
+  # 利用者の立場のビルドの確認は、Pull Request で起動したときだけ走らせる。条件はジョブに付ける
+  # (呼ばれる側で起動の種類を見て終わる形にすると、push のたびにランナーを起こす)。
+  # 取るのは今のソースから作った配布物なので、切り替えは local にして、版は渡さない。
+  # 検査の名前は consumer-ios / verify と consumer-android / verify になる。
+  consumer-ios:
+    name: consumer-ios
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/verify-consumer-ios.yml
+    with:
+      mode: local
+
+  consumer-android:
+    name: consumer-android
+    if: ${{ github.event_name == 'pull_request' }}
+    uses: ./.github/workflows/verify-consumer-android.yml
+    with:
+      mode: local
 
   lint:
     name: lint
