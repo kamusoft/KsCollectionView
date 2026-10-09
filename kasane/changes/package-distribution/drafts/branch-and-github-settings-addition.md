@@ -3,9 +3,9 @@
 > - 追記先: `kasane/handbook/cross/branch-and-github-settings.md`
 > - 追記は 8 個ある。それぞれの見出しに、追記先の節と、足すのか置き換えるのかを書いてある
 > - 文書の中のリンクは、追記先から見た相対パスで書いてある (この草稿の場所からは辿れない)
-> - **保護の更新 (tasks 9.3) と、`main` 宛ての Pull Request (tasks 9.2・9.4) は、この草稿を書いた時点ではまだ行っていない。** 追記先は「値を変えるときは、先にこの表を直す」と定めているが、この草稿の値は、まだ GitHub に入っていない値である。蒸留の前に、グループ 9 の証跡と突き合わせ、実行したコマンド・読み直した値に合わせて直す。草稿の案と違う形で実行したものは、実行したほうに直す
-> - 実行の結果が要る箇所は `【公開の実施後に記入】` の印で空けてある。印のある箇所は 6 つある (追記 3 に 1・追記 5 に 1・追記 6 に 3・追記 7 に 1)
-> - 追記 5 の payload は、追記先にある今の payload (2026-10-08 に実行して読み直したもの) の、必須の検査の配列に 2 つを足しただけの形である。足した形では、まだ実行していない
+> - **保護の更新 (tasks 9.3) と、`main` 宛ての Pull Request (tasks 9.2・9.4) は、2026-10-09 に行った。** この草稿の値は、GitHub に入れて読み直した値である。草稿の案と違う形で実行したものは無い
+> - 実行の結果が要る箇所 (6 つ。追記 3 に 1・追記 5 に 1・追記 6 に 3・追記 7 に 1) は、グループ 9 の証跡 (`evidence/public-repository-checks.md`) から埋めた。追記 5 の PUT の終了コードは、証跡の補足の節から書いた
+> - 追記 5 の payload は、追記先にある今の payload (2026-10-08 に実行して読み直したもの) の、必須の検査の配列に 2 つを足しただけの形である。2026-10-09 に、この形のまま実行して読み直した
 > - 追記先は「3 つの検査」と書いている箇所が多い。追記 1〜5 で直す箇所を挙げたが、蒸留のときに、文書の全体で「3 つ」を探して読み直す
 > - `timestamp` は、保護の値を読み直して確かめた日にする
 
@@ -37,7 +37,17 @@
 >
 > この 2 つは、外部の依存の取得 (Nuke・Maven の依存) に頼る。コードの誤りではない理由で止まったときは、実行をやり直す。やり直しても進まないときの手段は、下の管理者による迂回である。
 
-必須の検査が 5 つになった後の最初の Pull Request の記録: 【公開の実施後に記入】 (tasks 9.2・9.4 の証跡から、番号・日付・5 つの検査の結果と所要時間・マージできる状態・マージの方法を書く)
+5 つの検査が走った最初の Pull Request の記録 (2026-10-09): 2 番 (`develop` → `main`)。5 つの検査は、どれも成功した。
+
+| 検査の名前 | 結果 | 所要 |
+|---|---|---|
+| `lint` | 成功 | 17 秒 |
+| `ios / verify` | 成功 | 4 分 4 秒 |
+| `android / verify` | 成功 | 5 分 2 秒 |
+| `consumer-ios / verify` | 成功 | 1 分 58 秒 |
+| `consumer-android / verify` | 成功 | 3 分 16 秒 |
+
+マージできる状態は、`mergeable` が MERGEABLE、`mergeStateStatus` が CLEAN、`isCrossRepository` が false だった。この Pull Request を作った時点の保護は、まだ 3 つの検査だけを必須にしていた。5 つが成功した後に必須の検査を 5 つに更新し、更新の後も同じ状態 (MERGEABLE・CLEAN) であることを読んでから、merge commit でマージした (`gh pr merge 2 --repo kamusoft/KsCollectionView --merge`)。`develop` は消していない。マージの後に、`main` への push で起動した実行は無い。
 
 ## 追記 4: 節「保護の値」の表の「必須の検査」の行の置き換え
 
@@ -85,7 +95,18 @@ JSON
 
 「結果 (2026-10-08)」の表の後ろに、次を足す。
 
-結果 (必須の検査を 5 つにした更新): 【公開の実施後に記入】 (tasks 9.3 の証跡から、日付・実行したコマンド・終了コード・更新の前に読んだ値・更新の後に読み直した値を書く。必須の検査のほかの項目が、更新の前後で変わっていないことも書く)
+結果 (必須の検査を 5 つにした更新、2026-10-09): 上の payload の PUT は終了コード 0 で入った。同じコマンド (`gh api repos/kamusoft/KsCollectionView/branches/main/protection`) で、更新の前と後に値を読んだ。必須の検査だけが 3 件から 5 件に変わり、ほかの項目は変わらなかった。
+
+| 読む項目 | 更新の前 | 更新の後 |
+|---|---|---|
+| `required_status_checks.checks` | 3 件。`context` が `lint`・`ios / verify`・`android / verify`、`app_id` がどれも 15368 | 5 件。`context` が `lint`・`ios / verify`・`android / verify`・`consumer-ios / verify`・`consumer-android / verify`、`app_id` がどれも 15368 |
+| `required_status_checks.strict` | false | false |
+| `enforce_admins.enabled` | false | false |
+| `required_pull_request_reviews` | 承認の必要数 0。古い承認の取り消し・コードオーナーの承認・最後の push の承認は false | 同じ |
+| `allow_force_pushes.enabled`・`allow_deletions.enabled` | どちらも false | どちらも false |
+| `required_linear_history`・`required_signatures`・`required_conversation_resolution`・`lock_branch`・`block_creations`・`allow_fork_syncing` の `enabled` | どれも false | どれも false |
+
+必須の検査のほかの項目は、応答から URL の項目を除いて前後で突き合わせ、一致した。`develop` の保護も更新の前後で読み、一致した (必須の検査と Pull Request の必須は無く、強制 push と削除は禁止、管理者には強制しない)。
 
 ## 追記 6: 節「設定を入れる順」の後ろに、節を 1 つ足す
 
@@ -108,9 +129,9 @@ JSON
 
 | 順 | 結果 |
 |---|---|
-| 1 (`develop` への push) | 【公開の実施後に記入】 (tasks 9.1 の証跡から。3 つの検査だけが走って成功したこと、利用者の立場のビルドの確認が走らなかったこと) |
-| 2 (Pull Request で報告された名前) | 【公開の実施後に記入】 (tasks 9.2 の証跡から。5 つの検査の名前と結果) |
-| 3・4 (保護の更新とマージ) | 【公開の実施後に記入】 (tasks 9.3・9.4 の証跡から。更新の前後の値は、上の「main の保護」の結果に書く) |
+| 1 (`develop` への push) | 2026-10-09。`lint` (18 秒)・`ios / verify` (2 分 36 秒)・`android / verify` (4 分 50 秒) の 3 つだけが走り、どれも成功した。利用者の立場のビルドの確認の 2 つのジョブ (`consumer-ios`・`consumer-android`) は、条件により飛ばされた (skipped)。ランナーは起きていない |
+| 2 (Pull Request で報告された名前) | 2026-10-09、Pull Request 2 番。`lint`・`ios / verify`・`android / verify`・`consumer-ios / verify`・`consumer-android / verify` の 5 つが、決めたとおりの名前で報告され、どれも成功した。検査の一覧には、同じ commit に対する push の実行の結果も並ぶ。そちらの 2 つは SKIPPED で、名前に ` / verify` が付かない (`consumer-ios`・`consumer-android`)。保護に登録する名前は、Pull Request の実行が報告した ` / verify` の付くほうである |
+| 3・4 (保護の更新とマージ) | 2026-10-09。必須の検査を 3 つから 5 つに更新し、読み直して確かめた。ほかの保護の値と、`develop` の保護は変わらなかった (更新の前後の値は、上の「main の保護」の結果にある)。更新の後も、Pull Request 2 番は MERGEABLE・CLEAN のままだった。5 つの検査が成功した commit のまま、merge commit でマージした (06:10:44 UTC)。`main` の先端は merge commit になり、`develop` の先端は変わらない |
 
 ## 追記 7: 節「実施の記録」の直し
 
@@ -122,7 +143,7 @@ JSON
 
 | 行ったこと | 日付 | 証跡 |
 |---|---|---|
-| 利用者の立場のビルドの確認の 2 つを、`main` の必須の検査に足した (3 つから 5 つ) | 【公開の実施後に記入】 | `kasane/changes/archive/【蒸留の日付】-package-distribution/evidence/【グループ 9 の証跡のファイル名】` |
+| 利用者の立場のビルドの確認の 2 つを、`main` の必須の検査に足した (3 つから 5 つ) | 2026-10-09 | `kasane/changes/archive/【蒸留の日付】-package-distribution/evidence/【グループ 9 の証跡のファイル名】` |
 
 ## 追記 8: 節「関連」と出典に足す
 

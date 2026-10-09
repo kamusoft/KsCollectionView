@@ -4,7 +4,7 @@
 > - index に足す行の案: 適用のきっかけ「`scripts/distribution/`・`verification/`・Android の公開の設定・`ios/Package.swift` の宣言を触るとき・配布物を手元で作って確かめるとき・利用者の立場のビルドの確認の失敗を調べるとき」、種別 guide
 > - 文書の中のリンクは、置き先から見た相対パスで書いてある (この草稿の場所からは辿れない)
 > - 中身は、2026-10-09 時点の実物 (`scripts/distribution/`・`scripts/ci/verify-consumer-*.py`・`verification/`・`android/kscollectionview/build.gradle.kts`) と、手元での確認の記録 (`evidence/` の 5 枚) から書いた
-> - 公開リポジトリでの確認 (tasks のグループ 9) は、この草稿を書いた時点ではまだ行っていない。ランナーの上での値が要る箇所は `【公開の実施後に記入】` の印で空けてある。蒸留の前に、グループ 9 の証跡から埋める
+> - 公開リポジトリでの確認 (tasks のグループ 9) は、2026-10-09 に行った。ランナーの上での値が要る箇所 (3 つ。節「流し方」の所要時間と、節「確かめていないこと」の表の 2 行) は、グループ 9 の証跡 (`evidence/public-repository-checks.md`) から埋めた。表の 2 行は、ランナーの上で確かめた後の内容になっている。蒸留のときに、「確かめていないこと」の表に残すか、確かめたことの側へ移すかを決める
 > - 冒頭のリンク先の cross/ADR-0015・0016 は、書いた時点では proposed である。蒸留で accepted にしてから置く
 > - 手元への発行の発行先を変えるシステムプロパティの名前は、本文に続けて書いていない。続けて書くと、識別の lint (`scripts/identity-lint.py`) がホスト名と判定して書き込みを止める。名前を持つ定数 (`scripts/ci/verify-consumer-android.py` の `LOCAL_REPOSITORY_PROPERTY`) を指す形にしてある。配信用リポジトリの origin の形も、同じ理由で、SSH の形の URL を文字のまま書いていない。蒸留で lint の側を直すなら、本文を値そのものに書き換えられる
 > - `timestamp` は、蒸留で置く日にする
@@ -205,7 +205,7 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 
 手元の所要時間 (2026-10-09、依存の取得が済んだ状態): iOS は 30 秒ほど (毎回、何も無い状態からビルドする)。Android は、利用者役のビルドの出力が無い状態で 23 秒ほど、残っている状態で 5 秒ほどである。
 
-ランナーの上での所要時間: 【公開の実施後に記入】
+ランナーの上での所要時間 (2026-10-09、`main` 宛ての Pull Request 2 番での最初の実行。依存のキャッシュが無い状態): iOS (`consumer-ios / verify`) は 1 分 58 秒、Android (`consumer-android / verify`) は 3 分 16 秒である。測れたのは 1 回だけで、ばらつきはまだ分からない。
 
 ## 失敗したときの見方
 
@@ -259,8 +259,8 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 | Maven Central への実際の送信と、Maven Central の側の検査 (署名・POM の項目・javadoc jar) | 送信は 1 回も行っていない |
 | 本番の形の署名 (パスフレーズつきの鍵・鍵の ID を指定する形) | 確かめたのは、パスフレーズなしの使い捨ての鍵を `signingInMemoryKey` だけで渡す形である |
 | Gradle の configuration cache を有効にしたときの、開発中の版の歯止めの動き | このビルドは有効にしていない |
-| Linux の上での、写しを作る道具と確認のスクリプトのテスト、利用者役の組み立て | 【公開の実施後に記入】 (書いた時点では、手元の macOS でだけ流している) |
-| ランナーの上での確認の実行と所要時間 | 【公開の実施後に記入】 |
+| Linux の上での、写しを作る道具と確認のスクリプトのテスト、利用者役の組み立て | 2026-10-09 に、ランナーの上で通った。スクリプトのテスト (写しを作る道具のテストを含む 262 件) は、`develop` への push と `main` 宛ての Pull Request の `lint` (Linux のランナー) で成功した。利用者役の組み立ては、Pull Request 2 番の `consumer-android / verify` (ランナーは `ubuntu-24.04`) で成功した。どれも 1〜2 回の実行である |
+| ランナーの上での確認の実行と所要時間 | 2026-10-09 に、Pull Request 2 番で 1 回ずつ走り、どちらも成功した (iOS は 1 分 58 秒、Android は 3 分 16 秒)。依存のキャッシュが無い状態の最初の実行で、2 回目からの所要時間とばらつきは、まだ分からない。ランナーの上で失敗する実行は見ていない |
 | Xcode 27.0 以外でのビルド、Windows での確認のスクリプトの実行 | 対象にしていない |
 
 ## 関連
