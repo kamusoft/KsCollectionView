@@ -2,19 +2,54 @@
 kind: guide
 applies-when:
   always: false
-  tasks: [環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
+  tasks: [clone した後の準備, 作業用のブランチ・worktree の作成, 環境構築, Sample の起動, 本体のビルド・lint, 本体 source へのステップイン]
 title: ローカル開発環境と Sample の実行
-description: iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。両プラットフォームとも実際に確認した手順を記す
+description: clone した後の準備 (検査の有効化・作業の基点)、iOS / Android のローカル環境設定、Sample の起動、本体のビルドとステップインの手引き。両プラットフォームとも実際に確認した手順を記す
 timestamp: 2026-10-03
 ---
 
 # ローカル開発環境と Sample の実行
 
-この文書は、リポジトリを clone した開発者が iOS・Android の Sample を開いて実行し、本体をビルドし、本体 source へデバッガでステップインするまでの手順をまとめる。
+この文書は、リポジトリを clone した開発者が、検査を有効にして `develop` から作業を始め、iOS・Android の Sample を開いて実行し、本体をビルドし、本体 source へデバッガでステップインするまでの手順をまとめる。
 
 iOS の SwiftPM パッケージと Android の Gradle ビルドルート、および両者の Sample はいずれも成立済みであり、本書には実際に確認した手順を記す。**未検証の手順を現行の手引きとして書かないこと** — 動かない手順は、無い手順より読み手の時間を奪う。
 
 [cross/ADR-0002](../../decisions/cross/0002-monorepo-platform-build-roots.md) を先に読むと、プラットフォームごとに独立したビルドルートを持つ理由が分かる。
+
+## clone した後の準備と作業の基点
+
+clone した後に、次の 2 つを行う。どちらも clone ごとに 1 回でよい。
+
+| 行うこと | コマンド | 確かめ方 |
+|---|---|---|
+| commit と push の前の検査を有効にする | `git config core.hooksPath .githooks` | `git config core.hooksPath` が `.githooks` を返す |
+| 作業の基点のブランチに移る | `git switch develop` | `git branch --show-current` が `develop` を返す |
+
+remote は clone した時点で `origin` として入っている。`git remote -v` で、`kamusoft/KsCollectionView` を指していることを確かめる。
+
+clone した直後の状態: チェックアウトされるブランチは、既定のブランチの `main` である。作業は `develop` に切り替えてから始める。開発に使っている手元の remote は、GitHub の SSH の URL (ホストは `github.com`、パスは `kamusoft/KsCollectionView.git`) である。
+
+既定のブランチが `main` であることは、2026-10-08 に GitHub の設定を読み直して確かめた。新しく clone して、直後の状態を見ることはしていない。
+
+### 作業の基点は develop
+
+日々の開発は `develop` で行う。作業用のブランチと worktree は、`main` ではなく `develop` から切る。GitHub の既定のブランチは `main` なので、clone した直後は `develop` に移ってから始める。
+
+`main` に直接 commit しない。`main` に入るのは、`develop` からの Pull Request だけである ([ブランチの運用と GitHub の設定](branch-and-github-settings.md))。
+
+### commit と push の前の検査
+
+`.githooks/` の hook は、有効にしないと動かない。有効にすると、次の検査が走る。
+
+| 時点 | 検査 | 止まるもの |
+|---|---|---|
+| commit の前 | `scripts/git-gate-lint.py --staged` | ステージした内容にある、個人・端末・秘密を特定する値とローカル絶対パス |
+| commit の前 | gitleaks (入っているときだけ) | ステージした内容にある secret |
+| push の前 | `scripts/git-gate-lint.py --push` | push する commit が触ったファイルの、各 commit の時点の内容にある同じ違反 |
+
+- gitleaks が入っていないと、commit の前の secret の検査は警告を出して省かれる。`brew install gitleaks` で入れる
+- 検査で止まったら、該当の行を直して commit し直す。`--no-verify` で迂回しない
+- 公開リポジトリでは、push した時点で内容が公開される。`kasane/` 配下だけを変えた push では検証 CI が起動しないので、その内容を止められるのは手元のこの検査だけである
 
 ## 必要環境
 
@@ -164,5 +199,7 @@ breakpoint を置き、`:app` を debug 実行すればそのまま止まる。
 - [テスト実行規約](test-execution.md) — テストの実行方法と完了判定
 - [Sample のプラットフォーム間一致](sample-parity.md) — Sample の一致規約
 - [実行時挙動の検証規約](runtime-behavior-verification.md) — 実環境での確認が要る不具合の完了判定
+- [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — `develop` と `main` の役割、push と Pull Request の進め方
+- [検証 CI](verification-ci.md) — push の後に走る検証と、workflow を手元で確かめる方法
 
-出典: ../KsSettingsView/kasane/handbook/cross/local-development-setup.md (章立て・版の定義元の考え方・デモ画面一覧の原則)
+出典: ../KsSettingsView/kasane/handbook/cross/local-development-setup.md (章立て・版の定義元の考え方・デモ画面一覧の原則) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (既定のブランチと、開発に使っている手元の remote の形)

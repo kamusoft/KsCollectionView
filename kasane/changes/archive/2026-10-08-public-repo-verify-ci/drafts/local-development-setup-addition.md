@@ -4,7 +4,7 @@
 > - 追記 1 は、節「必要環境」の前に、新しい節として足す (clone の直後に行うことなので、先頭に置く)
 > - 追記 2 は、節「関連」に 2 行足す
 > - 追記 3 は、frontmatter と冒頭の段落の直し
-> - hook の中身は `.githooks/pre-commit`・`.githooks/pre-push` の実物から書いた。GitHub のリポジトリはこの草稿を書いた時点でまだ作られていないので、clone した直後の状態 (チェックアウトされるブランチ・remote の URL の形) は実物で確かめていない。その箇所に `【公開の実施後に記入】` の印を付けてある
+> - hook の中身は `.githooks/pre-commit`・`.githooks/pre-push` の実物から書いた。GitHub のリポジトリは 2026-10-08 に公開され、既定のブランチが `main` であること・開発に使っている手元の remote が SSH の形であることは、公開の実施の記録 (`evidence/publication-log.md`) にある。新しく clone して直後の状態を見た記録は無い。`【公開の実施後に記入】` の印は残っていない
 > - `timestamp` は、手順が再現することを確かめた場合だけ動かす
 
 ---
@@ -22,7 +22,9 @@ clone した後に、次の 2 つを行う。どちらも clone ごとに 1 回�
 
 remote は clone した時点で `origin` として入っている。`git remote -v` で、`kamusoft/KsCollectionView` を指していることを確かめる。
 
-clone した直後の状態: 【公開の実施後に記入: clone するとチェックアウトされるブランチ (既定のブランチは `main`)、remote の URL の形】
+clone した直後の状態: チェックアウトされるブランチは、既定のブランチの `main` である。作業は `develop` に切り替えてから始める。開発に使っている手元の remote は、GitHub の SSH の URL (ホストは `github.com`、パスは `kamusoft/KsCollectionView.git`) である。
+
+既定のブランチが `main` であることは、2026-10-08 に GitHub の設定を読み直して確かめた。新しく clone して、直後の状態を見ることはしていない。
 
 ### 作業の基点は develop
 

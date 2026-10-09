@@ -1,7 +1,7 @@
 ---
 id: 0010
 title: 開発は develop、リリース候補は main の 2 本のブランチに分ける
-status: proposed
+status: accepted
 date: 2026-10-08
 ---
 

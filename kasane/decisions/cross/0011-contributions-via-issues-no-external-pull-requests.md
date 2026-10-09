@@ -1,7 +1,7 @@
 ---
 id: 0011
 title: 貢献は Issue で受け、外部からの Pull Request は受け付けない
-status: proposed
+status: accepted
 date: 2026-10-08
 ---
 
@@ -47,3 +47,4 @@ date: 2026-10-08
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: 外部からの PR の扱い) / ../KsSettingsView/kasane/decisions/cross/0024-contributions-via-issues-no-external-pull-requests.md (兄弟ライブラリの決定とその理由)
 関連: cross/ADR-0010 (ブランチの役割。Pull Request を `main` 宛てだけに使う構え)
+現行照合: 2026-10-08 確認。GitHub のリポジトリの設定で、Pull Request を作れる人が共同作業者だけ (`pull_request_creation_policy: collaborators_only`)。`.github/ISSUE_TEMPLATE/` のフォーム 3 本が、版・プラットフォーム・再現手順などを必須にしている。`.github/CONTRIBUTING.md`・`CONTRIBUTING_ja.md` が方針を表明している。判定: 維持

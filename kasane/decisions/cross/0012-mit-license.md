@@ -1,7 +1,7 @@
 ---
 id: 0012
 title: ライセンスは MIT License とする
-status: proposed
+status: accepted
 date: 2026-10-08
 ---
 
@@ -37,3 +37,4 @@ date: 2026-10-08
 - 前提 (Context) が崩れたとき
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: ライセンスの種類)
+現行照合: 2026-10-08 確認。リポジトリのルートの `LICENSE` が MIT License の文面で、著作権の行は `Copyright (c) kamusoft`。判定: 維持

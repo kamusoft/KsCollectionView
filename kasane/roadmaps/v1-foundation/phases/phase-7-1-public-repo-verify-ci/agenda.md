@@ -78,3 +78,29 @@
 - [ ] iOS Sample を CI でビルドとユニットテストだけ流す指定 (UI テストを除く) を提案で決める
 - [ ] 検証 CI の構成 (再利用 workflow と入口、リリースからも同じ検証を呼ぶ) は ADR の候補。オーナーが既定を確かめたら起票する
 - [ ] ksn-propose で変更提案を起こす
+
+## 実装結果 (2026-10-08 反映)
+
+変更 `public-repo-verify-ci` で実装し、公開した。記録は `kasane/changes/archive/2026-10-08-public-repo-verify-ci/` にある。
+
+- GitHub に `kamusoft/KsCollectionView` を公開した。履歴は書き換えずにそのまま載せた (cross/ADR-0009)。公開前の 5 つの確認はすべて通った
+- ブランチを `develop` と `main` に分け、保護を入れた。本変更は `develop` から `main` 宛ての最初の Pull Request で `main` に入った (cross/ADR-0010)
+- ライセンス・準備中の README・貢献の案内・Issue のフォーム 3 本を置き、Pull Request を作れる人を共同作業者に限った (cross/ADR-0011・0012)
+- 検証 CI は、決定事項「検証 CI が走らせる範囲」と違う形になった。最初の実行で、手元では通る iOS 本体のテスト 1 件がランナーの Simulator で落ち、オーナーが CI では Simulator を使うテストを走らせないと決めた。iOS はビルドの確認だけ、Android は JVM のテストの全件を走らせる (cross/ADR-0013 を実装後の内容に書き直して確定)
+- 検証 CI の構成と検査の名前の固定は、cross/ADR-0014 として確定した
+- 手順と値は handbook の `cross/branch-and-github-settings.md` と `cross/verification-ci.md` にある
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| リリースの workflow から、同じ検証 (再利用 workflow) を呼ぶ | phase-7-4-release-pipeline の agenda (phase-7-1 からの申し送り) |
+| 管理者が `main` の保護を迂回してよい条件とやり方、マージの後に `main` を `develop` へ取り込み直すか、リリース候補にする節目の基準、secret が検出されたときにすること | phase-7-4-release-pipeline の agenda (同上) |
+| `main` の workflow の時間の上限が暫定の値のまま (決め直した値は `develop` にある) | phase-7-4-release-pipeline の agenda (同上。次の `main` 宛ての Pull Request で入る) |
+| 公開物を利用者の立場でビルドする確認を、`main` 宛ての Pull Request に足す | phase-7-2-package-distribution の agenda (既存の論点。再利用 workflow の形で足せることを申し送り) |
+| README の本文と `skills/` | phase-7-3-user-docs (既存の範囲。今あるのは準備中の案内だけ) |
+| ランナーで落ちた iOS 本体のテスト 1 件の原因の調査 | 見送り。CI では走らせないことにし、手元では通る (公開の後に全件を流して確認)。手元で同じ落ち方をしたら簡易起票する |
+| 端末をつないで走らせるテストを、今の 4 件で Gradle のタスクから流した記録が無い | 見送り。handbook の `cross/test-execution.md` に「確かめていないこと」として書いた。次に流すときに記録する |
+| Android SDK がランナーに無いときの取得の手順が、1 度も通っていない | 見送り。ランナーに SDK がある間は通らない。handbook の `cross/verification-ci.md` に書いた |
+| Android のテストのクラスの導き方の制限 (行末のコメントなど) | 見送り。handbook の `cross/verification-ci.md` の既知の制限に書いた |
+
