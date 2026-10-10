@@ -588,5 +588,43 @@ class ConsumerDefinitionTests(unittest.TestCase):
         self.assertEqual(SCRIPT.PUBLISH_TASK, ":kscollectionview:publishToMavenLocal")
 
 
+class ConsumerScreenSourceTests(unittest.TestCase):
+    """利用者役の実物の画面のソースが、利用者のアプリのコードとしてそのまま読める形であること。"""
+
+    SOURCE_ROOT = os.path.join(SCRIPT.CONSUMER_BUILD, "app", "src", "main", "kotlin")
+
+    def read(self, *parts: str) -> str:
+        with open(os.path.join(support.REPOSITORY_ROOT, self.SOURCE_ROOT, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def test_画面のソースはpackageの宣言を持たずimportから始まる(self) -> None:
+        text = self.read("ItemListScreen.kt")
+        self.assertTrue(text.startswith("import "), text.splitlines()[0])
+        self.assertNotRegex(text, r"(?m)^\s*package\b")
+
+    def test_画面のソースはコメントを持たない(self) -> None:
+        text = self.read("ItemListScreen.kt")
+        # 文字列の中にも "//" と "/*" を持たない内容なので、現れればコメントである。
+        self.assertNotIn("//", text)
+        self.assertNotIn("/*", text)
+
+    def test_ソースは画面と入口の2つだけである(self) -> None:
+        root = os.path.join(support.REPOSITORY_ROOT, self.SOURCE_ROOT)
+        found = sorted(
+            os.path.relpath(os.path.join(current, name), root)
+            for current, _, names in os.walk(root)
+            for name in names
+            if not name.startswith(".")
+        )
+        entry = os.path.join("jp", "kamusoft", "kscollectionview", "verification", "android", "MainActivity.kt")
+        self.assertEqual(found, ["ItemListScreen.kt", entry])
+
+    def test_入口は画面を名前だけのimportで呼ぶ(self) -> None:
+        # package の宣言を持たないファイルの宣言は、package を持つファイルからは import が無いと解決できない。
+        entry = self.read("jp", "kamusoft", "kscollectionview", "verification", "android", "MainActivity.kt")
+        self.assertRegex(entry, r"(?m)^import ItemListScreen$")
+        self.assertIn("setContent { ItemListScreen() }", entry)
+
+
 if __name__ == "__main__":
     unittest.main()

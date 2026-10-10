@@ -442,14 +442,14 @@ class FailureTests(ConsumerVerificationTestCase):
             {
                 "simulator": {
                     "exit": 65,
-                    "stdout": "VerificationListScreen.swift:1:8: error: no such module 'KsCollectionView'\n",
+                    "stdout": "ItemListScreen.swift:1:8: error: no such module 'KsCollectionView'\n",
                     "stderr": "** BUILD FAILED **\n",
                 }
             }
         )
         result = self.run_script("--mode", "local")
         self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-        self.assertIn("VerificationListScreen.swift:1:8: error: no such module 'KsCollectionView'\n", result.stdout)
+        self.assertIn("ItemListScreen.swift:1:8: error: no such module 'KsCollectionView'\n", result.stdout)
         self.assertIn("** BUILD FAILED **\n", result.stderr)
         self.assertIn("::error::利用者役のビルドが失敗した: Simulator 向け (xcodebuild の終了コード 65)", result.stdout)
         self.assertEqual(self.tools(), ["snapshot", SIMULATOR])
@@ -637,6 +637,30 @@ class ConsumerDefinitionTests(unittest.TestCase):
         self.assertTrue(swift_files)
         # 一覧を表示する利用例が、本ライブラリのモジュールを使っている。
         self.assertEqual(imports, {"KsCollectionView", "SwiftUI"})
+
+    def test_利用者役の画面のソースはモデルと画面を持つ1つのファイルである(self) -> None:
+        sources = os.path.join(support.REPOSITORY_ROOT, SCRIPT.CONSUMER_SOURCES)
+        found = sorted(
+            os.path.relpath(os.path.join(current, name), sources)
+            for current, _, names in os.walk(sources)
+            for name in names
+            if not name.startswith(".")
+        )
+        self.assertEqual(found, [os.path.join(SCRIPT.SCHEME, "ItemListScreen.swift")])
+        with open(os.path.join(sources, found[0]), encoding="utf-8") as f:
+            text = f.read()
+        self.assertRegex(text, r"(?m)^struct Item\b")
+        self.assertRegex(text, r"(?m)^struct ItemListScreen: View\b")
+        # 利用者のアプリのコードとして読める形にする。モジュールの外へ公開する宣言は持たない。
+        self.assertNotRegex(text, r"\bpublic\b")
+
+    def test_利用者役の画面のソースはコメントを持たない(self) -> None:
+        path = os.path.join(support.REPOSITORY_ROOT, SCRIPT.CONSUMER_SOURCES, SCRIPT.SCHEME, "ItemListScreen.swift")
+        with open(path, encoding="utf-8") as f:
+            text = f.read()
+        # 文字列の中にも "//" と "/*" を持たない内容なので、現れればコメントである。
+        self.assertNotIn("//", text)
+        self.assertNotIn("/*", text)
 
     def test_利用者役のディレクトリはそのままではpackageではない(self) -> None:
         # マニフェストは、作業用のディレクトリにだけ書く。ここに置くと、確認が追跡しているファイルを変える形になる。
