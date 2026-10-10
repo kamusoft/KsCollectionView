@@ -3,6 +3,7 @@ id: 0005
 title: 利用者向けドキュメントは Agent Skills (skills/、en/ja 2 版) で提供し、README はルート 2 枚に集約する
 status: accepted
 date: 2026-09-01
+amended-by: 0019
 ---
 
 ## Context

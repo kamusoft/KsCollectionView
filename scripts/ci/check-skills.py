@@ -11,10 +11,12 @@ Skill は、言語のディレクトリ (skills/en・skills/ja) の直下のデ�
      name・description・license・metadata.language・metadata.source の 5 項目だけを持つ。
      name がディレクトリの名前と同じで、metadata.language が置き場の言語と合う
   3. 相対のリンク
-     リンクの先が、その Skill のディレクトリの中に実在する。Skill の外へ出るリンクは違反。
+     リンクの先が、その Skill のディレクトリの中に実在する。Skill の外へ出るリンクは違反
+     (知識を Skill の外に委ねる参照を持たない。cross/ADR-0019)。
      Markdown の書き方のリンク・画像と、HTML の書き方 (href・src の値) の両方を見る
   4. URL
      一覧にある URL (完全一致) か、見本の URL の前置き (前方一致) に当たるものだけである
+     (操作の対象になる URL だけを持つ。cross/ADR-0019)
   5. 内部の言葉
      一覧にある言葉が、本文にもコードブロックにも現れない
 

@@ -5,8 +5,8 @@ applies-when:
   paths: [".github/workflows/**", ".github/actionlint.yaml", "scripts/ci/**"]
   tasks: [検証 CI の失敗の調査, 検証 CI への検査の追加・変更, CI の緑を完了の根拠に使う判断]
 title: 検証 CI
-description: 検証 CI が走る時点・走らせる範囲 (利用者の立場のビルドの確認を含む 5 つの検査)・緑が保証する範囲、失敗したときの見方、手元での確かめ方、既知の制限、検査を足すときの注意
-timestamp: 2026-10-09
+description: 検証 CI が走る時点・走らせる範囲 (利用者の立場のビルドの確認を含む 5 つの検査。README と利用者向け Skill の検査は lint のスクリプトのテストの中で流れる)・緑が保証する範囲、失敗したときの見方、手元での確かめ方、既知の制限、検査を足すときの注意
+timestamp: 2026-10-10
 ---
 
 # 検証 CI
@@ -93,6 +93,22 @@ timestamp: 2026-10-09
 
 文書の構造の検査は入れていない。
 
+### lint の中の、README と利用者向け Skill の検査
+
+`CI script tests` は、スクリプトのロジックのテストのほかに、今のリポジトリの実物を確かめるテストを含む。README と利用者向け Skill (`skills/`) の検査は、step を足さずに、このテストの中から流している。lint の step の数と名前は変わっていない。
+
+| 実物を確かめるテスト (`scripts/ci/tests/test_repository_files.py`) | 確かめること |
+|---|---|
+| README の節の並び | README の 2 枚が、決めた 9 つの節 (深さ 2 の見出し) を、決めた順で持つ。スクリーンショットの節が `assets/` の 6 枚を 1 回ずつ指し、6 枚が実在する。Skill への導線の節のリンクが、自分の言語の 2 つの `SKILL.md` と索引だけで、先が実在する |
+| README の例の検査 (`scripts/ci/check-readme-examples.py`) | README の最小コード例が、利用者役の画面のファイルの全体と同じである。README と各 `SKILL.md` のインストール例の値が、利用者役の使う値と同じで、版の位置が `{version}` であり、最新の版の確かめ先の URL が同じファイルにある。コードブロックの中で本ライブラリの Package URL か Maven の座標に触れる行が、決めた 1 行の形である |
+| Skill 自身の整合の検査 (`scripts/ci/check-skills.py`) | 英語版と日本語版で、Skill の集合・ファイルの集合・見出しの深さの並び・コードブロックの中身と順番が同じである。`SKILL.md` の frontmatter が決めた 5 項目である。Skill の外へ出るリンク (Markdown の書き方と、HTML の `href`・`src`) が無い。許可した一覧に無い URL が無い。決めた内部の言葉が無い |
+| Skill の索引 | 索引の 2 枚 (`skills/README.md`・`skills/README_ja.md`) の見出しの深さの並びが同じである |
+| 追従の記録 (`skills/.manifest.json`) | 記録が決めた項目を持つ。源泉がどれも、掛かる 1 枚か、掛からない理由のどちらかを持つ。掛かる 1 枚が実在する |
+
+どの検査も、`skills/` と README と利用者役のファイルの中だけで合否が決まる。Skill が源泉 (`kasane/concepts/`・本体のコード) からずれていることは、検査しない ([cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md))。そのため、`skills/` も README も利用者役も触らない push は、これらの検査で落ちない。源泉の概念の文書だけを変えた push も、本体に公開の宣言を足しただけの push も、落ちない (2026-10-10 に、一時のツリーで確かめた)。
+
+書き方の決まりは [利用者向け Skill と README の書き方](user-docs-writing.md)、源泉の変更に追従させる流れは [利用者向け Skill の追従](user-skill-refresh.md) にある。
+
 ### ios / verify
 
 1. 決めた版の Xcode を選ぶ。無ければ、ビルドを始める前に失敗で終わる
@@ -144,6 +160,8 @@ CI から外した後に、今のコードで iOS のテストが手元で通る
 | Android の Sample がビルドでき、デバッグのユニットテストが通った | push と Pull Request |
 | Android は、実行の件数が本体と Sample のそれぞれで 0 でなく、テストのソースにあるテストのクラスがすべて結果に現れた | push と Pull Request |
 | lint の step がどれも成功した (上の「lint」の表) | push と Pull Request |
+| README の最小コード例が利用者役の画面のファイルと同じで、README と各 `SKILL.md` のインストール例の値が利用者役の使う値と同じである | push と Pull Request |
+| 利用者向け Skill の英語版と日本語版が、同じファイル・同じ見出しの深さの並び・同じコードブロックを持ち、Skill の外へのリンク・一覧に無い URL・決めた内部の言葉を持たない | push と Pull Request |
 | 今の `ios/` から作った写しを、利用者と同じ書き方で取る利用者役が、リリースの構成で Simulator 向けにビルドできた | Pull Request だけ |
 | 同じ利用者役が、iOS の実機向けに (署名なしで) ビルドできた | Pull Request だけ |
 | 今の `android/` から発行した発行物を、座標の 1 行で取る利用者役のリリースが、コード縮小を有効にして組み立てられた | Pull Request だけ |
@@ -161,6 +179,11 @@ CI から外した後に、今のコードで iOS のテストが手元で通る
 | 利用者役が触らない API について、配布物の依存の宣言が足りている | 利用者役が確かめるのは、最小の利用例が触る範囲である |
 | 公開済みの配布物を取得できる | 検証 CI は切り替えを `local` にして呼ぶ。公開済みの配布物は取りに行かない |
 | `develop` への push の緑で、配布物が正しい | 上の表の「Pull Request だけ」の 4 行は、push の緑では言えない |
+| 利用者向け Skill が、今の源泉 (概念の文書・本体のコード) と合っている | 検査しないと決めてある。オーナーが頼んだときに、追従の道具で確かめる ([利用者向け Skill の追従](user-skill-refresh.md)) |
+| 本体の公開の宣言の名前が、Skill にすべて現れている | 検証 CI では流していない。追従のときに `python3 scripts/docs/check-api-coverage.py` で確かめる |
+| Skill の `references/` のコード例がコンパイルできる | どの検査もビルドしない。ビルドされるのは、README の最小コード例と同じ内容の、利用者役の画面のファイルだけである (`main` 宛ての Pull Request のとき) |
+| 各 `SKILL.md` の最小の動く例が、利用者役の画面のファイルと同じである | 検査が比べるのは README の例だけである。`SKILL.md` の側は、追従の道具が、利用者役の変更を「変わった源泉」として出す |
+| 英語版と日本語版の本文が、同じ内容である | 検査が比べるのは、見出しの深さの並びとコードブロックだけである。スクリーンショットが今の画面と合っていることも、検査しない |
 
 CI の緑は、手元の完了判定の緑と同じ意味ではない。とくに iOS は、緑でもテストは 1 件も走っていない。完了の判定には、[テスト実行規約](test-execution.md) の 4 系統の全件実行を使う。iOS の 2 系統 (本体・Sample) は、手元で流さなければどこでも走らない。
 
@@ -198,6 +221,8 @@ CI が件数を出すのは Android だけである。iOS はテストを実行�
 | iOS の確認のスクリプト (`test_verify_consumer_ios.py`) | 48 |
 | workflow のファイル (`test_workflow_files.py` に足した分) | 25 |
 
+README と利用者向け Skill の検査・追従の道具を足した変更で、262 件から 504 件に増えた (2026-10-10)。足したのは、利用者役の画面のファイルの形・README の例の検査・Skill 自身の整合の検査・追従の道具・実物を確かめるテストである。504 件は、手元で通っている。この変更はまだ push していないので、ランナーの上では走っていない。
+
 ## 失敗したときの見方
 
 まず、どの step が落ちたかを見る。Android は、実行の結果のページの概要に件数の内訳が出て、失敗の理由が注釈として出る。iOS は、落ちた step の記録に `xcodebuild` の出力がそのまま出る。
@@ -212,8 +237,41 @@ CI が件数を出すのは Android だけである。iOS はテストを実行�
 | Install gitleaks | 配布物を取得できない、またはチェックサムが合わない | 版を上げた直後なら、チェックサムを同時に直したかを見る |
 | Secret scan (gitleaks) | 「走査の対象を取り出せていない」なら、取り出したファイルが追跡中より少ない。そうでなければ secret の検出 | 前者は下の「取り出しから外す指定を足すと secret の検査が落ちる」。後者は検出された場所を見る。値はすでに公開されている |
 | Local absolute path lint / Identity lint / Comment policy lint | 違反がある | 同じコマンドを手元で流すと、同じ報告が出る |
-| CI script tests | スクリプトのテストが落ちた、または 1 件も実行されなかった | `python3 scripts/ci/run-tests.py -v` |
+| CI script tests | スクリプトのテストが落ちた、または 1 件も実行されなかった | `python3 scripts/ci/run-tests.py -v`。README か Skill の検査で落ちたときは、下の「README と利用者向け Skill の検査で落ちたとき」 |
 | Workflow definition check | workflow の定義の違反、または読み取れない書き方がある | 「ファイル:行: 内容」の形で示される |
+
+### README と利用者向け Skill の検査で落ちたとき
+
+`CI script tests` が、README か Skill の検査で落ちたときは、落ちたテストの名前と、違反の文面を見る。テストのクラスは `test_repository_files` の `ReadmeSectionsTest`・`UserDocsCheckTest`・`SkillsIndexTest`・`SkillsManifestTest` である。同じ違反は、検査のスクリプトを手元で直に流すと、「ファイル: 内容」の形で出る。
+
+```bash
+python3 scripts/ci/check-skills.py .
+python3 scripts/ci/check-readme-examples.py .
+```
+
+Skill 自身の整合の検査の違反:
+
+| 違反の文面 (要点。N は番号) | 意味 | すること |
+|---|---|---|
+| 見出しの深さの並びが、英語版と日本語版で違う / N つ目のコードブロックが、英語版と日本語版で違う / コードブロックの数が違う | 片方の言語だけを直した | もう片方の言語の同じ 1 枚に、同じ変更をする |
+| frontmatter に、決めていない項目がある / 項目が無い / frontmatter の N 行目を読み取れない | `SKILL.md` の frontmatter が、決めた 5 項目でない。値を複数行に折り返したときも、読み取れない行として出る | 5 項目だけにし、値を 1 行で書く |
+| Skill の外のファイルへのリンクがある / リンクの先が無い | README・索引・相手の Skill などへのリンクを書いた。または、Skill の中のファイルの名前を変えた。HTML の `href`・`src` で書いた先も、同じ文面で出る | Skill の外へのリンクは消す (相手の Skill は名前だけで触れる)。Skill の中のリンクは、先を直す |
+| 許可した一覧に無い URL がある | 一覧 (`scripts/ci/user-docs-rules.json`) に無い URL を書いた | 見本の URL は `https://example.com/` で始める。操作の対象になる URL を足すときだけ、一覧に足す。知識を委ねる先の URL は、足さずに消す |
+| 内部の言葉がある | ADR の番号・ハーネスの道具の名前・利用者役など、利用者の知らない言葉を書いた | 利用者の言葉に書き直す。一覧から言葉を外して通さない |
+
+README の例の検査と、追従の記録のテストの違反:
+
+| 違反の文面 (要点。N は番号) | 意味 | すること |
+|---|---|---|
+| 最小コード例が、利用者役の画面のファイルと違う: N 行目が違う / 行の数が違う | README の例か、利用者役の画面のファイルの、片方だけを変えた | 利用者役の画面のファイルを正として、README の 2 枚に写す。4 つの `SKILL.md` の最小の動く例も、同時に直す (検査は見ない) |
+| 最小コード例の節の見出しが、ちょうど 1 つ無い | README の節の見出しの文面を変えた | 見出しを `Minimal code examples`・`最小コード例` に戻す |
+| Package URL (package の名前・product の名前・Maven の座標) が、利用者役の使う値と違う / 版の指定・版の位置が `{version}` でない / 最新の版の確かめ先の URL が無い / インストール例の種類と数が違う | 例に具体の版を書いた。または、依存の書き方を変えたのに、例を直していない | 版は `{version}` に戻す。値は [公開識別子と配布座標](public-identifiers.md) に合わせる |
+| 本ライブラリの Package URL (Maven の座標) に触れている行が、決めた形でない | コードブロックの中で、Package URL か座標に触れる行を、決めた 1 行の形と違う書き方で書いた (行末のコメント・別の書き方・複数行に分けた宣言) | 違反の文面に出る形のとおりに、1 行で書く |
+| インストール例に、(行の種類) が無い (コードブロックの中に書く) | 依存の宣言の行を、コードブロックの外に書いた。または、例を消した | 依存の宣言の行を、コードブロックの中に書く |
+| 差し込む行が、Package URL と版の指定の形でない / (行) が、ちょうど 1 つ無い | 利用者役のひな形・依存の行・確認のスクリプトの、検査が値を読む行の形を変えた | 検査が読む形 (`scripts/ci/check-readme-examples.py` の冒頭) に合わせるか、検査を同時に直す |
+| (追従の記録のテスト) 源泉が、掛かる 1 枚も、掛からない理由も持たない / 掛かる 1 枚が無い | 記録に源泉を足したときに、行き先を書いていない。または、Skill の 1 枚の名前を変えた | 記録 (`skills/.manifest.json`) を直す |
+
+決まりの中身は、[利用者向け Skill と README の書き方](user-docs-writing.md) にある。
 
 ### ios / verify
 
@@ -251,7 +309,8 @@ python3 scripts/ci/check-workflows.py
 actionlint
 ```
 
-- スクリプトのテストは 15 秒ほどで終わる。2026-10-09 時点で 262 件。テスト 4 系統とは別に数える
+- スクリプトのテストは、手元で 22 秒ほどで終わる (2026-10-10、504 件)。テスト 4 系統とは別に数える
+- README か `skills/` か利用者役の画面のファイルを変えたときは、push の前に、検査の 2 本を直に流す (`python3 scripts/ci/check-skills.py .`・`python3 scripts/ci/check-readme-examples.py .`)。違反が、テストの失敗より読みやすい形で出る。どちらも何も書き換えない
 - actionlint は、リポジトリのルートで流すと `.github/actionlint.yaml` を読む。この設定は、ランナーの名前 `xcode-27` を登録している。actionlint が持つ名前の一覧にこの名前がまだ無く、登録が無いと知らない名前として弾かれる
 - actionlint は検証 CI では流していない。手元で流すだけである
 - プラットフォームの検証は、workflow の step と同じコマンドを手元で流して確かめられる。iOS の 2 つのビルドは Simulator を使わないので、Simulator を用意しなくてよい
@@ -299,6 +358,8 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 | `android / verify` | 15 分 | 3 分 50 秒〜6 分 14 秒 (2026-10-08、4 回)。4 分 50 秒・5 分 2 秒 (2026-10-09) | 30 分 |
 | `consumer-ios / verify` | 15 分 | 1 分 58 秒 (2026-10-09、1 回) | 15 分 |
 | `consumer-android / verify` | 15 分 | 3 分 16 秒 (2026-10-09、1 回) | 15 分 |
+
+`lint` の所要時間は、スクリプトのテストが 504 件に増えた後 (2026-10-10) には、まだ測っていない (増やした変更を push していない)。
 
 上の 3 つは、2026-10-08 に決め直した。`ios / verify` は、テストを実行していた形の 1 回目だけ 13 分 10 秒かかった。決め直した値を持つ commit での実行は、3 つとも成功した。下の 2 つは、2026-10-09 にランナーでの所要時間を見て、暫定の 15 分のまま変えないと決めた (理由は [利用者の立場のビルドの確認](consumer-build-check.md))。
 
@@ -356,6 +417,18 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 |---|---|---|
 | 失敗の見逃しの指定 (`continue-on-error`) が無いこと | スクリプトのテストが、lint の step・iOS の検証の workflow・利用者の立場のビルドの確認の 2 本について確かめる | Android の検証の step は確かめていない |
 
+### README と利用者向け Skill の検査が読める書き方
+
+README の例の検査と、Skill 自身の整合の検査は、Markdown を、コードの囲み・見出し・URL だけ読む。文法を解く道具は使っていない。次の書き方は、検査をすり抜ける。
+
+| 検査 | すり抜ける書き方 | 起きること |
+|---|---|---|
+| インストール例 | 座標を分けて書く形 (group・name・version を別々に書く宣言、version catalog) | 行の中に座標の字面が現れないので、具体の版を書いても違反にならない |
+| インストール例 | 文の中 (コードブロックの外) に書いた座標・版 | インストール例として数えない。値が違っていても、具体の版でも、違反にならない (Skill の中の URL は、URL の検査が一覧と比べる) |
+| Skill の外へのリンク | HTML の `href`・`src` のほかの属性 (`srcset` など) に書いた先 | リンクの先として読まない |
+| Skill の外へのリンク | HTML の属性の名前と値を、改行で分けた書き方 | 同上。検査は 1 行ずつ読む |
+| 英語版と日本語版の一致 | 本文だけを、片方の言語で直した | 見出しの深さの並びとコードブロックが同じなら、違反にならない |
+
 ### 確かめ方の限界
 
 | 事柄 | 確かめたこと | 確かめていないこと・頼っているもの |
@@ -396,6 +469,9 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 | 検査が何も見ずに終わり得る | 黙って空振りする経路を作らない。実行 0 件・走査の対象が空・期待した結果のファイルが無い、はどれも失敗にする |
 | 外部の action を足す・版を上げる | commit の ID で指定し、対応する版をコメントに書く。ID がタグの指す commit と一致することを `git ls-remote` で確かめる |
 | gitleaks の版を上げる | チェックサムを同時に直し、公式のリリースの記録と突き合わせる |
+| README か利用者向け Skill の検査を足す・変える | lint の step を足さない。検査のロジックは `scripts/ci/` のスクリプトに置き、ロジックのテスト (一時のディレクトリのひな形で、正常と異常を流す) と、今のリポジトリの実物に流すテスト (`scripts/ci/tests/test_repository_files.py`) の両方を付ける。合否が `skills/` と README と利用者役のファイルの中だけで決まる検査に限る。源泉とのずれを見る検査は足さない ([cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md)) |
+| 許可する URL・内部の言葉の一覧 (`scripts/ci/user-docs-rules.json`) を変える | 足し方は [利用者向け Skill と README の書き方](user-docs-writing.md) の「URL と内部の言葉の一覧に足すとき」に従う。役割 `latest-version` の URL は、インストール例の検査が読む。変えるときは、例のある 6 か所 (README の 2 枚と 4 つの `SKILL.md`) を同時に直す |
+| 追従の道具 (`scripts/docs/`) を変える | 道具は検証 CI の step では流れないが、テストは `scripts/ci/tests/` にあり、`CI script tests` で流れる。道具が git の履歴を変えない・Skill を書き換えない、という決まりを保つ |
 | コマンドの出力を記録に残す | `コマンド \| tee 記録` と書かない。コマンドが失敗しても成功に見える。記録を後の step が読む必要が出たら、コマンドの終了コードをそのまま返す包みをスクリプトにして、テストを付ける |
 
 ### ジョブと step
@@ -410,14 +486,22 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 
 ## 関連
 
+### 決定
+
 - [cross/ADR-0013](../../decisions/cross/0013-ci-runs-no-simulator-or-device-tests.md) — 走らせる範囲と、緑が保証する範囲の決定
 - [cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md) — workflow の構成と、検査の名前を固定した決定
 - [cross/ADR-0016](../../decisions/cross/0016-consumer-build-check-on-main-pull-requests.md) — 配布物を利用者役でビルドして確かめる決定
 - [cross/ADR-0010](../../decisions/cross/0010-develop-and-main-branch-roles.md) — 走る時点の元になる、ブランチの役割の決定
+- [cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md) — Skill が源泉からずれていることを、検証 CI で検査しない決定
+
+### 規約・ガイド
+
 - [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — 必須の検査を参照する保護の値
 - [利用者の立場のビルドの確認](consumer-build-check.md) — 利用者役の流し方と、失敗したときの見方
 - [配布物の形と作り方](package-distribution.md) — 配布物の中身と、写しを作る道具
+- [利用者向け Skill と README の書き方](user-docs-writing.md) — 検査が確かめている決まりの中身
+- [利用者向け Skill の追従](user-skill-refresh.md) — 検証 CI の外で流す、追従の道具
 - [テスト実行規約](test-execution.md) — 手元の完了判定と、件数の読み方
 - [ソースコメント規約](comment-policy.md) — Comment policy lint が確かめる規約
 
-出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 1〜7) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証をビルドだけにした指示) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (ランナーの上での実行・実地の確認・時間の上限の決め直し・公開の後の手元での iOS のテストの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/review-003.md (Android のテストのクラスの導き方の、残した制限) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 6・7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (5 つの検査のランナーの上での実行・時間の上限)
+出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 1〜7) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証をビルドだけにした指示) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (ランナーの上での実行・実地の確認・時間の上限の決め直し・公開の後の手元での iOS のテストの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/review-003.md (Android のテストのクラスの導き方の、残した制限) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 6・7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (5 つの検査のランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 5・6) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (実物に検査を流すテスト・一時のツリーでの 3 つの確かめ) / kasane/changes/archive/2026-10-10-user-docs/evidence/local-completion.md (スクリプトのテストの件数)

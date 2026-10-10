@@ -14,7 +14,7 @@
   ブロックの中の依存の宣言の行について、次を確かめる。
     - 値 (Package URL・package の名前・product の名前・Maven の座標) が、利用者役が公開済みの
       配布物を取るときに使う値と同じである
-    - 版の位置が {version} で、具体の版が無い
+    - 版の位置が {version} で、具体の版が無い (cross/ADR-0018)
     - 最新の版の確かめ先の URL が、同じファイルにある
     - README は SwiftPM と Gradle の両方の例を、iOS の SKILL.md は SwiftPM の例を、Android の
       SKILL.md は Gradle の例を持つ

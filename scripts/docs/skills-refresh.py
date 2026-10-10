@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """利用者向け Skill の追従のために、前回の追従から変わった源泉を出し、追従の記録を更新する。
 
+追従は、オーナーが頼んだときに、前回追従した commit からの源泉の差分をもとに行う
+(cross/ADR-0017)。覚えておくのは、その commit の ID 1 つである。
+
 追従の記録は skills/.manifest.json にある (形は skills_manifest.py の冒頭)。使い方は 2 つ。
 
 status

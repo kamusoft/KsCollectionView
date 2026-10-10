@@ -232,7 +232,42 @@ phase-7-2 が「README のインストール例と利用者役を一致させる
 
 - [x] 論点の解消
 - [x] 追従の仕組みの ADR を cross に起票する (cross/ADR-0017、proposed)
-- [ ] phase-7-4 への申し送りの候補: リリースの手順の中で、Skill の追従を確かめるかどうか (議論側の補足で、オーナーには確かめていない)
-- [ ] phase-7-4 への申し送りの候補: 最新の版の案内先になる Release の形 (どのリポジトリに作るか。翻案元は、案内が効くようにプレリリースの印を付けない決まり)
+- [x] phase-7-4 への申し送りの候補: リリースの手順の中で、Skill の追従を確かめるかどうか (議論側の補足で、オーナーには確かめていない)
+- [x] phase-7-4 への申し送りの候補: 最新の版の案内先になる Release の形 (どのリポジトリに作るか。翻案元は、案内が効くようにプレリリースの印を付けない決まり)
 - [x] インストール例の版の書き方と、Skill の外への参照の扱いの ADR を起票する (cross/ADR-0018・0019、proposed)
-- [ ] ksn-propose で変更提案を起こす
+- [x] ksn-propose で変更提案を起こす
+
+## 実装結果 (2026-10-10 反映)
+
+変更 `user-docs` で実装し、`develop` に commit した。記録は `kasane/changes/archive/2026-10-10-user-docs/` にある。
+
+- 利用者向け Skill の 4 部 (iOS・Android × 英語・日本語。`SKILL.md` と `references/` の 5 枚ずつ) と、索引の 2 枚を作った
+- ルートの README の 2 枚を 9 つの節で書き直し、Sample の画面のスクリーンショット 6 枚を `assets/` に置いた
+- 利用者役の画面のソースを、README の最小コード例としてそのまま載せられる形に書き直した。確かめる内容は変えていない
+- README の例と、Skill 自身の整合を確かめる検査を足した。検証 CI のスクリプトのテストから毎回流れ、lint の step は増えていない
+- 追従の道具 (変わった源泉の一覧・公開の宣言の名前の網羅の報告) と、追従の記録 (`skills/.manifest.json`) を足した
+- 配った先を再現した確認を行った。読ませる確認 4 回の指摘 211 件に結末を付け、使わせる確認 10 回はすべてビルドに成功した
+- 追従の仕組み・インストール例の版の書き方・Skill の外への参照の扱いは、cross/ADR-0017・0018・0019 として確定した
+- 手順と決まりは handbook の `cross/user-skill-refresh.md`・`cross/user-docs-writing.md` にある
+
+### 決定事項から形が変わった点
+
+- Skill に載せない公開の名前は、iOS の `buildExpression`・`buildBlock` の 2 つになった (オーナーの決定。コンパイラが自動で呼ぶ関数)
+- Android の利用する側の下限は、minSdk と compileSdk だけを示す。Android Gradle Plugin と Kotlin の下限は、その組でビルドして確かめていないので外した (オーナーの決定)
+- 最新の版の確かめ先は、本リポジトリの Release の一覧を仮の値として書いた
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| 最新の版の確かめ先 (Release をどこに作るか)。仮の値のままで、決まったら例のある 6 つのファイルと、許可する URL の一覧を直す | phase-7-4-release-pipeline の agenda (phase-7-3 からの申し送り) |
+| README の「まだ公開していない」の 1 文を、初回のリリースのときに外す | phase-7-4-release-pipeline の agenda (同上) |
+| リリースの手順の中で、Skill の追従を確かめるかどうか | phase-7-4-release-pipeline の agenda (同上) |
+| 本リポジトリと配信用リポジトリの、版の番号とタグの形の対応。決まっていないので、Skill に書けなかった | phase-7-4-release-pipeline の agenda (同上) |
+| 配信用リポジトリに置く README のひな形の案内が、ルートの README と食い違っていないかの確認 | phase-7-4-release-pipeline の agenda (同上) |
+| Android の利用する側の下限 (Android Gradle Plugin・Kotlin) を、ビルドして確かめて載せるか。Compose Foundation が本ライブラリを通して届くかの確認 | phase-7-4-release-pipeline の agenda (同上。初回リリースまでに片付ける範囲の論点に合流) |
+| Skill のコード例の実行時の動きは確かめていない (コンパイルとビルドまで) | phase-7-4-release-pipeline の agenda (同上。申し送りの「確かめること」に合流) |
+| 簡易起票が 3 件増えた (`android-sample-status-bar-contrast`・`ios-invalid-input-handling-gaps`・`platform-placement-parity-check`)。1 件目は、直した後にスクリーンショット 6 枚を撮り直す | phase-7-4-release-pipeline の agenda (同上。初回リリースまでに片付ける範囲の論点に合流) |
+| 新しいテストと検査は、検証 CI の上ではまだ走っていない (手元でだけ流した) | 見送り。次の push で分かる。handbook の `cross/verification-ci.md` に書いた |
+| 画像の同時取得数の案内は、Skill に載せていない | 見送り。簡易起票 `image-fetch-concurrency-priority` が決まった後に、追従で載せる |
+

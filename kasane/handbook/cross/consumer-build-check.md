@@ -3,10 +3,10 @@ kind: guide
 applies-when:
   always: false
   paths: ["scripts/ci/verify-consumer-*.py", "verification/**", ".github/workflows/verify-consumer-*.yml"]
-  tasks: [利用者の立場のビルドの確認を手元で流す, 利用者の立場のビルドの確認の失敗の調査, 利用者役・確認のスクリプト・確認の workflow の変更]
+  tasks: [利用者の立場のビルドの確認を手元で流す, 利用者の立場のビルドの確認の失敗の調査, 利用者役・確認のスクリプト・確認の workflow の変更, 利用者役の画面のソース (README の最小コード例の元) の変更]
 title: 利用者の立場のビルドの確認
-description: 配布物を利用者と同じ書き方で取る利用者役の形、手元での流し方、検証 CI での走り方、失敗したときの見方、確かめた範囲と確かめていないこと、変えるときの注意
-timestamp: 2026-10-09
+description: 配布物を利用者と同じ書き方で取る利用者役の形 (画面のソースは README の最小コード例と同じ内容)、手元での流し方、検証 CI での走り方、失敗したときの見方、確かめた範囲と確かめていないこと、変えるときの注意
+timestamp: 2026-10-10
 ---
 
 # 利用者の立場のビルドの確認
@@ -25,6 +25,25 @@ Sample は本体のソースを直接参照するので、配布物だけが壊�
 | Android | `verification/android/` | アプリのモジュール `:app` を 1 つ持つ、独立した Gradle のビルド。一覧を 1 つ表示する。本体を、座標の 1 行で取る | コード縮小 (R8) を有効にしたリリースが組み立てられ、実行時の依存に座標が指定の版で現れる |
 
 どちらも、起動はしない。Simulator もエミュレータも使わない ([cross/ADR-0013](../../decisions/cross/0013-ci-runs-no-simulator-or-device-tests.md))。利用者役のテストも無い。
+
+### 画面のソースは、README の最小コード例と同じ内容である
+
+利用者役の画面のソースは、プラットフォームごとに 1 つのファイルで、ルートの README の最小コード例と、各 `SKILL.md` の最小の動く例に、ファイルの全体がそのまま載っている。利用者が README から貼るコードが、import まで含めて、この確認でビルドしたものになる。
+
+| プラットフォーム | 画面のファイル | 形 |
+|---|---|---|
+| iOS | `verification/ios/Sources/VerificationApp/ItemListScreen.swift` | モデル `Item` と画面 `ItemListScreen` を 1 つのファイルに置く。コメントと `public` を持たない |
+| Android | `verification/android/app/src/main/kotlin/ItemListScreen.kt` | モデル `Item` と画面 `ItemListScreen` を置く。package の宣言を持たず、`import` から始まる。コメントを持たない。Material に依存しない書き方 (`BasicText`) である |
+
+Android の入口 (`MainActivity.kt`。利用者役のアプリの package の下にある) は、package の宣言を持つ。package の宣言を持たないファイルの画面を呼ぶために、画面の名前だけを書いた import (`import ItemListScreen`) を 1 行持つ。この import を消すと、名前を解決できずにビルドが落ちる。
+
+| 確かめること | 確かめるもの |
+|---|---|
+| 画面のファイルの形 (1 つのファイルであること・コメントが無いこと・Android が package の宣言を持たないこと・入口が名前だけの import で呼ぶこと) | スクリプトのテスト (`scripts/ci/tests/test_verify_consumer_ios.py`・`test_verify_consumer_android.py`) が、実物を見て確かめる |
+| README の最小コード例が、このファイルと同じ内容であること | 検査 (`scripts/ci/check-readme-examples.py`)。lint のジョブのスクリプトのテストの中で、検証 CI が起動する push のたびに流れる ([検証 CI](verification-ci.md))。`main` 宛ての Pull Request を待たずに、食い違いに気付ける |
+| 各 `SKILL.md` の最小の動く例が、このファイルと同じ内容であること | 検査は見ない。画面のファイルを変えると、追従の道具が「変わった源泉」として出す ([利用者向け Skill の追従](user-skill-refresh.md)) |
+
+載せ方の決まりは、[利用者向け Skill と README の書き方](user-docs-writing.md) にある。
 
 ### 切り替え
 
@@ -145,6 +164,8 @@ step は、Checkout・Setup JDK・Cache Gradle dependencies・Show toolchain・E
 
 どちらの確認も、外部の依存 (Nuke・Maven の依存) を取得できないと落ちる。コードを変えていないのに落ちたときは、取得の失敗を先に見る。
 
+画面のファイルを変えた push では、利用者の立場のビルドの確認より先に、lint の `CI script tests` が落ちることがある。README の最小コード例と画面のファイルが食い違ったとき (README の例の検査) と、画面のファイルの形が決めた形でなくなったとき (コメントを足した・Android に package の宣言を足した・iOS のファイルを分けた) である。見方は [検証 CI](verification-ci.md) の「失敗したときの見方」にある。
+
 ### iOS
 
 | 出力 | 意味 |
@@ -199,6 +220,8 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 
 コード縮小を有効にした利用者役を、2026-10-09 に手元のエミュレータ (Android 16・API 36) で 1 回起動した。一覧が表示され、スクロールでき、落ちなかった。
 
+画面のソースを README に載せる形 (Android は package の宣言を持たないファイル) に書き直した後、2026-10-10 に、コード縮小を有効にした利用者役を、作業専用のエミュレータ (Android 16・API 36) でもう 1 回起動した。一覧の最初の画面が表示され、落ちなかった。コード縮小の対応表には、新しい画面の名前があった。このときは、スクロールを操作していない。
+
 確かめたのは、最小の利用例が通る経路 (一覧の表示・区切り線・スクロール・起動時のコンテキストの捕捉) だけである。画像の読み込み・ページング・並べ替えなど、利用例が触らない機能は、コード縮小の後の動きを確かめていない。
 
 `KsAppContextInitializer` は、アプリの起動時にアプリケーションのコンテキストを捕捉する、本ライブラリの内部のクラスである。androidx App Startup が、マニフェストに書かれた名前で起動時に探す。名前で探されるクラスは、コード縮小で名前が変わると見つからなくなる。このクラスの名前は、androidx App Startup が自分の AAR に同梱している規則が保っている。本ライブラリの AAR には規則が無い。
@@ -214,7 +237,7 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 
 ### 確かめていないこと
 
-2026-10-09 時点で確かめていないことは、次のとおり。
+2026-10-10 時点で確かめていないことは、次のとおり。
 
 | 確かめていないこと | 分かっていること |
 |---|---|
@@ -225,6 +248,8 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 | ランナーの上で、コンパイル対象の Android SDK を取得する側の処理 (ランナーに SDK が無いときだけ動く) | コンパイル対象の SDK がランナーにあり、動かなかった |
 | `Select Xcode` の step が Xcode を見つけて選ぶ側の処理を、手元で動かすこと | step は、`/Applications` の下の `Xcode_<版>.app` という名前のアプリを探す。手元の Xcode は、この名前では置いていない。同じ本文の step が、`ios / verify` でランナーの上で通っている。無い版を渡すと `DEVELOPER_DIR` を書く前に失敗で終わることは、step の本文を取り出して手元で確かめた |
 | Xcode 27.0 以外でのビルド、Windows での確認のスクリプトの実行 | 対象にしていない |
+| 書き直した利用者役 (画面のソースを README に載せる形にしたもの) の、ランナーの上での実行 | 書き直した変更をまだ push していないので、ランナーの上では走っていない。手元では、切り替えを `local` にして、両プラットフォームが成功している (2026-10-10) |
+| Skill の `references/` のコード例のビルド | この確認がビルドするのは、画面のファイル (README の最小コード例と同じ内容) だけである。`references/` の例は、書いた・直したときに、作業用の置き場でコンパイルして確かめる ([利用者向け Skill と README の書き方](user-docs-writing.md)) |
 
 ## 変えるときの注意
 
@@ -237,13 +262,20 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 | Xcode の版・JDK の版 | 既存の検証の workflow と、確認の workflow で、同時に上げる。値がずれると、スクリプトのテストが落ちる。Xcode の版を上げるときは、マニフェストの宣言も同時に上げる ([配布物の形と作り方](package-distribution.md)) |
 | iOS の `Select Xcode` の step、Android のコンパイル対象の SDK を確かめる step | 既存の検証の workflow と同じ本文であることを、テストが確かめる。直すときは両方を直す |
 | 利用者役のビルドの定義 (`verification/android/` の `*.gradle.kts`・wrapper の設定) | 変えると、Android の確認のキャッシュのキーが変わる。wrapper を上げるときは、`android/` と `verification/android/` の両方を同じ版にする (スクリプトのテストが、設定が同じであることを確かめる) |
-| 利用者が書く依存の書き方 (Package URL・package の名前・座標) | 利用者役のひな形と依存の行を、同時に直す ([公開識別子と配布座標](public-identifiers.md)) |
+| 利用者が書く依存の書き方 (Package URL・package の名前・座標) | 利用者役のひな形と依存の行、README の 2 枚と 4 つの `SKILL.md` のインストール例を、同時に直す ([公開識別子と配布座標](public-identifiers.md))。インストール例の値が利用者役の値と違うと、README の例の検査が落ちる |
+| 利用者役の画面のファイル (`ItemListScreen.swift`・`ItemListScreen.kt`) | README の 2 枚の最小コード例と、4 つの `SKILL.md` の最小の動く例を、同時に同じ内容に直す。README の直し漏れは検査が落とすが、`SKILL.md` の直し漏れは検査が見ない。コメント・`public`・package の宣言・利用者に関係の無い行を足さない (そのまま README に載る)。Android は、Material に依存しない書き方を保つ (利用者役のモジュールは Material に依存していない) |
+| 利用者役の画面のファイルの名前・置き場 | 検査 (`scripts/ci/check-readme-examples.py`) が持つパス、スクリプトのテストが持つパス、追従の記録 (`skills/.manifest.json`) の `sources` のパスを、同時に直す |
+| Android の入口 (`MainActivity.kt`) | 画面の名前だけの import を消さない。入口を package の宣言を持たないファイルにしない (マニフェストの入口の名前の書き方まで変わる) |
+| 利用者役のモジュールの依存 | 足さない。足すと、README の最小コード例が、利用者に余分な依存を求める例になる。最小コード例に要る依存は、README と `SKILL.md` の例の下に書いてある |
 
-知っておく制限:
+### 知っておく制限
 
 - この確認は、外部の依存の取得 (Nuke・Maven の依存) に頼る。必須の検査が、コードの誤りではない理由で止まり得る。止まったときの進め方は [ブランチの運用と GitHub の設定](branch-and-github-settings.md) にある
 - iOS の確認は、Simulator 向けのビルドが落ちると、実機向けのビルドを流さない。1 回の失敗で、両方の行き先の結果は分からない
 - 確認のスクリプトのテストは、`xcodebuild` と `gradlew` を、呼ばれ方を記録する偽物に差し替えて流す。ビルドも発行も実際には走らない
+- 利用者役の画面は、配った先を再現した確認 (利用者向け Skill だけを渡したエージェントに画面を書かせて、ビルドする確認) の入口にも使う。そのときは、作業ツリーを写した作業用の写しの中で画面のファイルを入れ替え、本リポジトリの利用者役は入れ替えない ([利用者向け Skill の追従](user-skill-refresh.md))
+
+作業用の写しで Android の確認を流すときは、SDK の場所の渡し方に気を付ける。SDK の場所を書いた設定ファイル (`local.properties`) は git の管理の外にあり、作業ツリーを写しても、写しには入らない。初回 (2026-10-10) は、3 つ (`android/`・`samples/android/`・`verification/android/`) を写しに足した。足す前は、画面のファイルをコンパイルする前の、本体の発行で止まった (SDK の場所が見つからない)。
 
 ## 関連
 
@@ -251,6 +283,8 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 - [cross/ADR-0013](../../decisions/cross/0013-ci-runs-no-simulator-or-device-tests.md) — 検証 CI で Simulator・エミュレータを使わない決定
 - [配布物の形と作り方](package-distribution.md) — 配布物の中身、写しの作り方、手元への発行
 - [検証 CI](verification-ci.md) — 5 つの検査が走る時点と、緑が保証する範囲
+- [利用者向け Skill と README の書き方](user-docs-writing.md) — 最小コード例を、利用者役の画面のファイルと同じにする決まり
+- [利用者向け Skill の追従](user-skill-refresh.md) — 画面のファイルを変えた後に、`SKILL.md` の例を直す流れ
 - [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — 必須の検査を参照する保護の値と、検査が止まったときの進め方
 
-出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 3〜7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ios.md・consumer-android.md (利用者役・確認のスクリプト・失敗の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ci-workflows.md (確認の workflow の形・手元での確認) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (ランナーの上での実行・時間の上限)
+出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 3〜7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ios.md・consumer-android.md (利用者役・確認のスクリプト・失敗の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ci-workflows.md (確認の workflow の形・手元での確認) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (ランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 4) / kasane/changes/archive/2026-10-10-user-docs/evidence/consumer-screen-source.md (書き直した形・`local` の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-use.md (作業用の写しで流すときの `local.properties`)

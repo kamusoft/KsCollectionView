@@ -1,7 +1,7 @@
 ---
 id: 0019
 title: Skill の外への参照は、知識を委ねるものを持たず、操作の対象になる URL は持ってよいとする
-status: proposed
+status: accepted
 date: 2026-10-10
 amends: 0005
 ---
@@ -51,5 +51,6 @@ Skill の外への参照は、URL があるかどうかではなく、何のた�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-3-user-docs/history.md (2026-10-10: cross/ADR-0005 の閉世界性の条項) / ../KsSettingsView/kasane/decisions/cross/0029-install-examples-without-pinned-version.md (Decision: Skill の外部参照の境界) / ../KsSettingsView/kasane/changes/archive/2026-08-28-rollout-user-skills/deviation.md (Skill の外への参照が検収で落ちた経緯)
+出典: kasane/roadmaps/v1-foundation/phases/phase-7-3-user-docs/history.md (2026-10-10: cross/ADR-0005 の閉世界性の条項) / ../KsSettingsView/kasane/decisions/cross/0029-install-examples-without-pinned-version.md (Decision: Skill の外部参照の境界) / ../KsSettingsView/kasane/changes/archive/2026-08-28-rollout-user-skills/deviation.md (Skill の外への参照が検収で落ちた経緯) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 2: 相手のプラットフォームとの差の書き方 / Decision 5: Skill 自身の整合の検査)
+現行照合: 2026-10-10 確認。Skill の 24 枚が持つ URL は、`scripts/ci/user-docs-rules.json` の 4 つ (Package URL・配布元・最新の版の確かめ先・不具合の報告先) と、コード例の見本の前置きだけである。`scripts/ci/check-skills.py` が、Skill の外のファイルへのリンクと、一覧に無い URL を違反にする。相手のプラットフォームの Skill には、名前だけで触れている。判定: 維持
 関連: cross/ADR-0015 (SwiftPM の Package URL) / cross/ADR-0018 (インストール例に版を書かない決定)

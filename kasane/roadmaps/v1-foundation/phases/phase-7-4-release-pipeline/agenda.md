@@ -46,13 +46,28 @@
 
 ### phase-7-2 からの申し送り (2026-10-09、package-distribution)
 
-- 配信用リポジトリ `KsCollectionView-SPM` は、まだ無い。作成と設定 (Issue と Pull Request を閉じ、本リポジトリへ案内する)、写しを送って tag を付ける工程を、このフェーズで作る (cross/ADR-0015)。写しを作る道具 (`scripts/distribution/sync-spm-snapshot.py`) は git を操作せず、行き先には、まだ無いパス・空のディレクトリ・配信用リポジトリの作業コピーだけを受け付ける。commit・push・tag は、道具を呼ぶ側の工程が行う
+- 配信用リポジトリ `KsCollectionView-SPM` は、まだ無い。作成と設定 (Issue と Pull Request を閉じ、本リポジトリへ案内する)、写しを送って tag を付ける工程を、このフェーズで作る (cross/ADR-0015)
+- 写しを作る道具 (`scripts/distribution/sync-spm-snapshot.py`) は git を操作せず、行き先には、まだ無いパス・空のディレクトリ・配信用リポジトリの作業コピーだけを受け付ける。commit・push・tag は、道具を呼ぶ側の工程が行う
 - Android の公開の設定は入っている。足りないのは、実際に公開する workflow・署名の鍵の受け渡し・Maven Central への送信である。鍵はプロパティで受け取り、無ければ署名を飛ばす。確かめた署名は、パスフレーズなしの使い捨ての鍵だけで、本番の形 (パスフレーズつき) は確かめていない。版が開発中の版のままだと、Maven Central へ送るタスクは最初に失敗する
-- 利用者の立場の確認の再利用 workflow (`verify-consumer-ios.yml`・`verify-consumer-android.yml`) は、切り替えと版を入力に取る。リリースの workflow からは、公開済みの形で版を渡して呼べる (cross/ADR-0016)。公開済みの配布物の取得は、公開物が無いので確かめていない。最初のリリースで確かめる。リリースの workflow が作った成果物そのものを、公開の前に利用者役へ渡す形は、まだ無い
+- 利用者の立場の確認の再利用 workflow (`verify-consumer-ios.yml`・`verify-consumer-android.yml`) は、切り替えと版を入力に取る。リリースの workflow からは、公開済みの形で版を渡して呼べる (cross/ADR-0016)
+- 公開済みの配布物の取得は、公開物が無いので確かめていない。最初のリリースで確かめる。リリースの workflow が作った成果物そのものを、公開の前に利用者役へ渡す形は、まだ無い
 - コード縮小を有効にした Android の利用者役は、手元で 1 回起動して一覧が表示されることを確かめた。リリースの節目ごとに起動を確かめる決まりにするかは、決めていない
 - 利用者の立場の確認は、外部の依存の取得 (Nuke・Maven の依存) に頼る。コードの誤りでない理由で `main` の必須の検査が止まり得る。上の phase-7-1 からの申し送りの「管理者が迂回してよい条件」と一緒に決める
 - 簡易起票が 1 件増えた: `ios-release-build-concurrency-warnings` (本体をリリースの構成でビルドすると、並行性の警告が 2 か所で出る。利用者のビルドの出力に現れる)。論点「初回リリースまでに片付ける範囲」で扱う
 - 手順と値は handbook の `cross/package-distribution.md` (配布物を作る側) と `cross/consumer-build-check.md` (利用者役で確かめる側) にある
+
+### phase-7-3 からの申し送り (2026-10-10、user-docs)
+
+- README と 4 つの `SKILL.md` は、最新の版の確かめ先を、本リポジトリの Release の一覧 (仮の値) にしている。Release をどこにどう作るかを決める。別の場所にするなら、例のある 6 つのファイルと、許可する URL の一覧 (`scripts/ci/user-docs-rules.json`) を直す
+- 案内が効くように、Release を利用者に見える形で保つ決まりが要る (cross/ADR-0018 の負の帰結)。翻案元は、プレリリースの印を付けない決まりにしている
+- README のインストールの節の「まだ公開していない」の 1 文を、初回のリリースのときに外す
+- リリースの手順の中で、Skill の追従を確かめるかどうか (追従はオーナーが頼んだときにだけ行う決まりで、頼み忘れると古い Skill のままリリースされ得る。cross/ADR-0017)
+- 本リポジトリと配信用リポジトリの、版の番号とタグの形の対応を決める。決まっていないので、Skill の導入の節に書けなかった
+- 配信用リポジトリに置く README のひな形 (`scripts/distribution/spm-readme.template.md`) の案内が、ルートの README と食い違っていないかを確かめる
+- Android の利用する側の下限は、minSdk と compileSdk だけを示している。Android Gradle Plugin と Kotlin の下限を、ビルドして確かめて載せるかを決める。Compose Foundation が本ライブラリを通して届くかも、同じときに確かめる
+- 簡易起票が 3 件増えた: `android-sample-status-bar-contrast`・`ios-invalid-input-handling-gaps`・`platform-placement-parity-check`。1 件目は、直した後に README のスクリーンショット 6 枚を撮り直す。上の「初回リリースまでに片付ける範囲」の論点に含める
+- Skill のコード例は、コンパイルとビルドまでで確かめた。実行時の動きは確かめていない
+- 手順と決まりは handbook の `cross/user-skill-refresh.md` (追従の手順) と `cross/user-docs-writing.md` (Skill と README の書き方) にある
 
 ## 決定事項
 
