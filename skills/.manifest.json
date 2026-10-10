@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "syncedCommit": "e7993ac686e8665609f23f23abcf6455e45db387",
+  "syncedCommit": "bc3c83230bec730d1998557cafbc9ce4c47dc26a",
   "sources": [
     {"path": "kasane/concepts/core/core-model/collection-items.md", "pages": ["references/basics.md", "references/layout.md"]},
     {"path": "kasane/concepts/core/core-model/collection-interaction.md", "pages": ["references/basics.md"]},
