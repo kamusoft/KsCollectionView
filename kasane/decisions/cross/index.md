@@ -18,5 +18,8 @@
 | [0014](0014-ci-reusable-platform-workflows-and-fixed-check-names.md) | 検証 CI は、プラットフォーム別の再利用 workflow と入口 1 本で構成し、検査の名前を固定する | accepted | iOS / Android の検証は入力なしの再利用 workflow、入口が lint を持つ。検査の名前は `lint`・`ios / verify`・`android / verify`。`main` 宛ての Pull Request では変更したパスで絞り込まない。 |
 | [0015](0015-swiftpm-via-distribution-repository.md) | SwiftPM の配布物は、配信用の別リポジトリに本体の写しを置いて配る | accepted | 配信用の公開リポジトリ `KsCollectionView-SPM` のルートに `ios/` の本体の写しを置く。本リポジトリのルートにはマニフェストを置かず、`ios/Package.swift` を 1 枚のまま使う。ルートから直接配る案とバイナリで配る案を却下。 |
 | [0016](0016-consumer-build-check-on-main-pull-requests.md) | 配布物は、利用者と同じ書き方で参照する専用の利用者役を、main 宛ての Pull Request でビルドして確かめる | accepted | 専用の小さな利用者役が公開の前の成果物を参照してビルドする。`main` 宛ての Pull Request のときだけ走らせて必須の検査にし、起動はしない。Android はコード縮小を有効にする。Sample の流用・中身の照合だけ・必須にしない・push ごと・リリースのときだけを却下。 |
+| [0017](0017-user-skill-refresh-on-request-by-commit-diff.md) | 利用者向け Skill の追従は、オーナーが頼んだときに、前回追従した commit からの源泉の差分をもとに行う | proposed | 検証 CI はずれを検査しない。覚えておくのは前回追従した commit の ID 1 つで、ハッシュの対応表は持たない。手順は handbook と `scripts/` に置く。`main` 宛ての Pull Request で止める・ハッシュの対応表・専用の Skill を却下。 |
+| [0018](0018-install-examples-without-concrete-version.md) | インストール例には具体の版を書かず、利用者が置き換える印を置く | proposed | 版の位置に `{version}` を置き、最新の版は Release の一覧で確かめてもらう。リリースの工程は README と Skill の版を書き換えない。リリースのたびに置き換える・手で直すを却下。 |
+| [0019](0019-skill-external-references-by-purpose.md) | Skill の外への参照は、知識を委ねるものを持たず、操作の対象になる URL は持ってよいとする | proposed | cross/ADR-0005 の閉世界性の条項の一部を改める。続きを外で読ませる参照は持たず、Package URL・最新の版の確かめ先・不具合の報告先・配布元は書いてよい。文面のまま従うを却下。 |
 
 採番規則は [../index.md](../index.md) を参照。

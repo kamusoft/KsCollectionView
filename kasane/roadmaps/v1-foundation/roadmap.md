@@ -63,5 +63,5 @@ graph LR
 | phase-6-drag-reorder | completed | change | [agenda](phases/phase-6-drag-reorder/agenda.md) | [drag-reorder](../../changes/archive/2026-10-01-drag-reorder/proposal.md) |
 | phase-7-1-public-repo-verify-ci | completed | change | [agenda](phases/phase-7-1-public-repo-verify-ci/agenda.md) | [public-repo-verify-ci](../../changes/archive/2026-10-08-public-repo-verify-ci/proposal.md) |
 | phase-7-2-package-distribution | completed | change | [agenda](phases/phase-7-2-package-distribution/agenda.md) | [package-distribution](../../changes/archive/2026-10-09-package-distribution/proposal.md) |
-| phase-7-3-user-docs | in-progress | change | [agenda](phases/phase-7-3-user-docs/agenda.md) | — |
+| phase-7-3-user-docs | in-progress | change | [agenda](phases/phase-7-3-user-docs/agenda.md) | [user-docs](../../changes/user-docs/proposal.md) |
 | phase-7-4-release-pipeline | in-progress | change | [agenda](phases/phase-7-4-release-pipeline/agenda.md) | — |
