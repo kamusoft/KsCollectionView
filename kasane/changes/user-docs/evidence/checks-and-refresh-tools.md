@@ -180,3 +180,9 @@ iOS: 拾った名前 83 個 (名前を持つ宣言 90 個)・載せないと決�
 Android: 拾った名前 86 個 (名前を持つ宣言 98 個)・載せないと決めた名前 0 個
 公開の宣言の名前の網羅: 漏れ 0 件
 ```
+
+## 12.5 追従の記録の更新 (2026-10-10)
+
+- 実装の commit (`e7993ac`) の後に、`python3 scripts/docs/skills-refresh.py record` を流した (終了コード 0)。書き換わったのは `skills/.manifest.json` の `syncedCommit` の 1 行だけで、作業を始めたときの commit (`a064aca`) から、実装の commit に変わった
+- その後の `python3 scripts/docs/skills-refresh.py status` (終了コード 0): 「変わった源泉は無い」「公開の宣言の増減は無い」。最初の記録が、制作の見た源泉の commit を指している
+- commit の前に `record` を流すと、対象のパス (利用者役の画面のファイル 2 つ) に commit していない変更があるので、書き換えずに失敗で終わる (グループ 9 の実装のときに確かめた)。`record` は commit の後に流す
