@@ -1,7 +1,7 @@
 ---
 id: 0020
 title: 利用者向け Skill の追従は、オーナーが頼んだときに、専用の Skill が前回追従した commit からの源泉の差分をもとに行う
-status: proposed
+status: accepted
 date: 2026-10-14
 supersedes: 0017
 ---
@@ -62,5 +62,5 @@ Skill が持つのは、進め方とワーカーへの任せ方までとする�
 - 前提 (Context) が崩れたとき
 - 兄弟ライブラリと共通の追従の道具を、ハーネスの側に持つことにしたとき
 
-出典: kasane/changes/user-skill-refresh-skill/exploration.md (課題 / 動機・検討した選択肢・決定事項) / kasane/decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md (置き換える決定と、引き継ぐ却下案) / ../KsSettingsView/.agents/skills/docs-refresh/SKILL.md (兄弟ライブラリの追従の Skill の進め方とワーカーへの任せ方) / ~/.claude/skills/ksn-core/references/handbook.md (「読み込み」: handbook を作業の前に開くスキル) / ~/.claude/skills/ksn-core/references/worker-dispatch.md (ワーカーのモデルは器の定義が決め、呼ぶ側は器を選ぶ)
+出典: kasane/changes/archive/2026-10-14-user-skill-refresh-skill/exploration.md (課題 / 動機・検討した選択肢・決定事項) / kasane/decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md (置き換える決定と、引き継ぐ却下案) / ../KsSettingsView/.agents/skills/docs-refresh/SKILL.md (兄弟ライブラリの追従の Skill の進め方とワーカーへの任せ方) / ~/.claude/skills/ksn-core/references/handbook.md (「読み込み」: handbook を作業の前に開くスキル) / ~/.claude/skills/ksn-core/references/worker-dispatch.md (ワーカーのモデルは器の定義が決め、呼ぶ側は器を選ぶ)
 関連: cross/ADR-0005 (追従の仕組みの具体を、追従の決定に委ねた。開発者向けの規範・手順を handbook に置く) / cross/ADR-0010 (`develop` は事後に検証する決まり) / cross/ADR-0016 (`main` 宛ての Pull Request のときだけ走る検査の先例)

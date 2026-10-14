@@ -76,6 +76,7 @@ skills/
 | 冒頭の 1 段落 | この段落だけを読んで、これが何のライブラリかが分かるように書く |
 | frontmatter の項目 | `name` (ディレクトリの名前と同じ)・`description`・`license` (`MIT`)・`metadata.language` (`en` か `ja`)・`metadata.source` (配布元。本リポジトリの URL) の 5 項目だけにする |
 | frontmatter の値 | **項目ごとに 1 行で書く** (検査は、複数行の値と折り返しを読めず、違反にする)。日本語版の `description` は、日本語の本文に英語のキーワードを添える |
+| `description` の書き出し | 何をする Skill かと、どんな依頼で使うかを先頭に置く。codex は Skill の一覧で、説明を先頭から切って渡すことがある (2026-10-14 の試運転では約 140 字で切れた。切る長さは、置かれている Skill の数で変わりうる) |
 
 frontmatter の形 (今の `skills/ja/kscollectionview-ios/SKILL.md`。`description` は、ここでは省いて書いた)。`metadata` の 2 項目は、1 段だけ字下げして書く。
 

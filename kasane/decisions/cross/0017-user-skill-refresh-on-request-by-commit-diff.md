@@ -1,7 +1,7 @@
 ---
 id: 0017
 title: 利用者向け Skill の追従は、オーナーが頼んだときに、前回追従した commit からの源泉の差分をもとに行う
-status: accepted
+status: superseded
 date: 2026-10-10
 ---
 

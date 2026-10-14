@@ -105,7 +105,7 @@ timestamp: 2026-10-10
 | Skill の索引 | 索引の 2 枚 (`skills/README.md`・`skills/README_ja.md`) の見出しの深さの並びが同じである |
 | 追従の記録 (`skills/.manifest.json`) | 記録が決めた項目を持つ。源泉がどれも、掛かる 1 枚か、掛からない理由のどちらかを持つ。掛かる 1 枚が実在する |
 
-どの検査も、`skills/` と README と利用者役のファイルの中だけで合否が決まる。Skill が源泉 (`kasane/concepts/`・本体のコード) からずれていることは、検査しない ([cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md))。そのため、`skills/` も README も利用者役も触らない push は、これらの検査で落ちない。源泉の概念の文書だけを変えた push も、本体に公開の宣言を足しただけの push も、落ちない (2026-10-10 に、一時のツリーで確かめた)。
+どの検査も、`skills/` と README と利用者役のファイルの中だけで合否が決まる。Skill が源泉 (`kasane/concepts/`・本体のコード) からずれていることは、検査しない ([cross/ADR-0020](../../decisions/cross/0020-user-skill-refresh-via-dedicated-skill.md))。そのため、`skills/` も README も利用者役も触らない push は、これらの検査で落ちない。源泉の概念の文書だけを変えた push も、本体に公開の宣言を足しただけの push も、落ちない (2026-10-10 に、一時のツリーで確かめた)。
 
 書き方の決まりは [利用者向け Skill と README の書き方](user-docs-writing.md)、源泉の変更に追従させる流れは [利用者向け Skill の追従](user-skill-refresh.md) にある。
 
@@ -492,7 +492,7 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 - [cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md) — workflow の構成と、検査の名前を固定した決定
 - [cross/ADR-0016](../../decisions/cross/0016-consumer-build-check-on-main-pull-requests.md) — 配布物を利用者役でビルドして確かめる決定
 - [cross/ADR-0010](../../decisions/cross/0010-develop-and-main-branch-roles.md) — 走る時点の元になる、ブランチの役割の決定
-- [cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md) — Skill が源泉からずれていることを、検証 CI で検査しない決定
+- [cross/ADR-0020](../../decisions/cross/0020-user-skill-refresh-via-dedicated-skill.md) — Skill が源泉からずれていることを、検証 CI で検査しない決定 (追従を専用の Skill から頼んだときに行う)
 
 ### 規約・ガイド
 

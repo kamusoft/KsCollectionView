@@ -47,4 +47,4 @@ date: 2026-10-10
 
 出典: kasane/roadmaps/v1-foundation/phases/phase-7-3-user-docs/history.md (2026-10-10: インストール例の版の書き方) / ../KsSettingsView/kasane/decisions/cross/0029-install-examples-without-pinned-version.md (Decision: インストール例の version 表記・置換機構の撤去) / ../KsSettingsView/kasane/changes/archive/2026-09-06-skills-install-version-drift/exploration.md (実在しない版が残った経緯) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 1: Skill のファイルの置き方 / Decision 3: ルートの README / Decision 5: インストール例の検査)
 現行照合: 2026-10-10 確認。`README.md`・`README_ja.md` と、4 つの `SKILL.md` のインストール例は、版の位置が `{version}` で、置き換えの説明と、最新の版の確かめ先 (Release の一覧) を同じファイルに持つ。`scripts/ci/check-readme-examples.py` が、具体の版・確かめ先の案内が無いことを違反にし、検証 CI のスクリプトのテストから毎回流れる。版を書き換える道具は無い。確かめ先の Release はまだ作っておらず、URL は仮の値である (リリースの工程を決めるフェーズが確定する)。判定: 維持
-関連: cross/ADR-0003 (Maven の座標) / cross/ADR-0015 (SwiftPM の Package URL) / cross/ADR-0017 (追従をオーナーの依頼に限る決定) / cross/ADR-0019 (Skill が URL を持つことの扱い)
+関連: cross/ADR-0003 (Maven の座標) / cross/ADR-0015 (SwiftPM の Package URL) / cross/ADR-0017 (追従をオーナーの依頼に限る決定) / cross/ADR-0019 (Skill が URL を持つことの扱い) / cross/ADR-0020 (追従をオーナーの依頼に限る決定を引き継ぎ、cross/ADR-0017 を置き換えた)

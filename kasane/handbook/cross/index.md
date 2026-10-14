@@ -17,4 +17,4 @@
 | [配布物の形と作り方](package-distribution.md) | `scripts/distribution/`・Android の公開の設定 (`android/kscollectionview/build.gradle.kts`)・バージョンカタログ・`ios/Package.swift` の宣言を触るとき・配布物を手元で作って確かめるとき・検証で使う Xcode の版を上げるとき | guide |
 | [利用者の立場のビルドの確認](consumer-build-check.md) | `verification/`・`scripts/ci/verify-consumer-*.py`・`.github/workflows/verify-consumer-*.yml` を触るとき・配布物の形に関わる変更を push する前に手元で確かめるとき・`consumer-ios / verify`・`consumer-android / verify` の失敗を調べるとき・利用者役の画面のファイル (README の最小コード例の元) を変えるとき | guide |
 | [利用者向け Skill と README の書き方](user-docs-writing.md) | `skills/`・ルートの `README.md` / `README_ja.md`・`assets/`・`scripts/ci/user-docs-rules.json` を触るとき・利用者向け Skill や README の文面・コード例・インストール例・スクリーンショットを書く / 直すとき | rule |
-| [利用者向け Skill の追従](user-skill-refresh.md) | `skills/`・`scripts/docs/` を触るとき・利用者向け Skill の追従を頼まれたとき・公開 API や利用者に見える挙動を変えた変更を蒸留した後に、Skill へ反映するかを判断するとき | guide |
+| [利用者向け Skill の追従](user-skill-refresh.md) | `skills/`・`scripts/docs/`・`.agents/skills/docs-refresh/` を触るとき・利用者向け Skill の追従を頼まれたとき (入口は追従の Skill `docs-refresh`)・公開 API や利用者に見える挙動を変えた変更を蒸留した後に、Skill へ反映するかを判断するとき | guide |
