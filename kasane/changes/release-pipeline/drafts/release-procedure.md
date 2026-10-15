@@ -165,10 +165,26 @@ gh api repos/kamusoft/KsCollectionView/environments/release/deployment-branch-po
 
 ### 5. secret を登録する
 
-オーナーが行う。値は標準入力から流すか、`gh secret set` の問いに貼り付ける (画面に出ない)。`--body` で値をコマンドに書かない (シェルの履歴に残る)。ファイルを使ったときは、登録の後に `trash` で消す。
+オーナーが行う。登録した値は、後から読み直せない (名前の一覧しか読めない)。値の形を確かめられるのは登録の前だけなので、次を守る。
+
+- 何行もある値 (`SIGNING_KEY`・`SPM_DEPLOY_KEY`) は、ファイルか標準入力から流す。`gh secret set` の問いに貼り付けない (1 行の入力の問いに何行も貼ると、値が正しく入らず、残りの行がシェルに入るおそれがある。確かめてはいない)
+- 1 行の値 (`SIGNING_KEY_ID`・`SIGNING_PASSWORD`・`MAVEN_CENTRAL_USERNAME`・`MAVEN_CENTRAL_PASSWORD`) は、問いに貼り付けてよい (画面に出ない)
+- `--body` で値をコマンドに書かない (シェルの履歴に残る)
+- `SIGNING_KEY` に入れるのは秘密鍵である。流すものそのものの 1 行目を見て、次の表で見分ける (1 行目は、表の文字列の前後に `-----` が付いた形。この文書では、secret の検査が鍵と見なさないよう、前後の `-----` を外して書く)。初回の本番の試行 1 (2026-10-15) は、公開鍵を登録していて、署名の段 (`Build signed publication`) が `Could not read PGP secret key` で止まった
+
+| 書き出しのコマンド | 中身 | 1 行目 | `SIGNING_KEY` に |
+|---|---|---|---|
+| `gpg --armor --export-secret-keys <鍵の ID>` | 秘密鍵 | `BEGIN PGP PRIVATE KEY BLOCK` | 入れる |
+| `gpg --armor --export <鍵の ID>` | 公開鍵 (鍵サーバーに上げる方) | `BEGIN PGP PUBLIC KEY BLOCK` | 入れない (登録をやめる) |
+
+`SIGNING_KEY` は、一時のファイルに書き出し、そのファイルの 1 行目を確かめてから、同じファイルを流す。
 
 ```bash
-gpg --armor --export-secret-keys <鍵の ID> | gh secret set SIGNING_KEY --env release --repo kamusoft/KsCollectionView
+key_file=$(mktemp)
+gpg --armor --export-secret-keys <鍵の ID> > "$key_file"
+head -1 "$key_file"   # BEGIN PGP PRIVATE KEY BLOCK を含むこと。PUBLIC なら登録しない
+gh secret set SIGNING_KEY --env release --repo kamusoft/KsCollectionView < "$key_file"
+trash "$key_file"
 gh secret set SIGNING_KEY_ID --env release --repo kamusoft/KsCollectionView
 gh secret set SIGNING_PASSWORD --env release --repo kamusoft/KsCollectionView
 gh secret set MAVEN_CENTRAL_USERNAME --env release --repo kamusoft/KsCollectionView
@@ -176,6 +192,8 @@ gh secret set MAVEN_CENTRAL_PASSWORD --env release --repo kamusoft/KsCollectionV
 gh secret set SPM_DEPLOY_KEY --env release --repo kamusoft/KsCollectionView < "$key_dir/spm-deploy-key"
 trash "$key_dir"
 ```
+
+鍵の控えのファイル (パスワード管理などから取り出したもの) から登録するときも、そのファイルの `head -1` を確かめてから `< <ファイル>` で流し、登録の後に `trash` で消す。
 
 `SIGNING_KEY_ID` は、`gpg --list-secret-keys --keyid-format short` が示す 8 桁の 16 進の ID を入れる。パスフレーズつきの鍵を ASCII armor の形で、鍵の ID をこの形で渡す署名は、使い捨ての鍵で手元で通した (2026-10-15。`kasane/changes/archive/<archive の日付>-release-pipeline/evidence/publish-rehearsal-001.md`)。パスフレーズを誤ると、`Build signed publication` が署名のタスクで失敗する (送る前に止まる)。
 
