@@ -64,4 +64,4 @@ graph LR
 | phase-7-1-public-repo-verify-ci | completed | change | [agenda](phases/phase-7-1-public-repo-verify-ci/agenda.md) | [public-repo-verify-ci](../../changes/archive/2026-10-08-public-repo-verify-ci/proposal.md) |
 | phase-7-2-package-distribution | completed | change | [agenda](phases/phase-7-2-package-distribution/agenda.md) | [package-distribution](../../changes/archive/2026-10-09-package-distribution/proposal.md) |
 | phase-7-3-user-docs | completed | change | [agenda](phases/phase-7-3-user-docs/agenda.md) | [user-docs](../../changes/archive/2026-10-10-user-docs/proposal.md) |
-| phase-7-4-release-pipeline | in-progress | change | [agenda](phases/phase-7-4-release-pipeline/agenda.md) | [release-pipeline](../../changes/release-pipeline/proposal.md) |
+| phase-7-4-release-pipeline | completed | change | [agenda](phases/phase-7-4-release-pipeline/agenda.md) | [release-pipeline](../../changes/archive/2026-10-15-release-pipeline/proposal.md) |

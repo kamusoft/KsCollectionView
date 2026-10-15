@@ -3,9 +3,9 @@ kind: guide
 applies-when:
   always: false
   paths: ["scripts/distribution/**", "android/kscollectionview/build.gradle.kts", "android/gradle/libs.versions.toml", "ios/Package.swift"]
-  tasks: [配布物を手元で作って確かめる, 配布物の中身・公開の設定の変更, 検証で使う Xcode の版の引き上げ]
+  tasks: [配布物を手元で作って確かめる, 配布物の中身・公開の設定の変更, 公開の設定のテストを手元で流す, 検証で使う Xcode の版の引き上げ]
 title: 配布物の形と作り方
-description: SwiftPM の写しと Android の発行物の中身、手元での作り方、マニフェストが要求する Swift のツールの版の決まり、確かめていないこと
+description: SwiftPM の写しと Android の発行物の中身、手元での作り方、元の commit を POM に書く設定と Maven Central へ送るビルドを止める条件、発行物が同じ入力から同じバイトになる前提、公開の設定のテストの流し方、マニフェストが要求する Swift のツールの版の決まり、確かめたことと確かめていないこと
 timestamp: 2026-10-09
 ---
 
@@ -15,7 +15,7 @@ timestamp: 2026-10-09
 
 配布物を利用者と同じ書き方で取ってビルドする確認は、[利用者の立場のビルドの確認](consumer-build-check.md) が持つ。
 
-実際に公開する工程 (配信用リポジトリへの写しの送信と、そこに付ける版を表す tag・Maven Central への送信) は、この文書の範囲の外である。2026-10-09 時点では、まだ作っていない。SwiftPM を配信用の別リポジトリから配る理由は [cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md) にある。
+実際に公開する工程 (配信用リポジトリへの写しの送信と、そこに付ける版を表す tag・Maven Central への送信) は、この文書の範囲の外で、リリースの workflow (`.github/workflows/release.yml`) が持つ。手順は [リリースの手順](release-procedure.md) にある。この文書の道具と公開の設定は、リリースの workflow からも同じ形で使われる。SwiftPM を配信用の別リポジトリから配る理由は [cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md) にある。
 
 ## 配布物の全体
 
@@ -178,37 +178,75 @@ ANDROID_HOME=<Android SDK の場所> ./gradlew -Dmaven.repo.local=<発行先の�
 - 署名の鍵が無ければ、署名は飛ばされる (`signMavenPublication SKIPPED`)。鍵を Gradle のプロパティ `signingInMemoryKey` で渡すと署名が付く。環境変数なら `ORG_GRADLE_PROJECT_signingInMemoryKey` で渡せる
 - `android/local.properties` に SDK の場所を書いてあれば、`ANDROID_HOME` の前置きは要らない ([ローカル開発環境と Sample の実行](local-development-setup.md))
 
-### 開発中の版は Maven Central へ送れない
+### 元の commit を POM に書く
 
-版が `-SNAPSHOT` で終わるあいだは、名前に `MavenCentral` を含むタスク (取り下げ用の `dropMavenCentralDeployment` を除く) を含むビルドが、どのタスクも動き出す前に失敗する。開発中の版を誤って公開しないための仕組みで、ビルドファイルが持つ。出力に「開発中の版 (…) は Maven Central へ送れない」と出る。手元への発行は止まらない。
+Gradle のプロパティ `ksCollectionViewSourceCommit` に commit の ID を渡すと、POM の `scm` の `tag` に書かれる。リリースの workflow は、起動した commit を渡し、公開済みの版がどの commit から作られたかを、この値で照らす ([cross/ADR-0022](../../decisions/cross/0022-manual-release-dispatch-reversible-steps-first.md))。
 
-2026-10-09 に、`:kscollectionview:publishToMavenCentral`・`:kscollectionview:publishAndReleaseToMavenCentral`・`:kscollectionview:publish` の 3 つで、止まることを確かめた。`publish` は、名前に `MavenCentral` を含むタスクに依存するので、同じく止まる。
+| 渡し方 | 起きること |
+|---|---|
+| 40 桁の小文字の 16 進 (`-PksCollectionViewSourceCommit=<ID>`) | POM の `scm` に `<tag>` が書かれる |
+| 形の違う値 (短い ID・大文字を含むなど) | Gradle の設定の時点で止まる (誤った commit を発行物に残さないため) |
+| 渡さない | 手元への発行は通り、POM に `<tag>` が書かれない。Maven Central へ送るビルドは、下の仕組みで止まる |
+
+### 開発中の版と、元の commit の無い発行物は Maven Central へ送れない
+
+次のどちらかに当たるとき、名前に `MavenCentral` を含むタスク (取り下げ用の `dropMavenCentralDeployment` を除く) を含むビルドが、どのタスクも動き出す前に失敗する。誤って公開しないための仕組みで、ビルドファイルが持つ。手元への発行は止まらない。
+
+| 当たるとき | 出力 |
+|---|---|
+| 版が `-SNAPSHOT` で終わる (開発中の版) | 「開発中の版 (…) は Maven Central へ送れない」 |
+| `ksCollectionViewSourceCommit` を渡していない | 「元になった commit が無い発行物は Maven Central へ送れない」 |
+
+2026-10-09 に、開発中の版で、`:kscollectionview:publishToMavenCentral`・`:kscollectionview:publishAndReleaseToMavenCentral`・`:kscollectionview:publish` の 3 つが止まることを確かめた。元の commit の有無と形は、下の「公開の設定のテストを手元で流す」のテストが確かめる。`publish` は、名前に `MavenCentral` を含むタスクに依存するので、同じく止まる。
 
 認証の情報 (`mavenCentralUsername`・`mavenCentralPassword`) が無い環境では、Gradle 自身も、同じ時点で認証の情報の不足を報告して止まる。2 つの理由は並んで出る。認証の情報の不足だけを見て、この仕組みが効いていないと読まない。
 
+### 発行物は、同じ入力から同じバイトになる
+
+同じソース・版・元の commit から作った発行物 (署名を除く 5 点) は、どこで作っても同じバイトになる。Gradle の既定で、アーカイブの中の時刻とファイルの順が固定されるためである。リリースの workflow は、組み立ての段で作って利用者役で確かめた発行物と、公開のジョブで署名して組み立て直した発行物を、バイト単位で照らしてから送る (`scripts/release/check-android-artifacts.py`)。初回のリリース (2026-10-15) では、別のランナーで組み立てた 2 つが 5 点とも一致した。
+
+アーカイブに時刻を入れる設定や、ファイルの順を変える設定を足さない。足すと、リリースの workflow が送る前に止まる。
+
+### 公開の設定のテストを手元で流す
+
+POM に元の commit が入ることと、Maven Central へ送るビルドが止まることを、実際に Gradle で発行して確かめるテストがある (`scripts/ci/tests/test_android_publication.py`)。Android SDK と JDK が要るので、ふだんのスクリプトのテストではスキップとして数え、環境変数を付けたときだけ流れる。公開の設定 (`android/kscollectionview/build.gradle.kts`) を変えたら流す。
+
+```bash
+KS_GRADLE_TESTS=1 python3 scripts/ci/run-tests.py
+```
+
+2026-10-15 の手元 (依存の取得が済んだ状態) では、スクリプトのテスト全体が 40 秒ほどで、実行 732 件・失敗 0 件・スキップ 0 件だった。検証 CI の `lint` は、この環境変数を付けずに流す。
+
 ### 署名を手元で試すとき
 
-使い捨ての鍵で署名の経路を試すときの要点は、次のとおり。2026-10-09 に試したときの鍵の作り方と結果の記録は、`kasane/changes/archive/2026-10-09-package-distribution/evidence/android-publishing.md` の「使い捨ての鍵の扱い」にある。鍵を作るコマンドと、環境変数に入れる鍵の文字の形は、証跡に残っていないので、ここには書いていない。
+使い捨ての鍵で署名の経路を試すときの要点は、次のとおり。2026-10-09 に試したときの鍵の作り方と結果の記録は、`kasane/changes/archive/2026-10-09-package-distribution/evidence/android-publishing.md` の「使い捨ての鍵の扱い」に、2026-10-15 にリリースの workflow と同じ形 (パスフレーズつきの鍵と鍵の ID) で試した記録は、`kasane/changes/archive/2026-10-15-release-pipeline/evidence/publish-rehearsal-001.md` にある。鍵を作るコマンドと、環境変数に入れる鍵の文字の形は、証跡に残っていないので、ここには書いていない。
 
 | 段 | 要点 |
 |---|---|
 | 鍵束を置く場所 | 環境変数 `GNUPGHOME` で、リポジトリの外の一時のディレクトリにする。利用者の既定の鍵束は使わない。短いパスにする (GnuPG は鍵束の場所の下にソケットを作り、パスが長いと鍵を作れない) |
-| 作る鍵 | 試したのは、署名だけができる RSA 2048 ビット・パスフレーズなし・有効期間 1 日の鍵である |
+| 作る鍵 | 試したのは、署名だけができる RSA の、有効期間 1 日の鍵である。2026-10-09 はパスフレーズなし (2048 ビット)、2026-10-15 はパスフレーズつき (3072 ビット) |
+| 鍵の ID とパスフレーズ | 環境変数 `ORG_GRADLE_PROJECT_signingInMemoryKeyId` (`gpg --list-secret-keys --keyid-format short` の 8 桁)・`ORG_GRADLE_PROJECT_signingInMemoryKeyPassword` で渡す。パスフレーズを誤ると `signMavenPublication` が `PGPException` で失敗する |
 | 鍵を Gradle に渡す | 環境変数 `ORG_GRADLE_PROJECT_signingInMemoryKey` で渡す。コマンドの引数と記録に、鍵の中身を出さない |
 | 流すコマンド | 上の「手元のディレクトリへ発行する」と同じ。鍵があると、`signMavenPublication` が実行される |
 | 署名を確かめる | 発行物の `.asc` を、同じ鍵束の公開鍵で検証する (`gpg --verify`)。試したときは、5 つとも検証できた |
 | 後片付け | 鍵束のディレクトリごと消し、鍵束のための常駐のプロセスを止める |
 
-## 確かめていないこと
+## 確かめたことと確かめていないこと
 
-2026-10-09 時点で、配布物を作る側について確かめていないことは次のとおり。利用者役でのビルドについては、[利用者の立場のビルドの確認](consumer-build-check.md) の「確かめた範囲と確かめていないこと」にある。
+初回のリリース (2026-10-15) で、次を実物で確かめた。記録は [リリースの手順](release-procedure.md) の「初回のリリースで確かめたこと」にある。
+
+| 確かめたこと | 結果 |
+|---|---|
+| Maven Central への実際の送信と、Maven Central の側の検査 (署名・POM の項目・javadoc jar) | 検証を約 30 秒で通り、公開された。取得先に 5 点と署名がそろい、POM の `scm` の `tag` は起動した commit だった |
+| 本番の形の署名 (パスフレーズつきの鍵・鍵の ID を指定する形) | 通った |
+| 配信用リポジトリの作業コピーへ写しを置いて push すること | リリースの workflow が、配信用リポジトリを clone した作業コピーに、確かめた写しを置いて push した (置く道具は `scripts/release/place-spm-snapshot.py` で、消し方と受け付ける作業コピーの形は、写しを作る道具と同じ) |
+
+配布物を作る側について、まだ確かめていないことは次のとおり。利用者役でのビルドについては、[利用者の立場のビルドの確認](consumer-build-check.md) の「確かめた範囲と確かめていないこと」にある。
 
 | 確かめていないこと | 分かっていること |
 |---|---|
-| 本物の配信用リポジトリの作業コピーを行き先にした写しの作成 | 配信用リポジトリは、まだ無い。作業コピーを行き先にした形は、道具のテストが使い捨ての git のリポジトリで確かめている |
-| Maven Central への実際の送信と、Maven Central の側の検査 (署名・POM の項目・javadoc jar) | 送信は 1 回も行っていない |
-| 本番の形の署名 (パスフレーズつきの鍵・鍵の ID を指定する形) | 確かめたのは、パスフレーズなしの使い捨ての鍵を `signingInMemoryKey` だけで渡す形である |
-| Gradle の configuration cache を有効にしたときの、開発中の版を Maven Central へ送らせない仕組みの動き | このビルドは有効にしていない |
+| 写しを作る道具 (`sync-spm-snapshot.py`) に、本物の配信用リポジトリの作業コピーを行き先として渡すこと | リリースの workflow は、この道具を空の行き先にだけ使う。作業コピーを行き先にした形は、道具のテストが使い捨ての git のリポジトリで確かめている |
+| Gradle の configuration cache を有効にしたときの、Maven Central へ送らせない仕組みの動き | このビルドは有効にしていない |
 | Xcode 27.0 以外での写しのビルド、Windows での道具の実行 | 対象にしていない |
 
 写しを作る道具のテスト (31 件) は、macOS の手元のほかに、Linux のランナーの上でも通っている (2026-10-09。検証 CI の `lint` の中のスクリプトのテスト 262 件に含まれる)。
@@ -221,5 +259,6 @@ ANDROID_HOME=<Android SDK の場所> ./gradlew -Dmaven.repo.local=<発行先の�
 - [検証 CI](verification-ci.md) — スクリプトのテストと、5 つの検査が走る時点
 - [公開識別子と配布座標](public-identifiers.md) — Maven の座標と、SwiftPM の package の名前
 - [ローカル開発環境と Sample の実行](local-development-setup.md) — Android SDK の場所の渡し方
+- [リリースの手順](release-procedure.md) — 配布物を公開するリリースの workflow
 
-出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 1・2) / kasane/changes/archive/2026-10-09-package-distribution/proposal.md (マニフェストの宣言を、確かめている版に合わせて上げる変更) / kasane/changes/archive/2026-10-09-package-distribution/evidence/ios-manifest-and-spm-snapshot.md (写しの中身・大きさ・拒否される行き先) / kasane/changes/archive/2026-10-09-package-distribution/evidence/android-publishing.md (発行物・POM・依存の範囲の突き合わせ・開発中の版を送らせない仕組み・使い捨ての鍵)
+出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 1・2) / kasane/changes/archive/2026-10-09-package-distribution/proposal.md (マニフェストの宣言を、確かめている版に合わせて上げる変更) / kasane/changes/archive/2026-10-09-package-distribution/evidence/ios-manifest-and-spm-snapshot.md (写しの中身・大きさ・拒否される行き先) / kasane/changes/archive/2026-10-09-package-distribution/evidence/android-publishing.md (発行物・POM・依存の範囲の突き合わせ・開発中の版を送らせない仕組み・使い捨ての鍵) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 3・4) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/publish-rehearsal-001.md (パスフレーズつきの鍵での署名・発行物のバイトの一致) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-release-run-001.md (初回のリリースでの送信・公開・別のランナーでのバイトの一致)

@@ -22,9 +22,9 @@
 | [0018](0018-install-examples-without-concrete-version.md) | インストール例には具体の版を書かず、利用者が置き換える印を置く | accepted | 版の位置に `{version}` を置き、最新の版は Release の一覧で確かめてもらう。リリースの工程は README と Skill の版を書き換えない。リリースのたびに置き換える・手で直すを却下。 |
 | [0019](0019-skill-external-references-by-purpose.md) | Skill の外への参照は、知識を委ねるものを持たず、操作の対象になる URL は持ってよいとする | accepted | cross/ADR-0005 の閉世界性の条項の一部を改める。続きを外で読ませる参照は持たず、Package URL・最新の版の確かめ先・不具合の報告先・配布元は書いてよい。文面のまま従うを却下。 |
 | [0020](0020-user-skill-refresh-via-dedicated-skill.md) | 利用者向け Skill の追従は、オーナーが頼んだときに、専用の Skill が前回追従した commit からの源泉の差分をもとに行う | accepted | cross/ADR-0017 を全体として置き換える (supersedes: 0017)。頼んだときだけ・commit からの差分・スクリプトは `scripts/` を引き継ぎ、手順は専用の Skill に置いて、実作業を任せるワーカーの呼び分けを持たせる。handbook のガイドのまま・AGENTS.md に 1 行を却下。 |
-| [0021](0021-single-version-and-plain-tag-across-repositories.md) | すべてのプラットフォームに 1 つの版を付け、本リポジトリと配信用リポジトリに同じ版の文字列の tag を付ける | proposed | 片方だけ変わったリリースでも両方に同じ版を出す。tag は接頭辞なしの版の文字列。プレリリースは Maven で正式版より前に並ぶ語だけ。プラットフォームごとの版・`v` 付きの tag を却下。 |
-| [0022](0022-manual-release-dispatch-reversible-steps-first.md) | リリースは版を入力して main から手動で起動し、取り消せる操作から公開して、tag と Release を最後に作る | proposed | 版の正は起動の入力で、版を上げる commit を積まない。写しの push → Maven Central の保留と検証の決着 → 公開 → tag → Release。同じ版で再実行できる。tag の push での起動・develop からの起動・再実行の禁止を却下。 |
-| [0023](0023-release-notes-from-main-pull-request-bodies.md) | リリースノートは、前回の Release からの main 宛ての Pull Request の本文にある変更の節から組み立てる | proposed | 節は必須で、欠けや読めない行で止める。範囲は前回の Release の tag から。ラベルの分類・commit から作る・直近の 1 本だけ・節を任意にするを却下。 |
-| [0024](0024-release-in-main-repository-marked-latest.md) | Release は本リポジトリにだけ作り、プレリリースの印を付けずに、最新の Release として示す | proposed | 最新の版の確かめ先を 1 か所に保つ。プレリリースかどうかは版の文字列で示す。本リポジトリの外に作る案・プレリリースの印を付ける案を却下。 |
+| [0021](0021-single-version-and-plain-tag-across-repositories.md) | すべてのプラットフォームに 1 つの版を付け、本リポジトリと配信用リポジトリに同じ版の文字列の tag を付ける | accepted | 片方だけ変わったリリースでも両方に同じ版を出す。tag は接頭辞なしの版の文字列。プレリリースは Maven で正式版より前に並ぶ語だけ。プラットフォームごとの版・`v` 付きの tag を却下。 |
+| [0022](0022-manual-release-dispatch-reversible-steps-first.md) | リリースは版を入力して main から手動で起動し、取り消せる操作から公開して、tag と Release を最後に作る | accepted | 版の正は起動の入力で、版を上げる commit を積まない。写しの push → Maven Central の保留と検証の決着 → 公開 → tag → Release。同じ版で再実行できる。tag の push での起動・develop からの起動・再実行の禁止を却下。 |
+| [0023](0023-release-notes-from-main-pull-request-bodies.md) | リリースノートは、前回の Release からの main 宛ての Pull Request の本文にある変更の節から組み立てる | accepted | 節は必須で、欠けや読めない行で止める。範囲は前回の Release の tag から。ラベルの分類・commit から作る・直近の 1 本だけ・節を任意にするを却下。 |
+| [0024](0024-release-in-main-repository-marked-latest.md) | Release は本リポジトリにだけ作り、プレリリースの印を付けずに、最新の Release として示す | accepted | 最新の版の確かめ先を 1 か所に保つ。プレリリースかどうかは版の文字列で示す。本リポジトリの外に作る案・プレリリースの印を付ける案を却下。 |
 
 採番規則は [../index.md](../index.md) を参照。

@@ -241,10 +241,10 @@ README の最小コード例と、各 `SKILL.md` の最小の動く例は、利�
 - 例のそばに、次の 3 つを、同じファイルの中に書く: `{version}` を、利用者が使う版の番号に置き換えること・置き換えないと依存の解決に失敗すること・最新の版の確かめ先の URL
 - Package URL・package の名前・product の名前・Maven の座標は、[公開識別子と配布座標](public-identifiers.md) の値を書く。検査は、利用者役が公開済みの配布物を取るときに使う値と比べる
 - README は SwiftPM と Gradle の両方の例を、iOS の `SKILL.md` は SwiftPM の例を、Android の `SKILL.md` は Gradle の例を持つ。英語版と日本語版で、例の種類と数を同じにする
-- 配布物をまだ公開していないことの 1 文は、README のインストールの節の冒頭にだけ書く。Skill には書かない (利用者が Skill を手にするのは、公開の後である)。この 1 文は、初回のリリースのときに外す
+- README と Skill は、配布物を公開済みとして書く。「まだ公開していない」「最初の版を公開した後に解決できる」のような、公開の前の状態を述べる文を書かない (初回のリリース `0.1.0-beta.1` (2026-10-15) の前に、README の 2 枚から外した)
 - Skill の索引 (`skills/README.md`・`skills/README_ja.md`) には、ライブラリの版を書かない
 
-最新の版の確かめ先 (本リポジトリの Release の一覧) は、仮の値である。リリースの工程が別の場所に決めたら、例のある 6 つのファイルと、許可する URL の一覧を同時に直す。
+最新の版の確かめ先は、本リポジトリの Release の一覧である。リリースの workflow は、Release を本リポジトリにだけ作り、プレリリースの版でも印を付けずに最新として示す ([cross/ADR-0024](../../decisions/cross/0024-release-in-main-repository-marked-latest.md))。確かめ先を変えるときは、例のある 6 つのファイルと、許可する URL の一覧を同時に直す。
 
 ### 依存の宣言の行の形
 
@@ -394,4 +394,4 @@ README のスクリーンショットは、`assets/` の 6 枚である。3 つ�
 - [検証 CI](verification-ci.md) — README と Skill の検査が流れる場所と、落ちたときの見方
 - [Sample のプラットフォーム間一致](sample-parity.md) — スクリーンショットを撮る Sample の画面の決まり
 
-出典: kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 1〜4・8) / kasane/changes/archive/2026-10-10-user-docs/evidence/ios-skill-handoffs.md・android-skill-handoffs.md (見出しの対応・コード例のビルド) / kasane/changes/archive/2026-10-10-user-docs/evidence/skills-cross-check.md (4 つの Skill の突き合わせ) / kasane/changes/archive/2026-10-10-user-docs/evidence/readme-and-screenshots.md (対応プラットフォームの値の出どころ・スクリーンショットの撮り方・下限とスクリーンショットについてのオーナーの決定) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-read-dispositions.md・dist-use.md (配った先を再現した確認で挙がったこと) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (載せない名前の決定)
+出典: kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 1〜4・8) / kasane/changes/archive/2026-10-10-user-docs/evidence/ios-skill-handoffs.md・android-skill-handoffs.md (見出しの対応・コード例のビルド) / kasane/changes/archive/2026-10-10-user-docs/evidence/skills-cross-check.md (4 つの Skill の突き合わせ) / kasane/changes/archive/2026-10-10-user-docs/evidence/readme-and-screenshots.md (対応プラットフォームの値の出どころ・スクリーンショットの撮り方・下限とスクリーンショットについてのオーナーの決定) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-read-dispositions.md・dist-use.md (配った先を再現した確認で挙がったこと) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (載せない名前の決定) / kasane/changes/archive/2026-10-15-release-pipeline/specs/user-readme/spec.md・evidence/readme-before-release-001.md (公開の前の 1 文を外した)

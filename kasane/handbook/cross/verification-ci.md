@@ -5,7 +5,7 @@ applies-when:
   paths: [".github/workflows/**", ".github/actionlint.yaml", "scripts/ci/**"]
   tasks: [検証 CI の失敗の調査, 検証 CI への検査の追加・変更, CI の緑を完了の根拠に使う判断]
 title: 検証 CI
-description: 検証 CI が走る時点・走らせる範囲 (利用者の立場のビルドの確認を含む 5 つの検査。README と利用者向け Skill の検査は lint のスクリプトのテストの中で流れる)・緑が保証する範囲、失敗したときの見方、手元での確かめ方、既知の制限、検査を足すときの注意
+description: 検証 CI が走る時点・走らせる範囲 (利用者の立場のビルドの確認を含む 5 つの検査。README と利用者向け Skill の検査は lint のスクリプトのテストの中で流れる)・リリースの workflow からの呼ばれ方・緑が保証する範囲、失敗したときの見方、手元での確かめ方、既知の制限、検査を足すときの注意
 timestamp: 2026-10-10
 ---
 
@@ -64,15 +64,18 @@ timestamp: 2026-10-10
 | `.github/workflows/verify-android.yml` | Android の検証。同上 |
 | `.github/workflows/verify-consumer-ios.yml` | iOS の利用者の立場のビルドの確認。他の workflow から呼ばれる形だけを持ち、切り替え (`mode`、必須) と版 (`version`、任意) を入力に取る |
 | `.github/workflows/verify-consumer-android.yml` | Android の利用者の立場のビルドの確認。同上 |
+| `.github/workflows/release.yml` | リリースの workflow。検証 CI ではないが、上の 4 本を呼び、定義を同じ検査が確かめる (下の「リリースの workflow からの呼ばれ方」) |
+| `.github/pull_request_template.md` | `main` 宛ての Pull Request の本文のひな形。変更の節 (`## Changes`) の書き方を注釈に持つ。変更の節はリリースノートの材料で、リリースの workflow が読む |
 | `scripts/ci/*.py` | 検査のロジック。workflow はこれを呼ぶだけにしてある |
 | `scripts/ci/tests/` | スクリプトと、workflow・公開リポジトリの体裁のファイルに対するテスト |
 | `scripts/distribution/` | SwiftPM の写しを作る道具と、配信用の README の固定文。iOS の利用者の立場のビルドの確認が呼ぶ |
+| `scripts/release/` | リリースの workflow が呼ぶ道具。テストは `scripts/ci/tests/` にあり、`CI script tests` で流れる |
 | `verification/` | 利用者役 (配布物を利用者と同じ書き方で取る、iOS と Android の最小のプロジェクト) |
 | `.github/actionlint.yaml` | 手元の actionlint の設定 |
 
 検査の名前は `lint`・`ios / verify`・`android / verify`・`consumer-ios / verify`・`consumer-android / verify` の 5 つに固定してある ([cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md))。再利用 workflow を呼ぶジョブの検査の名前は「呼ぶ側のジョブの名前 / 呼ばれる側のジョブの名前」になるので、両方の名前を明示してある。`main` の保護がこの 5 つの名前を参照する ([ブランチの運用と GitHub の設定](branch-and-github-settings.md))。
 
-使う道具は版を固定している。ランナーは `ubuntu-24.04` と `xcode-27`、Xcode は 27.0、JDK は 21、gitleaks は 8.30.1 である。値の正は workflow のファイルで、ここに書いた値は 2026-10-09 時点の写しである。利用者の立場のビルドの確認の 2 本は、既存の検証と同じランナー・Xcode・JDK を使い、同じ値であることをスクリプトのテストが確かめる。権限は、リポジトリの内容の読み取りだけである。
+使う道具は版を固定している。ランナーは `ubuntu-24.04` と `xcode-27`、Xcode は 27.0、JDK は 21、gitleaks は 8.30.1 である。値の正は workflow のファイルで、ここに書いた値は 2026-10-09 時点の写しである。利用者の立場のビルドの確認の 2 本は、既存の検証と同じランナー・Xcode・JDK を使い、同じ値であることをスクリプトのテストが確かめる。権限は、リポジトリの内容の読み取りだけである。例外は 1 つだけで、リリースの workflow の `publish` のジョブは、tag と Release を作るために `contents: write` を持つ。
 
 ## 走らせる範囲
 
@@ -148,6 +151,16 @@ CI から外した後に、今のコードで iOS のテストが手元で通る
 
 どちらも Simulator・エミュレータを使わず、利用者役を起動しない。step ごとの手順と、ランナーの上での最初の実行の記録は、[利用者の立場のビルドの確認](consumer-build-check.md) にある。
 
+### リリースの workflow からの呼ばれ方
+
+リリースの workflow (`.github/workflows/release.yml`) は、検証 CI と同じ再利用 workflow を呼ぶ。検査の名前は `verify-ios / verify` のようにリリースの workflow のジョブの名前になり、`main` の保護の必須の検査とは別物である。手順と失敗したときの見方は [リリースの手順](release-procedure.md) にある。
+
+| リリースの workflow のジョブ | 呼ぶもの | 渡すもの |
+|---|---|---|
+| `verify-ios`・`verify-android` | `verify-ios.yml`・`verify-android.yml` | 何も渡さない (検証 CI と同じ検証) |
+| `consumer-ios`・`consumer-android` | `verify-consumer-ios.yml`・`verify-consumer-android.yml` | 切り替え `artifact` と、同じ run の artifact の名前 (`spm-snapshot`・`android-maven`)。Android には版も渡す |
+| `smoke-ios`・`smoke-android` | 同上 | 切り替え `published` と版 |
+
 ## 緑が保証する範囲
 
 緑が言えることは、起動で変わる。「Pull Request だけ」の行は、`main` 宛ての Pull Request の緑でだけ言える。
@@ -221,7 +234,9 @@ CI が件数を出すのは Android だけである。iOS はテストを実行�
 | iOS の確認のスクリプト (`test_verify_consumer_ios.py`) | 48 |
 | workflow のファイル (`test_workflow_files.py` に足した分) | 25 |
 
-README と利用者向け Skill の検査・追従の道具を足した変更で、262 件から 504 件に増えた (2026-10-10)。足したのは、利用者役の画面のファイルの形・README の例の検査・Skill 自身の整合の検査・追従の道具・実物を確かめるテストである。504 件は、手元で通っている。この変更はまだ push していないので、ランナーの上では走っていない。
+README と利用者向け Skill の検査・追従の道具を足した変更で、262 件から 504 件に増えた (2026-10-10)。足したのは、利用者役の画面のファイルの形・README の例の検査・Skill 自身の整合の検査・追従の道具・実物を確かめるテストである。
+
+リリースの workflow を足した変更で、実行 728 件・スキップ 4 件になった (2026-10-15)。足したのは、`scripts/release/` の道具のテスト・リリースの workflow の定義の検査・利用者役の切り替え `artifact` のテストなどである。スキップの 4 件は、Gradle を実際に流す Android の公開の設定のテストで、環境変数 `KS_GRADLE_TESTS=1` のときだけ流れる ([配布物の形と作り方](package-distribution.md))。728 件は、手元と、Linux のランナーの上の `lint` の両方で通っている。
 
 ## 失敗したときの見方
 
@@ -309,7 +324,7 @@ python3 scripts/ci/check-workflows.py
 actionlint
 ```
 
-- スクリプトのテストは、手元で 22 秒ほどで終わる (2026-10-10、504 件)。テスト 4 系統とは別に数える
+- スクリプトのテストは、手元で 40 秒ほどで終わる (2026-10-15、実行 728 件・スキップ 4 件)。`KS_GRADLE_TESTS=1` を付けると 732 件になる。テスト 4 系統とは別に数える
 - README か `skills/` か利用者役の画面のファイルを変えたときは、push の前に、検査の 2 本を直に流す (`python3 scripts/ci/check-skills.py .`・`python3 scripts/ci/check-readme-examples.py .`)。違反が、テストの失敗より読みやすい形で出る。どちらも何も書き換えない
 - actionlint は、リポジトリのルートで流すと `.github/actionlint.yaml` を読む。この設定は、ランナーの名前 `xcode-27` を登録している。actionlint が持つ名前の一覧にこの名前がまだ無く、登録が無いと知らない名前として弾かれる
 - actionlint は検証 CI では流していない。手元で流すだけである
@@ -353,13 +368,11 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 
 | ジョブ | 上限 | ランナーでの所要時間 | 決め直す前の暫定の値 |
 |---|---:|---|---:|
-| `lint` | 5 分 | 7〜10 秒 (2026-10-08、5 回)。17〜18 秒 (2026-10-09、2 回。スクリプトのテストが 262 件に増えた後) | 10 分 |
+| `lint` | 5 分 | 7〜10 秒 (2026-10-08、5 回)。17〜18 秒 (2026-10-09、2 回。スクリプトのテストが 262 件に増えた後)。30〜32 秒 (2026-10-15、4 回。728 件に増えた後) | 10 分 |
 | `ios / verify` | 15 分 | 2 分 16 秒〜4 分 8 秒 (2026-10-08、ビルドだけの形で 3 回)。2 分 36 秒・4 分 4 秒 (2026-10-09) | 40 分 |
 | `android / verify` | 15 分 | 3 分 50 秒〜6 分 14 秒 (2026-10-08、4 回)。4 分 50 秒・5 分 2 秒 (2026-10-09) | 30 分 |
 | `consumer-ios / verify` | 15 分 | 1 分 58 秒 (2026-10-09、1 回) | 15 分 |
 | `consumer-android / verify` | 15 分 | 3 分 16 秒 (2026-10-09、1 回) | 15 分 |
-
-`lint` の所要時間は、スクリプトのテストが 504 件に増えた後 (2026-10-10) には、まだ測っていない (増やした変更を push していない)。
 
 上の 3 つは、2026-10-08 に決め直した。`ios / verify` は、テストを実行していた形の 1 回目だけ 13 分 10 秒かかった。決め直した値を持つ commit での実行は、3 つとも成功した。下の 2 つは、2026-10-09 にランナーでの所要時間を見て、暫定の 15 分のまま変えないと決めた (理由は [利用者の立場のビルドの確認](consumer-build-check.md))。
 
@@ -407,7 +420,7 @@ secret の検査は、追跡中の内容を `git archive` で取り出した先�
 - 行頭のタブ
 - 閉じていない引用符
 
-確かめるのは 4 つだけである。外部の action と再利用 workflow が commit の ID で指定されていること、ランナーの名前が版を持ち `latest` を含まないこと、権限が内容の読み取りだけであること、ランナーの上で step を走らせるジョブ (`runs-on` を持つジョブ) が時間の上限 (`timeout-minutes`) を持つこと。同じリポジトリの中の指定 (`./` で始まる) は対象にしない。
+確かめるのは 4 つだけである。外部の action と再利用 workflow が commit の ID で指定されていること、ランナーの名前が版を持ち `latest` を含まないこと、権限が内容の読み取りだけであること (例外は、リリースの workflow の `publish` のジョブの `contents: write` だけで、そのジョブでもほかの権限は認めない)、ランナーの上で step を走らせるジョブ (`runs-on` を持つジョブ) が時間の上限 (`timeout-minutes`) を持つこと。同じリポジトリの中の指定 (`./` で始まる) は対象にしない。
 
 時間の上限は、1 以上の整数で書く。式 (`${{ ... }}`) で書いた上限と、整数として読めない値 (引用符で囲んだ数を含む) は、違反として止まる。値の大小は見ない。再利用 workflow を呼ぶだけのジョブ (`uses` を持つジョブ) は、`timeout-minutes` を書けないので対象にしない。呼ばれる側のジョブが上限を持つ。
 
@@ -458,7 +471,7 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 | 検査の名前 (ジョブの名前) を変える | `main` の保護の必須の検査が、名前を参照している。保護の側も同時に直す |
 | 必須にする検査を足す | 先に `main` 宛ての Pull Request で検査が報告されるのを見てから、保護に登録する。手順は [ブランチの運用と GitHub の設定](branch-and-github-settings.md) にある |
 | `main` 宛ての Pull Request の起動の条件を変える | 変更したパスでの絞り込みを足さない |
-| プラットフォームの検証の workflow (`verify-ios.yml`・`verify-android.yml`) を変える | 入力を足さない。リリースの workflow (2026-10-09 時点ではまだ無く、作る予定) が、同じ検証を入力なしで呼ぶ前提である |
+| プラットフォームの検証の workflow (`verify-ios.yml`・`verify-android.yml`) を変える | 入力を足さない。リリースの workflow (`release.yml`) が、同じ検証を入力なしで呼ぶ |
 | 利用者の立場のビルドの確認のジョブ・workflow・利用者役を変える | 入口のジョブから、Pull Request で起動したときだけ走る条件を外さない。ほかの注意は [利用者の立場のビルドの確認](consumer-build-check.md) の「変えるときの注意」にある |
 
 ### スクリプトと道具
@@ -472,7 +485,7 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 | README か利用者向け Skill の検査を足す・変える | lint の step を足さない。検査のロジックは `scripts/ci/` のスクリプトに置き、ロジックのテスト (一時のディレクトリのひな形で、正常と異常を流す) と、今のリポジトリの実物に流すテスト (`scripts/ci/tests/test_repository_files.py`) の両方を付ける。合否が `skills/` と README と利用者役のファイルの中だけで決まる検査に限る。源泉とのずれを見る検査は足さない ([cross/ADR-0017](../../decisions/cross/0017-user-skill-refresh-on-request-by-commit-diff.md)) |
 | 許可する URL・内部の言葉の一覧 (`scripts/ci/user-docs-rules.json`) を変える | 足し方は [利用者向け Skill と README の書き方](user-docs-writing.md) の「URL と内部の言葉の一覧に足すとき」に従う。役割 `latest-version` の URL は、インストール例の検査が読む。変えるときは、例のある 6 か所 (README の 2 枚と 4 つの `SKILL.md`) を同時に直す |
 | 追従の道具 (`scripts/docs/`) を変える | 道具は検証 CI の step では流れないが、テストは `scripts/ci/tests/` にあり、`CI script tests` で流れる。道具が git の履歴を変えない・Skill を書き換えない、という決まりを保つ |
-| コマンドの出力を記録に残す | `コマンド \| tee 記録` と書かない。コマンドが失敗しても成功に見える。記録を後の step が読む必要が出たら、コマンドの終了コードをそのまま返す包みをスクリプトにして、テストを付ける |
+| コマンドの出力を記録に残す | `コマンド \| tee 記録` と書かない。コマンドが失敗しても成功に見える。記録を後の step が読む必要が出たら、出力をファイルに受け、終了コードを控えてそのまま返す。step のシェルは失敗したコマンドで即座に終わる (`-e`) ので、`コマンド > 記録 2>&1 \|\| status=$?` で受け、記録を表示してから `exit "$status"` で終わる (リリースの workflow の `Upload to Maven Central` の形) |
 
 ### ジョブと step
 
@@ -482,6 +495,7 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 | ジョブを足す | 時間の上限を置く (無ければ workflow の定義の検査が落ちる) |
 | workflow のファイルを足す | 失敗の見逃しの指定を自分で確かめる (上の「workflow の定義の検査が読める書き方」) |
 | lint のジョブ・iOS の検証・利用者の立場のビルドの確認の step を足す・名前を変える | スクリプトのテスト (`scripts/ci/tests/test_workflow_files.py`) が持つ step の一覧も直す |
+| リリースの workflow のジョブ・step を足す・名前を変える・並べ替える | 同じテストが、起動 (手動だけ・入力は版と `dry-run`)・同時実行・Environment を指定するのが `publish` だけであること・公開の step の順・secret を受け取る step を確かめる。直したらテストも直し、試しで通す ([リリースの手順](release-procedure.md)) |
 | Xcode の版・JDK の版を上げる | 既存の検証の workflow と、利用者の立場のビルドの確認の workflow で、同時に上げる。値がずれると、スクリプトのテストが落ちる。Xcode の版を上げるときは、マニフェストの宣言も同時に上げる ([配布物の形と作り方](package-distribution.md)) |
 
 ## 関連
@@ -497,6 +511,7 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 ### 規約・ガイド
 
 - [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — 必須の検査を参照する保護の値
+- [リリースの手順](release-procedure.md) — 検証と利用者役の確認を呼ぶリリースの workflow の手順
 - [利用者の立場のビルドの確認](consumer-build-check.md) — 利用者役の流し方と、失敗したときの見方
 - [配布物の形と作り方](package-distribution.md) — 配布物の中身と、写しを作る道具
 - [利用者向け Skill と README の書き方](user-docs-writing.md) — 検査が確かめている決まりの中身
@@ -504,4 +519,4 @@ README の例の検査と、Skill 自身の整合の検査は、Markdown を、�
 - [テスト実行規約](test-execution.md) — 手元の完了判定と、件数の読み方
 - [ソースコメント規約](comment-policy.md) — Comment policy lint が確かめる規約
 
-出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 1〜7) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証をビルドだけにした指示) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (ランナーの上での実行・実地の確認・時間の上限の決め直し・公開の後の手元での iOS のテストの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/review-003.md (Android のテストのクラスの導き方の、残した制限) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 6・7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (5 つの検査のランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 5・6) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (実物に検査を流すテスト・一時のツリーでの 3 つの確かめ) / kasane/changes/archive/2026-10-10-user-docs/evidence/local-completion.md (スクリプトのテストの件数)
+出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 1〜7) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証をビルドだけにした指示) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/ci-local-verification.md (手元と Linux のコンテナでの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (ランナーの上での実行・実地の確認・時間の上限の決め直し・公開の後の手元での iOS のテストの確認) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/review-003.md (Android のテストのクラスの導き方の、残した制限) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 6・7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (5 つの検査のランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 5・6) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (実物に検査を流すテスト・一時のツリーでの 3 つの確かめ) / kasane/changes/archive/2026-10-10-user-docs/evidence/local-completion.md (スクリプトのテストの件数) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 2・9) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/ci-develop-001.md・github-prep-pr-001.md・github-release-pr-001.md (スクリプトのテストの件数と lint の所要時間)

@@ -1,7 +1,7 @@
 ---
 id: 0022
 title: リリースは版を入力して main から手動で起動し、取り消せる操作から公開して、tag と Release を最後に作る
-status: proposed
+status: accepted
 date: 2026-10-14
 ---
 
@@ -56,5 +56,5 @@ Android の本体は、開発中の版を `-SNAPSHOT` で宣言していて、�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (2. リリースの workflow / 5. 運用で起きた問題) / ../KsSettingsView/kasane/decisions/cross/0020-release-dispatch-tag-last-version-injection.md (Decision・却下した案・帰結) / ../KsSettingsView/kasane/changes/archive/2026-09-07-fix-release-central-validation-wait/exploration.md (検証の決着を待つ工程を足した経緯) / kasane/changes/release-pipeline/second-opinion-spec-001.md (tag だけの照合では、公開の後に別の commit から再実行できてしまう指摘)
+出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (2. リリースの workflow / 5. 運用で起きた問題) / ../KsSettingsView/kasane/decisions/cross/0020-release-dispatch-tag-last-version-injection.md (Decision・却下した案・帰結) / ../KsSettingsView/kasane/changes/archive/2026-09-07-fix-release-central-validation-wait/exploration.md (検証の決着を待つ工程を足した経緯) / kasane/changes/archive/2026-10-15-release-pipeline/second-opinion-spec-001.md (tag だけの照合では、公開の後に別の commit から再実行できてしまう指摘) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 2・3・4)
 関連: cross/ADR-0010 (リリースの起動元) / cross/ADR-0014 (検証の再利用 workflow) / cross/ADR-0015 (SwiftPM の配信用リポジトリ) / cross/ADR-0016 (利用者役の確認) / cross/ADR-0021 (版と tag の形)

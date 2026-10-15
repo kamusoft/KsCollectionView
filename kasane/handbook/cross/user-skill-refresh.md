@@ -93,6 +93,8 @@ codex から追従の使い方 (器 `ksn-scribe` を指定したワーカーの�
 
 追従の Skill には、追従が要るかを確かめるだけの使い方もある。1 を流し、記録の commit の後に本体のソースを変えた commit の一覧 (下の「道具の拾い方の限界と、人が本体の差分を見る場面」のコマンドの 1 行目) と合わせて報告する。何も書き換えず、ワーカーも起動しない。
 
+リリースの事前の確認でも、この確かめるだけの使い方 (引数 `check`) を流し、追従が要るかをオーナーへの確認のメッセージに添える ([リリースの手順](release-procedure.md) の「事前の確認」)。リリースの中では追従しない。要ると出たときに追従するかはオーナーが決め、追従した commit を入れてからリリースの事前の確認をやり直す。
+
 ### commit と記録の更新の順
 
 流れの 1 から 5 は、作業ツリーの上で行う。ワーカーは commit しない。commit と `record` は、流れの 6 の承認の後に、メインが次の A から C の順で行う。初回の制作も、この順だった。
@@ -366,5 +368,6 @@ git diff <記録の commit> -- ios/Sources android/kscollectionview/src/main
 - [利用者向け Skill と README の書き方](user-docs-writing.md) — Skill と README の文面の決まり
 - [検証 CI](verification-ci.md) — README と Skill の検査が、スクリプトのテストとして流れること
 - [利用者の立場のビルドの確認](consumer-build-check.md) — 利用者役と、確認のスクリプトの流し方
+- [リリースの手順](release-procedure.md) — 事前の確認で、追従が要るかを確かめるだけの使い方で調べる
 
-出典: kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 7〜9) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (道具を実物に流した結果・拾い方の限界・載せない名前の決定・記録の更新) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-read-dispositions.md・dist-use.md (配った先を再現した確認の進め方と結果) / kasane/changes/archive/2026-10-14-user-skill-refresh-skill/proposal.md・specs/user-docs-refresh/spec.md (追従の Skill との役目の分け方・追従の証跡・追従の範囲・直す 1 枚が無いときの終わり方) / kasane/changes/archive/2026-10-14-user-skill-refresh-skill/evidence/refresh-skill-trial.md (「レビューの後の直し」。掛からない源泉を消す・改名したときの道具の出力)
+出典: kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 7〜9) / kasane/changes/archive/2026-10-10-user-docs/evidence/checks-and-refresh-tools.md (道具を実物に流した結果・拾い方の限界・載せない名前の決定・記録の更新) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-read-dispositions.md・dist-use.md (配った先を再現した確認の進め方と結果) / kasane/changes/archive/2026-10-14-user-skill-refresh-skill/proposal.md・specs/user-docs-refresh/spec.md (追従の Skill との役目の分け方・追従の証跡・追従の範囲・直す 1 枚が無いときの終わり方) / kasane/changes/archive/2026-10-14-user-skill-refresh-skill/evidence/refresh-skill-trial.md (「レビューの後の直し」。掛からない源泉を消す・改名したときの道具の出力) / kasane/changes/archive/2026-10-15-release-pipeline/proposal.md・specs/release-skill/spec.md (リリースの事前の確認で追従の要否を見る)

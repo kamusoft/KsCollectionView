@@ -140,4 +140,33 @@ A1〜A4 と B1 は、オーナーの指示 (2026-10-14「以降の論点は兄�
 - [x] A1〜A4・B1 を決める (兄弟ライブラリの踏襲)。ADR cross/0021〜0024 を proposed で起票
 - [x] B2 を決める
 - [x] B3 を決める
-- [ ] ksn-propose で変更提案を起こす
+- [x] ksn-propose で変更提案を起こす (変更 release-pipeline)
+
+## 実装結果 (2026-10-15 反映)
+
+変更 `release-pipeline` で実装し、初回の版 `0.1.0-beta.1` を公開した。記録は `kasane/changes/archive/2026-10-15-release-pipeline/` にある。
+
+- リリースの workflow (`.github/workflows/release.yml`) と道具 (`scripts/release/`) を足した。版を入力して `main` から手動で起動し、公開しない試しも選べる。取り消せる操作から公開し、同じ版で再実行できる
+- 利用者役に、工程の成果物を受け取る切り替え `artifact` を足した。公開の前は工程の成果物で、公開の後は公開物で確かめる
+- `main` 宛ての Pull Request のひな形を足し、変更の節 (`## Changes`) からリリースノートを組み立てる。#1・#2 の本文にも変更の節を書き足した
+- リリースの入口の Skill (`.agents/skills/release/`) を置いた。手順の正は handbook の `cross/release-procedure.md` で、Skill は起動のたびに読む
+- 配信用リポジトリ `KsCollectionView-SPM`・書き込み用の deploy key・Environment `release` (`main` だけ)・secret 6 つを用意した
+- 初回の本番は、署名の鍵に公開鍵が登録されていて署名の段で止まり、登録し直して失敗したジョブの再実行で公開まで揃った (取り消せない操作の前に止まったので、外に残ったのは tag の無い写しだけだった)。所要は公開のジョブが約 9 分
+- 版と tag・起動と公開の順序・リリースノートの材料・Release の置き場所と印は、cross/ADR-0021〜0024 として確定した
+- 手順と決まりは handbook の `cross/release-procedure.md` (新設)・`cross/secret-handling.md` (新設)・`cross/branch-and-github-settings.md` (`main` の運用とリリースのための設定) にある
+
+### 決定事項から形が変わった点
+
+- リリースの Skill の事前の確認で、対象の commit に検証 CI の記録が無いとき (開発の記録だけを変えた push の先端) は、直近の成功の commit からの変更が検証 CI を起動しないパスだけなら、その成功で代える (オーナーの決定)
+- 検証 CI の push の run で、Android の画像のテスト 1 件がランナーの上でだけ落ちた。別の変更 `android-prefetch-failure-test-on-ci` でテストの確かめ方を直して取り込んだ (製品のコードは変えていない)
+
+### 申し送り
+
+| 項目 | 受け皿 |
+|---|---|
+| リリースの Skill は、実物ではまだ使っていない (初回は手順の草稿で行った)。2 回目のリリースが最初の実地になる | `deferred-verification-backlog` の exploration.md (2026-10-15 追記) |
+| 共同作業者でない人が配信用リポジトリに Issue・Pull Request を作れないこと、`develop` からのジョブが Environment の保護で止まることは、設定の値で確かめただけで、実地では確かめていない | `deferred-verification-backlog` の exploration.md (同上) |
+| secret の検査 (gitleaks) の指紋の形が、commit の前と検証 CI で違う見込み。最初の本物の誤検出で確かめる | `deferred-verification-backlog` の exploration.md (同上) |
+| commit の前の検査の案内 (`.githooks/pre-commit`) が、誤検出の扱いの決まり (書き換えを先にし、除外は指紋を理由つきで足す) と食い違う | 見送り (オーナーの決定 2026-10-15)。hook はハーネス Kasane が配る標準の装備のため、このリポジトリでは直さない。決まりは handbook の `cross/secret-handling.md` が hook の案内より優先すると書いた |
+| handbook の `cross/branch-and-github-settings.md` ほか 3 枚の散文が、構造 lint の 1 ファイルの目安 (10,000 字) を超えている (違反ではなく注意) | 見送り。分けるかは次に大きく書き換えるとき、または ksn-drift の棚卸しで決める |
+

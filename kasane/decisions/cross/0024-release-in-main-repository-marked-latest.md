@@ -1,7 +1,7 @@
 ---
 id: 0024
 title: Release は本リポジトリにだけ作り、プレリリースの印を付けずに、最新の Release として示す
-status: proposed
+status: accepted
 date: 2026-10-14
 ---
 
@@ -39,5 +39,5 @@ Release は本リポジトリにだけ作る。配信用リポジトリには作
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md (申し送りの phase-7-3 から: Release の置き場所・利用者に見える形で保つ決まり) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (2. リリースの workflow の GitHub の Release / 5. 運用で起きた問題) / ../KsSettingsView/kasane/decisions/cross/0029-install-examples-without-pinned-version.md (プレリリースの印を付けずに最新として指定する決まり)
+出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md (申し送りの phase-7-3 から: Release の置き場所・利用者に見える形で保つ決まり) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (2. リリースの workflow の GitHub の Release / 5. 運用で起きた問題) / ../KsSettingsView/kasane/decisions/cross/0029-install-examples-without-pinned-version.md (プレリリースの印を付けずに最新として指定する決まり) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 7)
 関連: cross/ADR-0018 (最新の版の確かめ先を Release の一覧にした決定) / cross/ADR-0019 (Skill が持ってよい URL) / cross/ADR-0021 (版と tag の形) / cross/ADR-0023 (リリースノートの材料)

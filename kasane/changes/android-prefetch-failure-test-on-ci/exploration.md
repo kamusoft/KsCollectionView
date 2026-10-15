@@ -8,10 +8,10 @@
 
 分かっていること (簡易起票の時点):
 
-- 同じコードで、手元の `./gradlew :kscollectionview:testDebugUnitTest --rerun-tasks` は 512 件・失敗 0 (2026-10-15。`kasane/changes/release-pipeline/evidence/local-tests-001.md`)
+- 同じコードで、手元の `./gradlew :kscollectionview:testDebugUnitTest --rerun-tasks` は 512 件・失敗 0 (2026-10-15。`kasane/changes/archive/2026-10-15-release-pipeline/evidence/local-tests-001.md`)
 - 119662f が Android で変えたのは `android/kscollectionview/build.gradle.kts` の公開の設定 (POM の scm の tag と、Maven Central へ送るタスクを止める条件) だけで、テストの設定・依存は変えていない
 - 前回の `develop` への push (8a0f7df、2026-10-09) の検証 CI では `android / verify` は成功していた。テストのファイルはその間に変わっていない (最後の変更は `prefetch-display-size` の実装)
-- 経緯の記録: `kasane/changes/release-pipeline/evidence/ci-develop-001.md`
+- 経緯の記録: `kasane/changes/archive/2026-10-15-release-pipeline/evidence/ci-develop-001.md`
 
 発見の文脈: 変更 `release-pipeline` の tasks 10.1 (実装を `develop` に入れ、検証 CI が緑になることを確かめる) で見つけた。本務とは別の能力 (画像の読み込み) なので、オーナーの判断 (2026-10-15) で別の change として起票した。`main` 宛ての Pull Request では `android / verify` が必須の検査なので、これが直るまで `release-pipeline` の tasks 10.2 以降 (準備の Pull Request・初回のリリース) に進めない。
 

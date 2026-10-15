@@ -2,17 +2,17 @@
 kind: guide
 applies-when:
   always: false
-  tasks: [develop への push, main 宛ての Pull Request の作成とマージ, GitHub のリポジトリの設定の変更・確認, ブランチの保護の変更・確認]
+  tasks: [develop への push, main 宛ての Pull Request の作成とマージ, GitHub のリポジトリの設定の変更・確認, ブランチの保護の変更・確認, 配信用リポジトリ・Environment の設定の変更・確認]
 title: ブランチの運用と GitHub の設定
-description: develop と main の役割、develop への push と main 宛ての Pull Request の進め方、GitHub のリポジトリの設定とブランチの保護の値・入れ方・確かめ方
-timestamp: 2026-10-09
+description: develop と main の役割、develop への push と main 宛ての Pull Request の進め方 (変更の節・管理者も保護を迂回しない・main を develop へ取り込み直さない)、GitHub のリポジトリ・ブランチの保護・配信用リポジトリ・Environment の設定の値と入れ方・確かめ方、実施の記録
+timestamp: 2026-10-15
 ---
 
 # ブランチの運用と GitHub の設定
 
-この文書は、公開リポジトリ `kamusoft/KsCollectionView` の 2 本のブランチをどう使うかと、GitHub の側に入れてある設定の値・入れ方・確かめ方をまとめる。文中の「オーナー」は、リポジトリの持ち主である開発者を指す。日々の push と、`main` 宛ての Pull Request は、ここに書いた順で進める。設定を変えるとき・入れ直すときも、ここの値を正とする。
+この文書は、公開リポジトリ `kamusoft/KsCollectionView` の 2 本のブランチをどう使うかと、GitHub の側に入れてある設定の値・入れ方・確かめ方をまとめる。文中の「オーナー」は、リポジトリの持ち主である開発者を指す。開発者は 1 人で、GitHub の管理者の権限を持つのもオーナーだけである。日々の push と、`main` 宛ての Pull Request は、ここに書いた順で進める。設定を変えるとき・入れ直すときも、ここの値を正とする。
 
-ブランチを 2 本に分けた理由は [cross/ADR-0010](../../decisions/cross/0010-develop-and-main-branch-roles.md) にある。検証 CI の中身は [検証 CI](verification-ci.md) が持つ。必須の検査の名前を固定した理由は [cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md) にある。`main` 宛ての Pull Request で、配布物を利用者役 (配布物を利用者と同じ書き方で取る最小のプロジェクト) でビルドして確かめ、必須の検査にした理由は [cross/ADR-0016](../../decisions/cross/0016-consumer-build-check-on-main-pull-requests.md) にある。
+ブランチを 2 本に分けた理由は [cross/ADR-0010](../../decisions/cross/0010-develop-and-main-branch-roles.md) にある。検証 CI の中身は [検証 CI](verification-ci.md) が持つ。必須の検査の名前を固定した理由は [cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md) にある。`main` 宛ての Pull Request で、配布物を利用者役 (配布物を利用者と同じ書き方で取る最小のプロジェクト) でビルドして確かめ、必須の検査にした理由は [cross/ADR-0016](../../decisions/cross/0016-consumer-build-check-on-main-pull-requests.md) にある。リリースの進め方は [リリースの手順](release-procedure.md) に、secret の登録と、secret を検出したときの手順は [secret の扱い](secret-handling.md) にある。
 
 ## ブランチの役割
 
@@ -37,23 +37,30 @@ timestamp: 2026-10-09
 
 ## main 宛ての Pull Request を作ってマージする
 
-`main` に入れるのは、リリース候補にする節目である。次の順で進める。
+`main` に入れる節目の基準は置かない。いつ `main` 宛ての Pull Request を出すかと、版の番号は、オーナーが決める。`main` 宛ての Pull Request は、リリースのとき以外にも出してよい。リリースのノートは、前回の Release から `main` に入った Pull Request の本文の変更の節 (`## Changes` の節) をまとめる ([cross/ADR-0023](../../decisions/cross/0023-release-notes-from-main-pull-request-bodies.md))。リリースのときは、[リリースの手順](release-procedure.md) の「リリースの Pull Request」の手順で進める (下の 5 段は使わない)。リリース以外で `main` 宛ての Pull Request を出すときは、次の順で進める。
 
 1. `develop` の最新の検証 CI が成功で終わっていることを確かめる
-2. Pull Request を作る: `gh pr create --repo kamusoft/KsCollectionView --base main --head develop --title <タイトル> --body-file <本文のファイル>`
+2. 本文を、ひな形 (`.github/pull_request_template.md`) の形で書き、Pull Request を作る: `gh pr create --repo kamusoft/KsCollectionView --base main --head develop --title <タイトル> --body-file <本文のファイル>`
 3. 5 つの必須の検査 (`lint`・`ios / verify`・`android / verify`・`consumer-ios / verify`・`consumer-android / verify`) が成功で終わるのを待ち、マージできる状態を読む: `gh pr view <番号> --json mergeable,mergeStateStatus,isCrossRepository`
 4. merge commit でマージする: `gh pr merge <番号> --repo kamusoft/KsCollectionView --merge` (ブランチの削除の指定は付けない)
 5. 手元の `main` を GitHub の `main` まで早送りする: `git fetch origin main:main`
+
+本文の変更の節 (`## Changes`) は必須で、利用者向けの変更が無ければ `- none` の 1 行にする。行の書き方はひな形の注釈と [リリースの手順](release-procedure.md) の「変更の節の下書きと、オーナーの確認」に、変更の節の後ろに行を足すときの見出しの置き方は同じ文書の「リリースの Pull Request」にある。本文とマージの後について、次を守る。
+
+| 決まり | 理由 |
+|---|---|
+| 変更の節が無い・読めない行がある Pull Request を `main` に入れない。マージした後に見つけたら、本文を `gh pr edit` で直す | 次のリリースの workflow が、公開の前に止まる。直した本文は、次のリリースに反映される |
+| マージの後に、`main` を `develop` へ取り込み直さない | マージは merge commit だけなので、`develop` の履歴がそのまま `main` に入り、取り込み直す必要が無い。リリースのノートの範囲も、Release の tag で決まる。兄弟ライブラリ KsSettingsView で、squash の後に `main` を取り込み直して、前の版の項目がノートに重複して載ったことがある |
 
 `main` 宛ての Pull Request では、変更したパスに関わらず 5 つの検査が走る。`lint` は、出どころが同じリポジトリの `develop` であることを確かめ、結果を step `Pull request head restriction` の記録に出す。`develop` 以外のブランチや、別のリポジトリから作った Pull Request は、ここで落ちる。
 
 5 つのうち、利用者の立場のビルドの確認の 2 つ (`consumer-ios / verify`・`consumer-android / verify`) は、`main` 宛ての Pull Request でだけ走る。`develop` の最新の検証 CI が成功していても、この 2 つは Pull Request を作って初めて結果が出る。配布物の形に関わる変更を含むときは、Pull Request を作る前に、手元で同じ確認を流しておく ([利用者の立場のビルドの確認](consumer-build-check.md) の「手元で流す」)。
 
-マージの方法は merge commit に決めてある。squash と rebase は使わない (`develop` の commit がそのまま `main` に入り、節目が merge commit として残る)。
+マージの方法は merge commit に決めてある。squash と rebase は使わない (`develop` の commit がそのまま `main` に入り、取り込んだ区切りが merge commit として残る)。
 
-管理者は `main` と `develop` の保護を迂回できる設定にしてある。開発者が 1 人で、ランナーの不調などで必須の検査が止まったときの逃げ道が要るためである。ランナー `xcode-27` は public preview で、止まったときに `main` 宛ての Pull Request を進める手段は、この迂回だけになる。
+管理者 (オーナー) も、`main` の保護を迂回しない。オーナーが操作するときも、エージェントが操作するときも同じである。必須の検査が、コードの誤りではない理由 (外部の依存 (Nuke・Maven の依存) の取得の失敗・ランナーの不調) で止まったときは、失敗したジョブを再実行して、通るまで待つ: `gh run rerun <run の ID> --repo kamusoft/KsCollectionView --failed`。ランナー `xcode-27` は public preview で、止まったまま進まないことがあるが、そのときも迂回せずに待つ。
 
-利用者の立場のビルドの確認の 2 つは、外部の依存の取得 (Nuke・Maven の依存) に頼る。コードの誤りではない理由で止まったときは、実行をやり直す。やり直しても進まないときの手段も、この迂回である。
+迂回しないのは、リリースの workflow も、公開の前に同じ検証と利用者役の確認を流し、同じ外部の依存を取得するからである。迂回しても、リリースは早まらない。得られるのは、検査の通っていない commit が `main` に入ることだけである (オーナーの決定 2026-10-14。記録は `kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md` の決定事項 B2)。保護の設定は、管理者に強制しないまま (`enforce_admins` は false) にしてある。迂回しない決まりは、設定ではなく、この手順で守る。
 
 ### これまでの Pull Request の記録
 
@@ -66,6 +73,8 @@ timestamp: 2026-10-09
 | マージの後 | `main` への push による検証の実行は作られなかった。`develop` は残っている | 同じ |
 
 1 番の `lint` の step の記録には、`出どころは kamusoft/KsCollectionView の develop` と出た。
+
+3 番 (準備の Pull Request。リリースの workflow を `main` に入れた) と 4 番 (初回のリリースの Pull Request) の記録は、下の「実施の記録」の証跡にある。どちらも 5 つの必須の検査が成功し、先端が対象の commit のときだけ merge commit でマージした。
 
 ## GitHub の設定の値
 
@@ -82,6 +91,7 @@ timestamp: 2026-10-09
 | ラベル | `bug`・`enhancement`・`question` がある (Issue のフォームが付ける) |
 | `main` の保護 | 下の節 |
 | `develop` の保護 | 下の節 |
+| 配信用リポジトリ `kamusoft/KsCollectionView-SPM`・Environment `release` | 下の「リリースのための設定」 |
 
 Pull Request を作れる人の設定は、API では `pull_request_creation_policy` という項目で、値は `collaborators_only` である。
 
@@ -95,10 +105,11 @@ Pull Request を作れる人の設定は、API では `pull_request_creation_pol
 | 削除 | 禁止 | 禁止 |
 | 管理者への強制 | しない | しない |
 | `main` の最新を取り込んでいないとマージできない (`strict`) | しない | — |
-| 古い承認の取り消し・コードオーナーの承認 | どちらもしない | — |
+| 古い承認の取り消し・コードオーナーの承認・最後の push の承認 | どれもしない | — |
 | push できる人の限定 | なし | なし |
+| そのほかの項目 (線形の履歴・署名の必須・会話の解決の必須・ブランチのロック・作成の禁止・fork の同期) | どれも使わない | どれも使わない |
 
-この表の最後の 3 行 (`strict`・古い承認の取り消しとコードオーナーの承認・push できる人の限定) は、設計の文書 (末尾の出典の `design.md`) の表に無い値で、兄弟ライブラリ KsSettingsView と同じにした (オーナーに示して承認を得た)。
+最後の 4 行 (`strict`・承認の 3 項目・push できる人の限定・そのほかの項目) は、設計の文書 (`kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md` の Decision 9) の表に無い値で、兄弟ライブラリ KsSettingsView と同じにした (オーナーに示して承認を得た)。
 
 必須の検査の名前は、検証 CI のジョブの名前と一致していなければならない。再利用 workflow を呼ぶジョブの検査の名前は「呼ぶ側のジョブの名前 / 呼ばれる側のジョブの名前」になる。ジョブの名前を変えるときは、保護の側も同時に直す。検査を足すときは、下の「必須の検査を足すとき」の順で行う。
 
@@ -327,9 +338,116 @@ Issue のフォームと、空の Issue を作れなくする指定は、リポ�
 
 | 順 | 結果 |
 |---|---|
-| 1 (`develop` への push) | `lint` (18 秒)・`ios / verify` (2 分 36 秒)・`android / verify` (4 分 50 秒) の 3 つだけが走り、どれも成功した。利用者の立場のビルドの確認の 2 つのジョブ (`consumer-ios`・`consumer-android`) は、条件により飛ばされた (skipped)。ランナーは起きていない |
+| 1 (`develop` への push) | `lint` (18 秒)・`ios / verify` (2 分 36 秒)・`android / verify` (4 分 50 秒) の 3 つだけが走り、どれも成功した。利用者の立場のビルドの確認の 2 つのジョブ (`consumer-ios`・`consumer-android`) は、Pull Request で起動したときだけ走る条件により飛ばされた (skipped)。ランナーは起きていない |
 | 2 (Pull Request で報告された名前) | Pull Request 2 番で、5 つが決めたとおりの名前で報告され、どれも成功した。検査の一覧には、同じ commit に対する push の実行の結果も並ぶ。そちらの 2 つは SKIPPED で、名前に ` / verify` が付かない (`consumer-ios`・`consumer-android`)。保護に登録する名前は、Pull Request の実行が報告した ` / verify` の付くほうである |
 | 3・4 (保護の更新とマージ) | 必須の検査を 3 つから 5 つに更新し、読み直して確かめた。ほかの保護の値と、`develop` の保護は変わらなかった。更新の後も、Pull Request 2 番は MERGEABLE・CLEAN のままだった。5 つの検査が成功した commit のまま、merge commit でマージした (06:10:44 UTC)。`main` の先端は merge commit になり、`develop` の先端は変わらない |
+
+## リリースのための設定
+
+リリースの workflow が使う、配信用リポジトリと Environment `release` の設定である。値を変えるときは、先にこの節の 2 つの値の表を直す。ジョブの名前 (`validate`・`publish` など)・写し・試しと本番などの言葉は、[リリースの手順](release-procedure.md) の「この文書の言葉」と「workflow の形」にある。
+
+リリースの workflow には、公開まで進む本番と、外へ何も送らない試し (dry-run) がある。secret を使うのは本番のジョブ `publish` だけで、試しは `publish` を飛ばすので Environment を使わない。そのため、Environment を `main` だけに限っても、試しは `develop` などのどのブランチからも起動できる。本番は、最初のジョブ `validate` が `main` 以外からの起動を止める。GitHub への操作は、1 つずつオーナーの承認を得てから行い、実行したコマンドと読み直しの結果を証跡に残す。
+
+### 配信用リポジトリの設定の値
+
+SwiftPM の配信用リポジトリ `kamusoft/KsCollectionView-SPM` は、リリースの workflow が写し (SwiftPM がルートで読めるように作った本体の写し。[配布物の形と作り方](package-distribution.md)) と tag を push するだけのリポジトリである ([cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md))。貢献は本リポジトリの Issue で受ける ([cross/ADR-0011](../../decisions/cross/0011-contributions-via-issues-no-external-pull-requests.md))。
+
+| 設定 | 値 |
+|---|---|
+| 公開の範囲 | public |
+| 既定のブランチ | `main` (最初の本番の push で決まる) |
+| Issues・Wiki・Discussions・Projects | どれも無効 |
+| Pull Request を作れる人 | 共同作業者だけ (`collaborators_only`) |
+| 書き込み | 書き込み用の deploy key (題 `release workflow (kamusoft/KsCollectionView)`) 1 つと、管理者だけ。作り方は [secret の扱い](secret-handling.md) の「配信用リポジトリの deploy key」 |
+| Release | 作らない ([cross/ADR-0024](../../decisions/cross/0024-release-in-main-repository-marked-latest.md)) |
+| ルートの README | 写しに入る `scripts/distribution/spm-readme.template.md`。配信用の写しであることと、使い方と不具合の報告先が本リポジトリであることを示す |
+
+### Environment `release` の値
+
+リリースの secret は、本リポジトリの Environment `release` にだけ置く (リポジトリの secret には置かない)。リリースの workflow の `publish` のジョブだけが、この Environment を指定する。
+
+| 設定 | 値 |
+|---|---|
+| 使えるブランチ (deployment branch policy。以下「ブランチの決まり」) | `main` だけ (`custom_branch_policies` を真にし、`main` を `type: branch` で 1 件足す)。`protected_branches` を真にする形は使わない (`develop` も保護されたブランチなので、`develop` から使えてしまう) |
+| 承認者・待ち時間 | 付けない。本番の起動は、オーナーが版と変更の節の文面を確定した後に手動で行うので、そこで止められる。確定した後は、起動から公開まで止まらずに進める |
+| secret | 6 つ (`SIGNING_KEY`・`SIGNING_KEY_ID`・`SIGNING_PASSWORD`・`MAVEN_CENTRAL_USERNAME`・`MAVEN_CENTRAL_PASSWORD`・`SPM_DEPLOY_KEY`)。中身・登録のしかたは [secret の扱い](secret-handling.md) の「リリースの secret」。値はオーナーが登録する |
+
+### 入れる順
+
+| 順 | 行うこと | 書いてある所 | この順にする理由 |
+|---|---|---|---|
+| 1 | 配信用リポジトリを空で作る | 下の「配信用リポジトリの作成」 | リリースの workflow の `validate` が配信用リポジトリの tag を読むので、無いと試しも止まる |
+| 2 | deploy key を作って登録する | [secret の扱い](secret-handling.md) | 配信用リポジトリが要る |
+| 3 | Environment `release` を作り、`main` だけが使える形にする | 下の「Environment `release` の作成」 | secret を登録すると、ブランチの決まりの無い Environment が作られる。先に決まりを入れるか、登録の後に必ず読み直して直す |
+| 4 | secret を登録する | [secret の扱い](secret-handling.md) | — |
+| 5 | リリースの workflow を、準備の Pull Request (workflow を `main` に入れるためだけの Pull Request。利用者向けの変更が無いので、変更の節は `- none`) で `main` に入れる | 上の「main 宛ての Pull Request を作ってマージする」 | 手動で起動する workflow は、既定のブランチにファイルがあるときだけ起動できる |
+| 6 | `develop` から試しを起動し、`develop` からの本番が `validate` で止まることを確かめる | [リリースの手順](release-procedure.md) の「試し」 | 外へ何も送らずに、公開の前の確認までを通す |
+
+### 配信用リポジトリの作成
+
+空の public のリポジトリとして作る。README などのファイルは置かない (最初の写しは、本番の run が push する)。
+
+```bash
+gh repo create kamusoft/KsCollectionView-SPM --public --disable-issues --disable-wiki \
+  --description "Swift Package Manager distribution of KsCollectionView (source and issues: kamusoft/KsCollectionView)" \
+  --homepage https://github.com/kamusoft/KsCollectionView
+gh repo edit kamusoft/KsCollectionView-SPM --enable-projects=false --enable-discussions=false
+gh api -X PATCH repos/kamusoft/KsCollectionView-SPM -f pull_request_creation_policy=collaborators_only
+```
+
+確かめ方: 読み直して、次の表の値であることを確かめる。
+
+```bash
+gh api repos/kamusoft/KsCollectionView-SPM \
+  --jq '{visibility, has_issues, has_wiki, has_projects, has_discussions, pull_request_creation_policy, size}'
+git ls-remote https://github.com/kamusoft/KsCollectionView-SPM.git
+```
+
+| 項目 | 期待する値 |
+|---|---|
+| `visibility` | `public` |
+| `has_issues`・`has_wiki`・`has_projects`・`has_discussions` | どれも `false` |
+| `pull_request_creation_policy` | `collaborators_only` |
+| `git ls-remote` | 作った直後は、何も出ずに終了コード 0 で終わる (空のリポジトリ) |
+
+変更の直後の読み直しは、古い値を返すことがある。食い違ったら、20 秒ほど待って読み直す。2026-10-15 の作成では、直後の読み直しで `has_projects` が `true`、`pull_request_creation_policy` が `all` と返り、20 秒後に決めた値になった。
+
+### Environment `release` の作成
+
+```bash
+gh api -X PUT repos/kamusoft/KsCollectionView/environments/release --input - <<'JSON'
+{"deployment_branch_policy": {"protected_branches": false, "custom_branch_policies": true}}
+JSON
+gh api -X POST repos/kamusoft/KsCollectionView/environments/release/deployment-branch-policies \
+  -f name=main -f type=branch
+```
+
+確かめ方 (変更の直後に食い違ったら、20 秒ほど待って読み直す):
+
+```bash
+gh api repos/kamusoft/KsCollectionView/environments/release \
+  --jq '{name, deployment_branch_policy, protection_rules: [.protection_rules[].type]}'
+gh api repos/kamusoft/KsCollectionView/environments/release/deployment-branch-policies \
+  --jq '[.branch_policies[] | {name, type}]'
+```
+
+| 項目 | 期待する値 |
+|---|---|
+| `deployment_branch_policy` | `protected_branches: false`・`custom_branch_policies: true` |
+| `protection_rules` | `branch_policy` だけ (承認者・待ち時間の規則が無い) |
+| ブランチの決まり | 1 件。`name: main`・`type: branch` |
+
+2026-10-15 の実施では、オーナーが secret を先に登録したときに、ブランチの決まりの無い Environment (`deployment_branch_policy: null`) が作られていた。上のコマンドで `main` だけにした。
+
+### 読み直した値 (2026-10-15)
+
+初回のリリースの後に、本リポジトリ・配信用リポジトリ・Environment の設定を読み直し、この文書の値の表とすべて一致した。
+
+| 読んだもの | 値 |
+|---|---|
+| 配信用リポジトリ | public・既定のブランチ `main`・Issues・Wiki・Discussions・Projects はどれも無効・`collaborators_only`・deploy key は書き込みの権限で 1 つ・Release は 0 件 |
+| Environment | `release` の 1 つだけ。使えるブランチは `main` だけで、規則は `branch_policy` だけ。secret は 6 つの名前がそろい、リポジトリの secret は 0 件 |
+| 本リポジトリと保護 | 上の「GitHub の設定の値」「保護の値」の表と同じ (`main` の必須の検査 5 つ・`enforce_admins` は false) |
 
 ## 実施の記録
 
@@ -345,18 +463,33 @@ Issue のフォームと、空の Issue を作れなくする指定は、リポ�
 | `develop` から `main` への最初の Pull Request のマージ | 2026-10-08 | 7.6 |
 | Issue のフォームの確認 | 2026-10-08 | 7.7 |
 | 利用者の立場のビルドの確認の 2 つを、`main` の必須の検査に足した (3 つから 5 つ) | 2026-10-09 | `kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md` |
+| 配信用リポジトリの作成と設定 | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-spm-repository-001.md` |
+| 配信用リポジトリの deploy key と、Environment `release` と secret の登録 | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-release-environment-001.md` |
+| 準備の Pull Request (3 番。リリースの workflow を `main` に入れた) | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-prep-pr-001.md` |
+| 1 番・2 番の本文に変更の節 (`- none`) を足した | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-pr-bodies-001.md` |
+| `SIGNING_KEY` を秘密鍵で登録し直した (初回の本番の試行 1 が公開鍵で止まった後) | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-release-run-001.md` |
+| 初回のリリース `0.1.0-beta.1` (リリースの Pull Request 4 番と、本番の run) | 2026-10-15 | `kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-release-pr-001.md`・`github-release-run-001.md` |
 
 `develop` の最初の検証 CI は、1 回目の実行で `ios / verify` だけが失敗し、iOS をビルドだけにした後 (iOS のテストの実行を CI から外した後) の 2 回目の実行で、当時の 3 つの検査がすべて成功した ([検証 CI](verification-ci.md))。保護は、2 回目の成功の後に入れた。
 
 ## 関連
+
+### 決定
 
 - [cross/ADR-0010](../../decisions/cross/0010-develop-and-main-branch-roles.md) — ブランチを 2 本に分けた決定
 - [cross/ADR-0011](../../decisions/cross/0011-contributions-via-issues-no-external-pull-requests.md) — 外部からの Pull Request を受け付けない決定
 - [cross/ADR-0009](../../decisions/cross/0009-publish-existing-history-as-is.md) — 履歴を書き換えずに公開した決定
 - [cross/ADR-0014](../../decisions/cross/0014-ci-reusable-platform-workflows-and-fixed-check-names.md) — 検証 CI の構成と、必須の検査の名前を固定した決定
 - [cross/ADR-0016](../../decisions/cross/0016-consumer-build-check-on-main-pull-requests.md) — 配布物を利用者役でビルドして確かめ、必須の検査にする決定
+- [cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md) — SwiftPM を配信用リポジトリで配る決定
+- [cross/ADR-0023](../../decisions/cross/0023-release-notes-from-main-pull-request-bodies.md) — リリースのノートを `main` 宛ての Pull Request の変更の節から組み立てる決定
+
+### 規約・ガイド
+
 - [検証 CI](verification-ci.md) — 5 つの検査の中身と、失敗したときの見方
 - [利用者の立場のビルドの確認](consumer-build-check.md) — `main` 宛ての Pull Request でだけ走る 2 つの検査の、手元での流し方と失敗の見方
 - [ローカル開発環境と Sample の実行](local-development-setup.md) — clone の後の準備と、手元の検査の有効化
+- [リリースの手順](release-procedure.md) — リリースの workflow の起動と見守り、リリースの Pull Request の本文
+- [secret の扱い](secret-handling.md) — リリースの secret と deploy key の登録、secret を検出したときの手順
 
-出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 8・9) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (公開の実施と読み直しの記録) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (管理する側の画面にだけ出る空の Issue の行) / ../KsSettingsView/kasane/handbook/cross/release-procedure.md (保護の payload の形と `app_id`) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 8) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (必須の検査を 5 つにした更新と読み直しの記録)
+出典: kasane/changes/archive/2026-10-08-public-repo-verify-ci/design.md (Decision 8・9) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (公開の実施と読み直しの記録) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (管理する側の画面にだけ出る空の Issue の行) / ../KsSettingsView/kasane/handbook/cross/release-procedure.md (保護の payload の形と `app_id`) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 8) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (必須の検査を 5 つにした更新と読み直しの記録) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md (決定事項 B1・B2) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 5) / kasane/changes/archive/2026-10-15-release-pipeline/drafts/branch-and-github-settings.md (この文書へ足した文面の草稿) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-*.md (配信用リポジトリ・Environment・Pull Request の実施の記録)
