@@ -5,10 +5,12 @@
 その利用者役のリリースを、コード縮小 (R8) を有効にして組み立て、実行時の依存に本ライブラリの
 座標が指定の版で現れることを確かめる。利用者役は起動しない。
 
-配布物をどこから取るかは、切り替えで決まる。組み立てと成功の条件は、どちらでも同じである。
+配布物をどこから取るかは、切り替えで決まる。組み立てと成功の条件は、どれでも同じである。
 
   local      今の本体 (android/) を、一時のディレクトリの Maven リポジトリへ発行し、利用者役に
              そこだけから取らせる。版を渡さなければ、本体のバージョンカタログの版を使う
+  artifact   発行しない。外から渡された Maven リポジトリ (リリースの工程が発行したもの) の
+             ディレクトリから、渡した版を、利用者役にそこだけから取らせる
   published  発行しない。渡した版を、利用者役に Maven Central だけから取らせる
 
 行うことは、順に次のとおり。子プロセス (Gradle) の出力は、加工せずにそのまま流す。
@@ -30,12 +32,14 @@ Android SDK の場所は、Gradle が読む。環境変数 ANDROID_HOME で渡�
 使い方:
   python3 scripts/ci/verify-consumer-android.py --mode local
   python3 scripts/ci/verify-consumer-android.py --mode local --version 1.2.3
+  python3 scripts/ci/verify-consumer-android.py --mode artifact --repository <Maven リポジトリ> --version 1.2.3
   python3 scripts/ci/verify-consumer-android.py --mode published --version 1.2.3
 
 終了コード:
   0  組み立てと依存の確認が、どちらも成功した
   1  発行・組み立て・確認のどれかが失敗した
-  2  引数の誤り (知らない切り替え・published で版が無い)。何も始めていない
+  2  引数の誤り (知らない切り替え・published か artifact で版が無い・artifact でリポジトリが
+     無い・artifact 以外でリポジトリを渡した)。何も始めていない
 """
 
 from __future__ import annotations
@@ -57,7 +61,7 @@ REPOSITORY_ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import ci_report  # noqa: E402
 
-MODES = ("local", "published")
+MODES = ("local", "artifact", "published")
 
 GROUP = "jp.kamusoft"
 ARTIFACT = "kscollectionview"
@@ -101,6 +105,8 @@ class Request:
     mode: str
     # local で渡されなければ None (本体のバージョンカタログの版を使う)。
     version: str | None
+    # artifact で渡された Maven リポジトリのディレクトリ (絶対パス)。ほかの切り替えでは None。
+    repository: str | None = None
 
 
 def parse_request(argv: list[str] | None) -> Request:
@@ -108,18 +114,42 @@ def parse_request(argv: list[str] | None) -> Request:
     parser = argparse.ArgumentParser(description="Android の配布物を、利用者の立場でビルドして確かめる")
     # choices は使わない。知らない値のときの文言を、自分で決めるためである。
     parser.add_argument("--mode", required=True, help="配布物をどこから取るか (local | published)")
-    parser.add_argument("--version", default="", help="取る版 (published では必須。local で空なら本体のバージョンカタログの版)")
+    parser.add_argument(
+        "--version", default="", help="取る版 (published と artifact では必須。local で空なら本体のバージョンカタログの版)"
+    )
+    parser.add_argument(
+        "--repository",
+        default="",
+        help="渡された Maven リポジトリのディレクトリ (artifact では必須。ほかの切り替えでは渡さない)",
+    )
     args = parser.parse_args(argv)
 
     if args.mode not in MODES:
-        raise UsageError(f"--mode は {' か '.join(MODES)} のどちらかにする: {args.mode!r}")
+        raise UsageError(f"--mode は {' か '.join(MODES)} のどれかにする: {args.mode!r}")
     # workflow は、版の入力が空のときに空の文字列を渡す。空は「渡していない」と同じに扱う。
     version = args.version.strip() or None
     if version is not None and not VERSION_PATTERN.fullmatch(version):
         raise UsageError(f"--version に使えない文字がある: {version!r}")
-    if args.mode == "published" and version is None:
-        raise UsageError("--mode published では --version が必須である (取る版を決められない)")
-    return Request(mode=args.mode, version=version)
+    if args.mode in ("published", "artifact") and version is None:
+        raise UsageError(f"--mode {args.mode} では --version が必須である (取る版を決められない)")
+    return Request(mode=args.mode, version=version, repository=repository_argument(args.mode, args.repository))
+
+
+def repository_argument(mode: str, value: str) -> str | None:
+    """渡された Maven リポジトリのディレクトリを確かめ、実体のパスにして返す。artifact 以外では None を返す。"""
+    # workflow は、リポジトリを渡さない切り替えでは空の文字列を渡す。空は「渡していない」と同じに扱う。
+    value = value.strip()
+    if mode != "artifact":
+        if value:
+            # 渡したリポジトリが使われないまま成功すると、渡した発行物を確かめたように見える。
+            raise UsageError(f"--repository は --mode artifact でだけ渡す (--mode {mode} では使わない): {value!r}")
+        return None
+    if not value:
+        raise UsageError("--mode artifact では --repository が必須である (発行物を取る場所を決められない)")
+    if not os.path.isdir(value):
+        raise UsageError(f"--repository がディレクトリではない: {value!r}")
+    # Gradle が場所の表記を揃えても食い違わないように、実体のパスにしておく。
+    return os.path.realpath(value)
 
 
 def catalog_version(repository_root: str) -> str:
@@ -275,10 +305,11 @@ def check_dependencies(repository_root: str, arguments: list[str], version: str)
 
 def verify(request: Request, repository_root: str) -> str:
     """確認を行い、確かめた版を返す。失敗したら VerificationError を投げる。"""
-    if request.mode == "published":
+    if request.mode in ("published", "artifact"):
+        # 発行はしない。published は Maven Central から、artifact は渡されたリポジトリから取る。
         assert request.version is not None
         version = request.version
-        arguments = consumer_arguments(request.mode, version, None)
+        arguments = consumer_arguments(request.mode, version, request.repository)
         assemble_consumer(repository_root, arguments)
         check_dependencies(repository_root, arguments, version)
         return version
@@ -307,7 +338,12 @@ def main(argv: list[str] | None = None) -> int:
         ci_report.emit_errors([str(error)])
         return 1
 
-    source = "作業用の Maven リポジトリ (今の本体を発行したもの)" if request.mode == "local" else "Maven Central"
+    sources = {
+        "local": "作業用の Maven リポジトリ (今の本体を発行したもの)",
+        "artifact": f"渡された Maven リポジトリ ({request.repository})",
+        "published": "Maven Central",
+    }
+    source = sources[request.mode]
     ci_report.emit_summary(
         [
             "### Android の利用者の立場のビルドの確認",

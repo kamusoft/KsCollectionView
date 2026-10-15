@@ -6,18 +6,25 @@ KsCollectionView として取る SwiftPM のパッケージである。その利
 Simulator 向けと実機向けの 2 つの行き先にビルドする。行き先は、特定の端末を指さない総称の
 指定で、Simulator は選ばず、起動もしない。実機向けは、署名なしでビルドする。
 
-配布物をどこから取るかは、切り替えで決まる。ビルドと成功の条件は、どちらでも同じである。
+配布物をどこから取るかは、切り替えで決まる。ビルドと成功の条件は、どれでも同じである。
 
   local      今の本体 (ios/) から、配信用リポジトリのルートに置くのと同じ写しを一時の
              ディレクトリに作り、利用者役にその写しをパスで参照させる。版は使わない
+  artifact   写しを作らない。外から渡された写し (リリースの工程が組み立てたもの) の
+             ディレクトリを、利用者役にパスで参照させる。版は使わない
   published  写しを作らない。利用者役に、配信用リポジトリの URL を、渡した版の完全一致で
              参照させる
+
+artifact で渡す写しのディレクトリは、ルートにマニフェスト (Package.swift) を持ち、名前が
+KsCollectionView-SPM でなければならない。SwiftPM は、パスの末尾の名前を package の名前として
+扱うので、名前が違うと、利用者役の target の依存 (package KsCollectionView-SPM) を解決できない。
 
 行うことは、順に次のとおり。子プロセス (写しを作る道具・xcodebuild) の出力は、加工せずに
 そのまま流す。どれかが失敗したら、後ろを始めずに、その時点で失敗で終わる。
 
   1. 引数を確かめる
   2. (local だけ) 写しを、一時のディレクトリの下の KsCollectionView-SPM に作る
+     (artifact では、渡された写しにマニフェストがあることを 1 で確かめてある)
   3. 利用者役を一時のディレクトリに写し、ひな形に参照の行を差し込んでマニフェストを書く
   4. Simulator 向けにビルドする
   5. 実機向けにビルドする
@@ -31,12 +38,14 @@ Xcode は、PATH の上の xcodebuild をそのまま使う。どの Xcode を�
 
 使い方:
   python3 scripts/ci/verify-consumer-ios.py --mode local
+  python3 scripts/ci/verify-consumer-ios.py --mode artifact --snapshot <写しのディレクトリ>/KsCollectionView-SPM
   python3 scripts/ci/verify-consumer-ios.py --mode published --version 1.2.3
 
 終了コード:
   0  2 つの行き先のビルドが、どちらも成功した
   1  写しの作成・利用者役の準備・ビルドのどれかが失敗した
-  2  引数の誤り (知らない切り替え・published で版が無い)。何も始めていない
+  2  引数の誤り (知らない切り替え・published で版が無い・artifact で写しが無いか
+     名前が違う・artifact 以外で写しを渡した)。何も始めていない
 """
 
 from __future__ import annotations
@@ -59,7 +68,7 @@ REPOSITORY_ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
 import ci_report  # noqa: E402
 
-MODES = ("local", "published")
+MODES = ("local", "artifact", "published")
 
 # 利用者がマニフェストに書く package の名前。SwiftPM は、参照先のパスや URL の末尾の名前を
 # package の名前として扱うので、写しのディレクトリもこの名前にする。
@@ -112,8 +121,10 @@ class UsageError(Exception):
 @dataclasses.dataclass(frozen=True)
 class Request:
     mode: str
-    # local で渡されなければ None。local では使わない。
+    # 渡されなければ None。local と artifact では使わない。
     version: str | None
+    # artifact で渡された写しのディレクトリ (絶対パス)。ほかの切り替えでは None。
+    snapshot: str | None = None
 
 
 def parse_request(argv: list[str] | None) -> Request:
@@ -121,24 +132,57 @@ def parse_request(argv: list[str] | None) -> Request:
     parser = argparse.ArgumentParser(description="iOS の配布物を、利用者の立場でビルドして確かめる")
     # choices は使わない。知らない値のときの文言を、自分で決めるためである。
     parser.add_argument("--mode", required=True, help="配布物をどこから取るか (local | published)")
-    parser.add_argument("--version", default="", help="取る版 (published では必須。local では使わない)")
+    parser.add_argument("--version", default="", help="取る版 (published では必須。local と artifact では使わない)")
+    parser.add_argument(
+        "--snapshot",
+        default="",
+        help=f"渡された写しのディレクトリ (artifact では必須。名前は {PACKAGE_NAME}。ほかの切り替えでは渡さない)",
+    )
     args = parser.parse_args(argv)
 
     if args.mode not in MODES:
-        raise UsageError(f"--mode は {' か '.join(MODES)} のどちらかにする: {args.mode!r}")
+        raise UsageError(f"--mode は {' か '.join(MODES)} のどれかにする: {args.mode!r}")
     # workflow は、版の入力が空のときに空の文字列を渡す。空は「渡していない」と同じに扱う。
     version = args.version.strip() or None
     if version is not None and not VERSION_PATTERN.fullmatch(version):
         raise UsageError(f"--version に使えない文字がある: {version!r}")
     if args.mode == "published" and version is None:
         raise UsageError("--mode published では --version が必須である (取る版を決められない)")
-    return Request(mode=args.mode, version=version)
+    return Request(mode=args.mode, version=version, snapshot=snapshot_argument(args.mode, args.snapshot))
+
+
+def snapshot_argument(mode: str, value: str) -> str | None:
+    """渡された写しのディレクトリを確かめ、絶対パスにして返す。artifact 以外では None を返す。"""
+    # workflow は、写しを渡さない切り替えでは空の文字列を渡す。空は「渡していない」と同じに扱う。
+    value = value.strip()
+    if mode != "artifact":
+        if value:
+            # 渡した写しが使われないまま成功すると、写しを確かめたように見える。
+            raise UsageError(f"--snapshot は --mode artifact でだけ渡す (--mode {mode} では使わない): {value!r}")
+        return None
+    if not value:
+        raise UsageError("--mode artifact では --snapshot が必須である (参照する写しを決められない)")
+    # 実体のパスにはしない。シンボリックリンクの先の名前が違うと、package の名前が変わるためである。
+    snapshot = os.path.abspath(value)
+    if os.path.basename(snapshot) != PACKAGE_NAME:
+        raise UsageError(
+            f"--snapshot のディレクトリの名前は {PACKAGE_NAME} にする (SwiftPM はパスの末尾の名前を"
+            f" package の名前として扱う): {value!r}"
+        )
+    if not os.path.isfile(os.path.join(snapshot, "Package.swift")):
+        raise UsageError(f"--snapshot のディレクトリに、写しのマニフェスト (Package.swift) が無い: {value!r}")
+    # マニフェストの文字列にそのまま差し込むので、引用符と逆斜線を含むパスは通さない。
+    if '"' in snapshot or "\\" in snapshot:
+        raise UsageError(f"--snapshot のパスに使えない文字 (引用符・逆斜線) がある: {value!r}")
+    return snapshot
 
 
 def dependency_line(request: Request) -> str:
     """利用者役のマニフェストに差し込む、配布物への参照の行。"""
     if request.mode == "published":
         return f'.package(url: "{DISTRIBUTION_URL}", exact: "{request.version}"),'
+    if request.mode == "artifact":
+        return f'.package(path: "{request.snapshot}"),'
     return f'.package(path: "../{PACKAGE_NAME}"),'
 
 
@@ -250,8 +294,8 @@ def main(argv: list[str] | None = None) -> int:
         ci_report.emit_errors([str(error)])
         return 2
 
-    if request.mode == "local" and request.version is not None:
-        print(f"local では版を使わない (写しをパスで参照する)。渡された版: {request.version}", flush=True)
+    if request.mode in ("local", "artifact") and request.version is not None:
+        print(f"{request.mode} では版を使わない (写しをパスで参照する)。渡された版: {request.version}", flush=True)
 
     try:
         dependency = verify(request, REPOSITORY_ROOT)
@@ -259,11 +303,12 @@ def main(argv: list[str] | None = None) -> int:
         ci_report.emit_errors([str(error)])
         return 1
 
-    source = (
-        "今の ios/ から作った写し"
-        if request.mode == "local"
-        else f"配信用リポジトリ ({DISTRIBUTION_URL}) の版 {request.version}"
-    )
+    sources = {
+        "local": "今の ios/ から作った写し",
+        "artifact": f"渡された写し ({request.snapshot})",
+        "published": f"配信用リポジトリ ({DISTRIBUTION_URL}) の版 {request.version}",
+    }
+    source = sources[request.mode]
     ci_report.emit_summary(
         [
             "### iOS の利用者の立場のビルドの確認",

@@ -4,7 +4,7 @@
 英語と日本語の 2 枚の構成の一致、案内どうしの導線、Issue のフォームの必須の項目、
 ルートの README の節の並び・画像・Skill への導線、Skill の索引の 2 枚の見出しの並び、
 利用者向けの文書の検査の結果、
-追従の記録の形。
+追従の記録の形、Pull Request のひな形の変更の節と書き方。
 
 利用者向けの文書の検査 (README の最小コード例・インストール例・Skill 自身の整合) は、
 今のリポジトリの実物に対して流す。Skill が源泉 (概念の文書・本体のソース) からずれている
@@ -24,6 +24,7 @@ USER_DOCS = support.load_script("user_docs.py")
 README_EXAMPLES = support.load_script("check-readme-examples.py")
 SKILLS_CHECK = support.load_script("check-skills.py")
 SKILLS_MANIFEST = support.load_script("skills_manifest.py", DOCS_DIR)
+RELEASE_NOTES = support.load_script("build-release-notes.py", os.path.join(support.REPOSITORY_ROOT, "scripts", "release"))
 
 HEADING = re.compile(r"^(#{1,6})\s+\S")
 FENCE = re.compile(r"^\s*(```|~~~)")
@@ -311,6 +312,55 @@ class IssueFormTest(unittest.TestCase):
         self.assertRegex(config, r"(?m)^blank_issues_enabled:\s*false\s*$")
         # 外部への案内のリンクは置かない。
         self.assertRegex(config, r"(?m)^contact_links:\s*\[\]\s*$")
+
+
+class PullRequestTemplateTest(unittest.TestCase):
+    """Pull Request のひな形。変更の節の内容が、リリースノートの組み立ての材料になる (cross/ADR-0023)。"""
+
+    PATH = (".github", "pull_request_template.md")
+
+    def setUp(self) -> None:
+        self.template = read(*self.PATH)
+
+    def with_section(self, *lines: str) -> str:
+        """ひな形の変更の節の書き方の注釈の後ろに、行を書き足した本文を返す。"""
+        return self.template.rstrip("\n") + "\n" + "\n".join(lines) + "\n"
+
+    def test_変更の節が1つだけあり書き方は注釈としてノートに載らない(self) -> None:
+        self.assertEqual(self.template.splitlines().count("## Changes"), 1)
+        # 何も書き足さないままの本文は、節が空としてリリースの前に止まる (書き忘れを通さない)。
+        entries, problems = RELEASE_NOTES.parse_changes(self.template)
+        self.assertIsNone(entries)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("変更の節が空", problems[0])
+
+    def test_書き方に従って書いた節は読める(self) -> None:
+        entries, problems = RELEASE_NOTES.parse_changes(self.with_section("- none"))
+        self.assertEqual((entries, problems), ([], []))
+        entries, problems = RELEASE_NOTES.parse_changes(
+            self.with_section("- feature: Add a new option.", "- fix: Fix a crash.")
+        )
+        self.assertEqual(problems, [])
+        self.assertEqual(entries, [("feature", "Add a new option."), ("fix", "Fix a crash.")])
+
+    def test_書き方に行の形と種類と変更が無いときと言語の決まりがある(self) -> None:
+        section = self.template.split("## Changes", 1)[1]
+        comment = re.search(r"<!--(.*?)-->", section, flags=re.DOTALL)
+        self.assertIsNotNone(comment)
+        guidance = comment.group(1)
+        for text in (
+            "release notes",
+            "`- <kind>: <description>`",
+            "breaking, feature, fix, docs",
+            "`- none`",
+            "in English",
+            "Do not list internal work",
+            "stops the release",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, guidance)
+        # ひな形の種類は、組み立ての道具が読む種類と同じである。
+        self.assertEqual(list(RELEASE_NOTES.KINDS), ["breaking", "feature", "fix", "docs"])
 
 
 if __name__ == "__main__":

@@ -200,6 +200,16 @@ class ConsumerVerificationTestCase(unittest.TestCase):
     def builds(self) -> list[dict]:
         return [call for call in self.calls() if call["tool"] == "xcodebuild"]
 
+    def given_snapshot(self, name: str = "KsCollectionView-SPM", manifest: bool = True) -> str:
+        """外から渡す写しのディレクトリを、使い捨てのリポジトリの外に作って返す。"""
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        snapshot = os.path.join(os.path.realpath(directory.name), "downloaded", name)
+        support.write(os.path.join(snapshot, "Sources", "KsCollectionView", "Engine.swift"), "// 写しのソース\n")
+        if manifest:
+            support.write(os.path.join(snapshot, "Package.swift"), "// swift-tools-version: 6.4\n")
+        return snapshot
+
 
 class LocalModeTests(ConsumerVerificationTestCase):
     def test_写しを作ってからSimulator向けと実機向けの順にビルドする(self) -> None:
@@ -365,6 +375,76 @@ class PublishedModeTests(ConsumerVerificationTestCase):
         self.assertIn('exact: "1.2.3"', result.stdout)
 
 
+class ArtifactModeTests(ConsumerVerificationTestCase):
+    def test_artifactでは写しを作らずに渡された写しで2つのビルドを始める(self) -> None:
+        snapshot = self.given_snapshot()
+        result = self.run_script("--mode", "artifact", "--snapshot", snapshot)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 写しを作る道具は呼ばれず、Simulator 向けと実機向けの 2 つのビルドだけが走る。
+        self.assertEqual(self.tools(), [SIMULATOR, DEVICE])
+        for build in self.builds():
+            # 写しのディレクトリは、作業用のディレクトリに作られていない。
+            self.assertEqual(build["siblings"], ["consumer"])
+
+    def test_利用者役は渡された写しをパスで参照する(self) -> None:
+        snapshot = self.given_snapshot()
+        result = self.run_script("--mode", "artifact", "--snapshot", snapshot)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for build in self.builds():
+            self.assertIn(f'.package(path: "{snapshot}"),', build["manifest"])
+            self.assertNotIn(".package(url:", build["manifest"])
+            self.assertNotIn(SCRIPT.DEPENDENCY_PLACEHOLDER, build["manifest"])
+            self.assertIn(TARGET_DEPENDENCY, build["manifest"])
+
+    def test_相対のパスで渡しても絶対のパスで参照する(self) -> None:
+        snapshot = self.given_snapshot()
+        relative = os.path.relpath(snapshot)
+        result = self.run_script("--mode", "artifact", "--snapshot", relative)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for build in self.builds():
+            self.assertIn(f'.package(path: "{snapshot}"),', build["manifest"])
+
+    def test_ビルドは切り替えによって変わらない(self) -> None:
+        def normalized(build: dict) -> list[str]:
+            return [argument.replace(os.path.dirname(build["cwd"]), "<work>") for argument in build["arguments"]]
+
+        self.assertEqual(self.run_script("--mode", "local").returncode, 0)
+        local_builds = [normalized(build) for build in self.builds()]
+        os.remove(os.path.join(self.root, "calls.jsonl"))
+        result = self.run_script("--mode", "artifact", "--snapshot", self.given_snapshot())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([normalized(build) for build in self.builds()], local_builds)
+
+    def test_artifactでも成功の条件は同じである(self) -> None:
+        snapshot = self.given_snapshot()
+        for kind in ("simulator", "device"):
+            with self.subTest(kind=kind):
+                self.behave({kind: {"exit": 65}})
+                result = self.run_script("--mode", "artifact", "--snapshot", snapshot)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+
+    def test_artifactでは渡された版を使わない(self) -> None:
+        snapshot = self.given_snapshot()
+        result = self.run_script("--mode", "artifact", "--snapshot", snapshot, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for build in self.builds():
+            self.assertNotIn("exact:", build["manifest"])
+
+    def test_渡された写しとリポジトリの中を変えない(self) -> None:
+        snapshot = self.given_snapshot()
+        before = (tree(self.root, skip=("calls.jsonl",)), tree(snapshot))
+        result = self.run_script("--mode", "artifact", "--snapshot", snapshot)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((tree(self.root, skip=("calls.jsonl",)), tree(snapshot)), before)
+
+    def test_概要に渡された写しが出る(self) -> None:
+        snapshot = self.given_snapshot()
+        result = self.run_script("--mode", "artifact", "--snapshot", snapshot)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("`artifact`", result.stdout)
+        self.assertIn(f"渡された写し ({snapshot})", result.stdout)
+
+
 class ArgumentTests(ConsumerVerificationTestCase):
     def assert_nothing_started(self, result: subprocess.CompletedProcess, reason: str) -> None:
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
@@ -374,7 +454,9 @@ class ArgumentTests(ConsumerVerificationTestCase):
     def test_知らない切り替えでは何も始めない(self) -> None:
         for mode in ("dry-run", "LOCAL", "local ", ""):
             with self.subTest(mode=mode):
-                self.assert_nothing_started(self.run_script("--mode", mode), "--mode は local か published")
+                self.assert_nothing_started(
+                    self.run_script("--mode", mode), "--mode は local か artifact か published のどれか"
+                )
 
     def test_切り替えが無ければ何も始めない(self) -> None:
         self.assert_nothing_started(self.run_script(), "--mode")
@@ -399,7 +481,37 @@ class ArgumentTests(ConsumerVerificationTestCase):
 
     def test_引数の誤りは注釈として出る(self) -> None:
         result = self.run_script("--mode", "dry-run")
-        self.assertIn("::error::--mode は local か published", result.stdout)
+        self.assertIn("::error::--mode は local か artifact か published", result.stdout)
+
+    def test_artifactで写しを渡さなければ何も始めない(self) -> None:
+        for arguments in ((), ("--snapshot", ""), ("--snapshot", "  ")):
+            with self.subTest(arguments=arguments):
+                self.assert_nothing_started(
+                    self.run_script("--mode", "artifact", *arguments), "--snapshot が必須"
+                )
+
+    def test_artifactで写しにマニフェストが無ければ何も始めない(self) -> None:
+        empty = self.given_snapshot(manifest=False)
+        missing = os.path.join(os.path.dirname(empty), "missing", "KsCollectionView-SPM")
+        for snapshot in (empty, missing):
+            with self.subTest(snapshot=snapshot):
+                self.assert_nothing_started(
+                    self.run_script("--mode", "artifact", "--snapshot", snapshot), "マニフェスト (Package.swift) が無い"
+                )
+
+    def test_artifactで写しの名前がpackageの名前でなければ何も始めない(self) -> None:
+        snapshot = self.given_snapshot(name="snapshot")
+        self.assert_nothing_started(
+            self.run_script("--mode", "artifact", "--snapshot", snapshot), "名前は KsCollectionView-SPM にする"
+        )
+
+    def test_artifact以外で写しを渡すと何も始めない(self) -> None:
+        snapshot = self.given_snapshot()
+        for arguments in (("--mode", "local"), ("--mode", "published", "--version", "1.2.3")):
+            with self.subTest(arguments=arguments):
+                self.assert_nothing_started(
+                    self.run_script(*arguments, "--snapshot", snapshot), "--snapshot は --mode artifact でだけ渡す"
+                )
 
 
 class FailureTests(ConsumerVerificationTestCase):
@@ -526,6 +638,13 @@ class ManifestTests(unittest.TestCase):
         # local では、版を渡しても参照は変わらない。
         self.assertEqual(SCRIPT.dependency_line(SCRIPT.Request(mode="local", version="1.2.3")), LOCAL_DEPENDENCY)
 
+    def test_artifactは渡された写しを絶対のパスで参照する(self) -> None:
+        snapshot = "/work/downloaded/KsCollectionView-SPM"
+        self.assertEqual(
+            SCRIPT.dependency_line(SCRIPT.Request(mode="artifact", version=None, snapshot=snapshot)),
+            f'.package(path: "{snapshot}"),',
+        )
+
     def test_publishedは配信用リポジトリを版の完全一致で参照する(self) -> None:
         self.assertEqual(
             SCRIPT.dependency_line(SCRIPT.Request(mode="published", version="2.0.0-rc.1")),
@@ -556,6 +675,12 @@ class ConsumerDefinitionTests(unittest.TestCase):
             "local": SCRIPT.render_manifest(
                 self.template, SCRIPT.dependency_line(SCRIPT.Request(mode="local", version=None))
             ),
+            "artifact": SCRIPT.render_manifest(
+                self.template,
+                SCRIPT.dependency_line(
+                    SCRIPT.Request(mode="artifact", version=None, snapshot="/work/downloaded/KsCollectionView-SPM")
+                ),
+            ),
             "published": SCRIPT.render_manifest(
                 self.template, SCRIPT.dependency_line(SCRIPT.Request(mode="published", version="1.2.3"))
             ),
@@ -584,6 +709,10 @@ class ConsumerDefinitionTests(unittest.TestCase):
     def test_localはpackageの名前のディレクトリをパスで参照する(self) -> None:
         packages = re.findall(r"\.package\(.*\)", without_comments(self.manifests["local"]))
         self.assertEqual(packages, ['.package(path: "../KsCollectionView-SPM")'])
+
+    def test_artifactは渡された写しのディレクトリをパスで参照する(self) -> None:
+        packages = re.findall(r"\.package\(.*\)", without_comments(self.manifests["artifact"]))
+        self.assertEqual(packages, ['.package(path: "/work/downloaded/KsCollectionView-SPM")'])
 
     def test_publishedは配信用リポジトリを版の完全一致で参照する(self) -> None:
         packages = re.findall(r"\.package\(.*\)", without_comments(self.manifests["published"]))
