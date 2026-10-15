@@ -26,5 +26,6 @@
 | [0022](0022-manual-release-dispatch-reversible-steps-first.md) | リリースは版を入力して main から手動で起動し、取り消せる操作から公開して、tag と Release を最後に作る | accepted | 版の正は起動の入力で、版を上げる commit を積まない。写しの push → Maven Central の保留と検証の決着 → 公開 → tag → Release。同じ版で再実行できる。tag の push での起動・develop からの起動・再実行の禁止を却下。 |
 | [0023](0023-release-notes-from-main-pull-request-bodies.md) | リリースノートは、前回の Release からの main 宛ての Pull Request の本文にある変更の節から組み立てる | accepted | 節は必須で、欠けや読めない行で止める。範囲は前回の Release の tag から。ラベルの分類・commit から作る・直近の 1 本だけ・節を任意にするを却下。 |
 | [0024](0024-release-in-main-repository-marked-latest.md) | Release は本リポジトリにだけ作り、プレリリースの印を付けずに、最新の Release として示す | accepted | 最新の版の確かめ先を 1 か所に保つ。プレリリースかどうかは版の文字列で示す。本リポジトリの外に作る案・プレリリースの印を付ける案を却下。 |
+| [0025](0025-release-entry-skill-and-single-owner-confirmation.md) | リリースは専用の Skill から始め、手順の正は handbook に置き、オーナーの確認は版と変更の節の文面の 1 回にまとめる | accepted | Skill `release` はオーナーの依頼からだけ動き、手順を持たずに handbook を読む。確定したらマージ・起動・tag と Release の作成まで止まらずに進む。handbook だけ・Skill に手順を持たせるを却下。 |
 
 採番規則は [../index.md](../index.md) を参照。

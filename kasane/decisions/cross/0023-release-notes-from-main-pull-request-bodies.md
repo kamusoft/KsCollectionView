@@ -43,5 +43,5 @@ date: 2026-10-14
 - 前提 (Context) が崩れたとき
 - 変更の節の書き漏れで、リリースが止まることが繰り返されたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (1. ADR 3 枚 の 0030) / ../KsSettingsView/kasane/decisions/cross/0030-release-notes-from-pr-body-and-handbook-as-procedure-source.md (Decision・却下した案・帰結・Revisit When) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 6)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (1. ADR 3 枚 の 0030) / ../KsSettingsView/kasane/decisions/cross/0030-release-notes-from-pr-body-and-handbook-as-procedure-source.md (Decision・却下した案・帰結・Revisit When) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 6)
 関連: cross/ADR-0010 (ブランチの役割と、main 宛ての Pull Request) / cross/ADR-0022 (リリースの工程の順序)

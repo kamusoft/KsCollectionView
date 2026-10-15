@@ -51,5 +51,5 @@ amended-by: 0034
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 追加読み込みの発火条件 — 「末尾に近い」の測り方 / しきい値の既定値 / しきい値の公開、多重発火と連鎖の抑止 — 初回の読み込み)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 追加読み込みの発火条件 — 「末尾に近い」の測り方 / しきい値の既定値 / しきい値の公開、多重発火と連鎖の抑止 — 初回の読み込み)
 関連: core/ADR-0005 (末尾近傍での発火はライブラリの責務) / core/ADR-0009 (`LoadMoreMargin` 相当の発火しきい値を後続で検討とした)

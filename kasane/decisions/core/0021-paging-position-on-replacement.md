@@ -57,5 +57,5 @@ core/ADR-0018 の決定のうち、次の 2 つをページングを付けた一
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 多重発火と連鎖の抑止 — 末尾への追従との関係 / 2026-09-27: 多重発火と連鎖の抑止 — 取り直しのときの表示範囲の位置) / kasane/changes/archive/2026-09-29-paging-state-machine/deviation.md (collection-core の Requirement「取り直しの結果は先頭から表示する」の 2 項目) / kasane/changes/archive/2026-09-29-paging-state-machine/review-001.md (取り直しの結果を先頭から出す規則が描画の回のまとまり方しだいで効かなくなる)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 多重発火と連鎖の抑止 — 末尾への追従との関係 / 2026-09-27: 多重発火と連鎖の抑止 — 取り直しのときの表示範囲の位置) / kasane/changes/archive/2026-09-29-paging-state-machine/deviation.md (collection-core の Requirement「取り直しの結果は先頭から表示する」の 2 項目) / kasane/changes/archive/2026-09-29-paging-state-machine/review-001.md (取り直しの結果を先頭から出す規則が描画の回のまとまり方しだいで効かなくなる)
 関連: core/ADR-0020 (発火条件) / core/ADR-0005 (状態は利用者が持つ)

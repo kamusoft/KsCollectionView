@@ -24,4 +24,4 @@ iOS エンジンはセルを `UIHostingConfiguration` でホスティングす�
 - 正: 状態の正がデータモデルに一本化され、挙動が予測しやすい
 - 負: セル内だけの一時状態 (展開・入力途中など) はスクロールで失われる。残したい場合は利用者がデータに反映する設計上の負担が生じ、ドキュメントでの明示が必須
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: セルホスティング)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: セルホスティング)

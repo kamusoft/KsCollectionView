@@ -24,3 +24,11 @@
 配らなかったものは 2 つ。phase-8 の申し送りの「iOS Sample のユニットテストターゲット」は追加済みで解消していた。決定事項「このフェーズを分ける」はこの分割で消化した。
 
 完了済みフェーズの agenda に残る `phase-7-samples-distribution/agenda.md` へのリンクは書き換えていない (完了済みの文書は変更しない)。申し送りの行き先は上の表で引く。
+
+## 2026-10-15: ロードマップのアーカイブ
+
+全 11 フェーズが completed になったので、`kasane/roadmaps/archive/2026-10-15-v1-foundation/` へ移した。
+
+- 蒸留漏れのチェック: 各フェーズの決定事項と経緯を走査し、ADR にするかの判断が記録されていなかった決定 1 件 (phase-7-4: リリースを専用の Skill から始め、手順の正を handbook に置き、オーナーの確認を版と変更の節の文面の 1 回にまとめる) を、オーナーの判断で cross/ADR-0025 として起票し、accepted にした (決定は変更 release-pipeline で Skill と handbook に埋め込み済み)。ほかに迷った 4 件は、各フェーズの経緯に「ADR にしない」判断と理由が書かれていたので起票していない
+- 媒体の削除: phase-4 の artifacts の試作の画像 3 件 (webp) を削除した
+- ロードマップの中の相対リンク (`../../changes/archive/...` など) は、移動で 1 段深くなるが書き換えていない (change-id とロードマップ ID が名前の末尾に残るので glob で辿れる)。ロードマップの外の生きている層 (decisions・handbook・concepts・進行中の changes) からの参照は、archive 後のパスに直した

@@ -37,5 +37,5 @@ D&D 並べ替え機能で、ドラッグをどの操作で始めるかと、既�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 開始の操作 — 持ち上げ方 / 開始の操作 — 既存の長押しとの関係)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 開始の操作 — 持ち上げ方 / 開始の操作 — 既存の長押しとの関係)
 関連: core/ADR-0026 (置いたときに 1 回知らせる) / core/ADR-0030 (動かせるかの判定) / core/ADR-0009 (タップ・長押しの語彙の継承)

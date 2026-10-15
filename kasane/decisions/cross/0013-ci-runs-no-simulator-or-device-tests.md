@@ -56,5 +56,5 @@ CI の緑が保証するのは、iOS がビルドできることと、Android �
 - GitHub の標準のランナーで、iOS 本体のテストが手元と同じように安定して通ると確かめられたとき
 - 手元の完了判定で 4 系統を全件流す決まりをやめるとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: CI が走らせる範囲 / 実機が要るテストと性能計測の受け皿) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証の乖離) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (7.4 の 1 回目と 2 回目の実行) / ../KsSettingsView/kasane/decisions/cross/0026-ci-guarantee-logic-and-wiring-not-e2e.md (兄弟ライブラリの保証範囲)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: CI が走らせる範囲 / 実機が要るテストと性能計測の受け皿) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/deviation.md (iOS の検証の乖離) / kasane/changes/archive/2026-10-08-public-repo-verify-ci/evidence/publication-log.md (7.4 の 1 回目と 2 回目の実行) / ../KsSettingsView/kasane/decisions/cross/0026-ci-guarantee-logic-and-wiring-not-e2e.md (兄弟ライブラリの保証範囲)
 関連: cross/ADR-0006 (性能の合否と、CI の受け皿ができたときの見直し) / cross/ADR-0008 (手元の完了判定で 4 系統を全件流す決まりと、UI テストの位置づけ) / cross/ADR-0010 (検証 CI が走る時点) / cross/ADR-0014 (検証 CI の構成と検査の名前)

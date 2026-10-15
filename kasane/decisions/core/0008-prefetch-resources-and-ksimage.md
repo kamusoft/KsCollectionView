@@ -27,4 +27,4 @@ amended-by: 0013
 - 正: phase-8 はこの外形の内側 (ローダ選定・キャッシュ設計・`KsImage` の機能範囲) を自由に設計できる
 - 負: `KsImage` を使わない既存の画像コンポーネントとはプリフェッチキャッシュが共有されない。その場合の扱い (連携口を設けるか) は phase-8 で判断する
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 画像プリフェッチのリソース宣言と専用画像コンポーネント) / core/ADR-0002 / core/ADR-0004
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 画像プリフェッチのリソース宣言と専用画像コンポーネント) / core/ADR-0002 / core/ADR-0004

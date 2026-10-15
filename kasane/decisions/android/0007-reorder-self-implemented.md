@@ -33,5 +33,5 @@ Android の並べ替えは、Compose の公開 API の上に自前で作る。`s
 
 - 前提 (Context) が崩れたとき。Compose Foundation に Lazy 系の公式の並べ替え API が入ったときは、置き換えを検討する
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: Android の実装方式) / kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/artifacts/reorderable-oss-assessment-2026-09-29.md / kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: Android の実装方式) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/artifacts/reorderable-oss-assessment-2026-09-29.md / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
 関連: core/ADR-0026〜core/ADR-0033 (並べ替えの契約) / android/ADR-0001 (LazyVerticalGrid に統一) / android/ADR-0006 (`animateItem`) / core/ADR-0012 (画像ローダーへの直接依存の前例)

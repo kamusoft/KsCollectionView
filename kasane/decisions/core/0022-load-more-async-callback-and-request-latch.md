@@ -36,5 +36,5 @@ DSL の利用形の試案では、頼む処理は Swift が非同期のクロー
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 多重発火と連鎖の抑止 — 頼んだ後の待ち方) / kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/agenda.md (Pull to Refresh — 外形だけ確認して phase-5 に申し送り)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 多重発火と連鎖の抑止 — 頼んだ後の待ち方) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-3-android-wrapper-foundation/agenda.md (Pull to Refresh — 外形だけ確認して phase-5 に申し送り)
 関連: core/ADR-0005 (多重発火の抑止はライブラリの責務) / core/ADR-0020 (発火条件) / core/ADR-0002 (非同期処理は各流儀) / core/ADR-0023 (取り直しとの競合は、追加読み込みを取り消さずに引っ張りを止めて防ぐ)

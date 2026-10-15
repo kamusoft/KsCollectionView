@@ -64,7 +64,7 @@ kasane/handbook/cross/release-procedure.md
 
 ## 確認は 1 回
 
-オーナーに確認するのは、1 回のメッセージだけである。段ごとに「進めてよいか」を聞かない。
+オーナーに確認するのは、1 回のメッセージだけである。段ごとに「進めてよいか」を聞かない。 (この境界の決定: `kasane/decisions/cross/0025-release-entry-skill-and-single-owner-confirmation.md`)
 
 確認のメッセージに並べるもの:
 

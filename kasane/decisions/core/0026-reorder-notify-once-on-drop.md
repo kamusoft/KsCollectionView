@@ -37,5 +37,5 @@ D&D 並べ替え機能 (ロードマップ v1-foundation) で、ドラッグで�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 並べ替えの結果の受け渡し — 知らせるタイミングと仮の並びの持ち主) / kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 並べ替えの結果の受け渡し — 知らせるタイミングと仮の並びの持ち主) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
 関連: core/ADR-0027 (受け入れたかを返し、受け入れなければ元に戻す) / core/ADR-0003 (プレーンな配列 + 安定 ID、差分はライブラリの責務) / core/ADR-0002 (語彙・構造は 1 対 1、記法は各流儀)

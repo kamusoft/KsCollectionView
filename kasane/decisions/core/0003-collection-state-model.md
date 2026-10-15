@@ -28,4 +28,4 @@ iOS エンジンは diffable data source を使い (core/ADR-0001)、アイテ�
 - 負: 安定 ID は利用者のデータ型に課す要求であり、後から課し直すことはできない片方向の契約になる
 - 負: iOS は `Equatable` 準拠も事実上要求する (内容変更検知のため)。Swift の値型では通常自動合成されるが、契約として明示が必要
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: コレクションの状態モデル) / kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: テンプレートマッピング (a)) / core/ADR-0001 / core/ADR-0002
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: コレクションの状態モデル) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: テンプレートマッピング (a)) / core/ADR-0001 / core/ADR-0002

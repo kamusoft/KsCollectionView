@@ -42,4 +42,4 @@ Android の配布は `jp.kamusoft:kscollectionview` の 1 artifact と決まっ�
 - 採りたい Compose 版が要求する SDK Platform が広く配布済みになったとき (実装時点の例: Platform 37 の普及で Compose 1.12 系へ上げる)
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ビルド構成) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md (Compose BOM と compileSdk の引き下げ、2026-09-05) / cross/ADR-0003 / android/ADR-0001
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ビルド構成) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md (Compose BOM と compileSdk の引き下げ、2026-09-05) / cross/ADR-0003 / android/ADR-0001

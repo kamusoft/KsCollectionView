@@ -13,7 +13,7 @@ timestamp: 2026-10-15
 
 この文書は、版を入力してリリースの workflow (`.github/workflows/release.yml`) を起動し、iOS と Android の配布物を同じ版で公開して、tag と Release を作るまでの手順をまとめる。文中の「オーナー」は、リポジトリの持ち主である開発者を指す。コマンドの `<版>` は `0.1.0` や `0.1.0-beta.1` の形の値に、`<対象の commit>` は 40 桁の commit の ID (`git rev-parse` の出力。短い ID にしない) に、`<番号>` はリリースの Pull Request の番号に、`<run の ID>` はリリースの workflow の run の ID に読み替える。
 
-扱うリポジトリは 2 つある。本リポジトリ `kamusoft/KsCollectionView` と、SwiftPM の配信用リポジトリ `kamusoft/KsCollectionView-SPM` である ([cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md))。版と tag の付け方は [cross/ADR-0021](../../decisions/cross/0021-single-version-and-plain-tag-across-repositories.md)、起動のしかたと公開の順序は [cross/ADR-0022](../../decisions/cross/0022-manual-release-dispatch-reversible-steps-first.md)、リリースノートの材料は [cross/ADR-0023](../../decisions/cross/0023-release-notes-from-main-pull-request-bodies.md)、Release の置き場所と印は [cross/ADR-0024](../../decisions/cross/0024-release-in-main-repository-marked-latest.md) にある。
+扱うリポジトリは 2 つある。本リポジトリ `kamusoft/KsCollectionView` と、SwiftPM の配信用リポジトリ `kamusoft/KsCollectionView-SPM` である ([cross/ADR-0015](../../decisions/cross/0015-swiftpm-via-distribution-repository.md))。版と tag の付け方は [cross/ADR-0021](../../decisions/cross/0021-single-version-and-plain-tag-across-repositories.md)、起動のしかたと公開の順序は [cross/ADR-0022](../../decisions/cross/0022-manual-release-dispatch-reversible-steps-first.md)、リリースノートの材料は [cross/ADR-0023](../../decisions/cross/0023-release-notes-from-main-pull-request-bodies.md)、Release の置き場所と印は [cross/ADR-0024](../../decisions/cross/0024-release-in-main-repository-marked-latest.md) に、リリースを専用の Skill から始めてオーナーの確認を 1 回にまとめることは [cross/ADR-0025](../../decisions/cross/0025-release-entry-skill-and-single-owner-confirmation.md) にある。
 
 ## この文書の使い方
 
@@ -502,15 +502,21 @@ unset KS_CENTRAL_USERNAME KS_CENTRAL_PASSWORD
 
 ## 関連
 
+### handbook の文書
+
 - [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — `develop` と `main` の役割、`main` 宛ての Pull Request の進め方、配信用リポジトリと Environment の設定
 - [secret の扱い](secret-handling.md) — リリースの secret の中身と登録・差し替え、secret を検出したときの手順
 - [検証 CI](verification-ci.md) — リリースの workflow が呼ぶ検証と、workflow の定義の検査
 - [利用者の立場のビルドの確認](consumer-build-check.md) — 利用者役の切り替え (`local`・`artifact`・`published`)
 - [配布物の形と作り方](package-distribution.md) — SwiftPM の写しと Android の発行物の作り方、元の commit の渡し方
 - [利用者向け Skill の追従](user-skill-refresh.md) — 事前の確認で使う、追従の Skill の確かめるだけの使い方
+
+### 決定 (ADR)
+
 - [cross/ADR-0021](../../decisions/cross/0021-single-version-and-plain-tag-across-repositories.md) — 1 つの版と、接頭辞の無い tag
 - [cross/ADR-0022](../../decisions/cross/0022-manual-release-dispatch-reversible-steps-first.md) — 手動の起動と、取り消せる操作から公開する順序
 - [cross/ADR-0023](../../decisions/cross/0023-release-notes-from-main-pull-request-bodies.md) — リリースノートの材料
 - [cross/ADR-0024](../../decisions/cross/0024-release-in-main-repository-marked-latest.md) — Release の置き場所と印
+- [cross/ADR-0025](../../decisions/cross/0025-release-entry-skill-and-single-owner-confirmation.md) — 専用の Skill から始め、オーナーの確認を 1 回にまとめる
 
 出典: kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 1〜13) / kasane/changes/archive/2026-10-15-release-pipeline/deviation.md / kasane/changes/archive/2026-10-15-release-pipeline/drafts/release-procedure.md (この文書の草稿) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/ (外部の挙動の調査・初回の試しと本番の証跡) / kasane/changes/archive/2026-10-15-release-pipeline/review-003.md (読み直しの条件と artifact の書き方) / ../KsSettingsView/kasane/handbook/cross/release-procedure.md (手順の形)

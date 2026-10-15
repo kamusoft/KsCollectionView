@@ -40,5 +40,5 @@ KMP の共有 VM が公開する `StateFlow` は同じ値を流さないため�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 並べ替えの結果の受け渡し — 受け入れなかったとき・保存に失敗したときの戻し方)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 並べ替えの結果の受け渡し — 受け入れなかったとき・保存に失敗したときの戻し方)
 関連: ios/ADR-0011 (iOS は UIKit が並びを確定した後に受け入れを聞き、受け入れなければ置いた位置から戻す) / core/ADR-0026 (置いたときに 1 回知らせ、仮の並びはライブラリが持つ) / core/ADR-0033 (ドラッグ中に届いた配列の保留) / core/ADR-0003 (プレーンな配列 + 安定 ID) / core/ADR-0022 (ページングの次ページ要求は非同期関数で受ける)

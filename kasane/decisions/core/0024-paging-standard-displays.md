@@ -55,5 +55,5 @@ core/ADR-0005 の決定のうち、標準フッターが失敗で再試行ボタ
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-27: 標準の表示部品 — 何も指定しないときに用意する表示の範囲 / VM が自分で取り直している間の表示 / 差し替えの形 / 文言と言語) / kasane/changes/archive/2026-09-29-paging-state-machine/deviation.md (collection-paging の Requirement「ページングの表示」(次のページの読み込み中) の項目)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-27: 標準の表示部品 — 何も指定しないときに用意する表示の範囲 / VM が自分で取り直している間の表示 / 差し替えの形 / 文言と言語) / kasane/changes/archive/2026-09-29-paging-state-machine/deviation.md (collection-paging の Requirement「ページングの表示」(次のページの読み込み中) の項目)
 関連: core/ADR-0019 (エラーを出す場所と再試行の行き先) / core/ADR-0020 (初回の読み込み) / core/ADR-0023 (Pull to Refresh のインジケータ)

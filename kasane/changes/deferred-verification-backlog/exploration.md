@@ -4,7 +4,7 @@
 
 先行フェーズの change で確かめられなかったこと、決めなかったことのうち、簡易起票になっていないものを集めた。ロードマップ v1-foundation の phase-7-4 (リリースの手順) の議論で、オーナーの決定により「初回リリースの基準と片付ける範囲」をロードマップの論点から外した (2026-10-14)。外したままでは、ロードマップを archive した後に誰も追わなくなるので、追跡が切れないようにここに積む。どれも、それぞれの change の完了判定では扱わないと決めた範囲で、実害は確かめていない。
 
-出どころの一覧は、phase-7-4 の agenda の「ロードマップの外へ出したもの」(`kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md`。ロードマップの archive 後は `kasane/roadmaps/archive/*-v1-foundation/` の下)。
+出どころの一覧は、phase-7-4 の agenda の「ロードマップの外へ出したもの」(`kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/agenda.md`。ロードマップの archive 後は `kasane/roadmaps/archive/*-v1-foundation/` の下)。
 
 ### 性能 (phase-2・phase-3 の申し送り)
 

@@ -36,5 +36,5 @@ date: 2026-09-29
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 開始の操作 — アクセシビリティの移動操作) / kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 開始の操作 — アクセシビリティの移動操作) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md
 関連: core/ADR-0031 (スイッチと長押し) / core/ADR-0024 (ライブラリは文言を持たない) / core/ADR-0026・0027・0028・0030 (並べ替えの知らせ・受け入れ・行き先・判定)

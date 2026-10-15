@@ -43,4 +43,4 @@ date: 2026-10-08
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: ブランチの役割) / ../KsSettingsView/kasane/decisions/cross/0028-ci-triggers-by-branch-role.md (兄弟ライブラリの形と整理の経緯)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-1-public-repo-verify-ci/history.md (2026-10-08: ブランチの役割) / ../KsSettingsView/kasane/decisions/cross/0028-ci-triggers-by-branch-role.md (兄弟ライブラリの形と整理の経緯)

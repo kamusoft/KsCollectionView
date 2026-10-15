@@ -29,5 +29,5 @@ amended-by: 0024
 - 負: 状態遷移を利用者が自分で書くため、誤った遷移 (appending 中に refresh 等) の防護は型では効かない。ガイドとフッター挙動でカバーする
 - 未決: `failed` にエラー内容を持たせるかは phase-5 またはサンプル作成時に確定する
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: ページング契約の外形) / core/ADR-0002
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: ページング契約の外形) / core/ADR-0002
 関連: core/ADR-0019 (失敗の状態は中身を持たず、エラーを出す場所と再試行の行き先を決めた)
