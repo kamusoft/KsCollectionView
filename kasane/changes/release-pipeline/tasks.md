@@ -53,14 +53,14 @@
 
 ## 9. GitHub の準備 (外向き。オーナーの承認を得てから)
 
-- [ ] 9.1 配信用リポジトリ `kamusoft/KsCollectionView-SPM` を作り、Issue の機能を無効にし、Pull Request を作れる人を共同作業者に限る。設定を API で読み直して証跡に残す (→ Requirement: 配信用リポジトリ)
-- [ ] 9.2 オーナーが、配信用リポジトリの書き込み用の deploy key を作って登録する (エージェントは公開鍵の登録の手順を示す)
-- [ ] 9.3 Environment `release` を作り、deployment branch policy を `main` だけにする。設定を API で読み直して証跡に残す (→ Requirement: リリース用の環境)
-- [ ] 9.4 オーナーが、Environment `release` に 6 つの secret を登録する。エージェントは名前の一覧を API で読み直し、6 つがそろっていることを確かめる (値は読まない) (→ Requirement: リリース用の環境)
+- [x] 9.1 配信用リポジトリ `kamusoft/KsCollectionView-SPM` を作り、Issue の機能を無効にし、Pull Request を作れる人を共同作業者に限る。設定を API で読み直して証跡に残す (→ Requirement: 配信用リポジトリ)
+- [x] 9.2 オーナーが、配信用リポジトリの書き込み用の deploy key を作って登録する (エージェントは公開鍵の登録の手順を示す)
+- [x] 9.3 Environment `release` を作り、deployment branch policy を `main` だけにする。設定を API で読み直して証跡に残す (→ Requirement: リリース用の環境)
+- [x] 9.4 オーナーが、Environment `release` に 6 つの secret を登録する。エージェントは名前の一覧を API で読み直し、6 つがそろっていることを確かめる (値は読まない) (→ Requirement: リリース用の環境)
 
 ## 10. 通しの確認と初回のリリース
 
-- [ ] 10.1 実装を `develop` に入れ、検証 CI が緑になることを確かめる
+- [x] 10.1 実装を `develop` に入れ、検証 CI が緑になることを確かめる
 - [ ] 10.2 準備の Pull Request (変更の節は `- none`) を `develop` から `main` へ出し、必須の検査が通ったらマージする。リリースの workflow のファイルが既定のブランチに入り、手動で起動できるようになる
 - [ ] 10.3 `develop` から dry-run を起動し、公開の前の確認まで通り、外へ何も送らないことを確かめる (→ Requirement: 公開の前の確認 / secret の渡し方)
 - [ ] 10.4 `develop` から本番の起動を試し、最初のジョブで止まることを確かめる (→ Requirement: リリースの起動)

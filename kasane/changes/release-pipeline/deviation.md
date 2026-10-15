@@ -26,3 +26,4 @@
 - 蒸留時に反映: handbook — cross/verification-ci.md「コマンドの出力を記録に残す」に、`-e` の下でログをファイルに受けて元の終了コードを返す形 (`|| status=$?`) を足す (上の「`| tee` の決まりに…足すかを決める」の行の具体化)
 - 蒸留時に反映: handbook — リリースの手順に、`scripts/release/place-spm-snapshot.py` (確かめた写しを置く・2 回の tree の照合) と `scripts/release/check-ci-skipped-changes.py` (事前の確認で検証 CI の成功を代える判定) を書く (草稿には書いてある)
 - 蒸留時に反映: handbook — リリースの手順へ移すとき、事前の確認の「run が無い」の読み直しを push した直後に限ると書き (Skill の文面と揃える)、artifact が実行の権限を保たないことの書き方を「失敗したとき」の表と「確かめていないこと」の表で揃える (review-003.md の Suggestion 2 件)
+- 蒸留時に反映: handbook — リリースの手順の、GitHub の設定を変えた直後の確かめ方に「直後の読み直しで食い違ったら、少し (20 秒ほど) 待って読み直す」を足す (tasks 9.1 で、変更の直後の読み直しが古い値を返した。evidence/github-spm-repository-001.md)
