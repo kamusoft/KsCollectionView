@@ -1,5 +1,8 @@
 package jp.kamusoft.kscollectionview.verification.android
 
+// 画面のファイル (ItemListScreen.kt) は package の宣言を持たない。package を持つこのファイルからは、
+// 名前だけの import が無いと解決できない。
+import ItemListScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,6 +11,6 @@ import androidx.activity.compose.setContent
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { VerificationListScreen() }
+        setContent { ItemListScreen() }
     }
 }

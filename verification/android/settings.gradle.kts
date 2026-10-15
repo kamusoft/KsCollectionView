@@ -7,8 +7,9 @@
 //
 // 配布物をどこから取るかは、Gradle のプロパティで受け取る。
 //
-//   ksCollectionViewMode        local (既定) か published
-//   ksCollectionViewRepository  local のときに必須。発行物を置いた Maven リポジトリのディレクトリ
+//   ksCollectionViewMode        local (既定)・artifact・published のどれか
+//   ksCollectionViewRepository  local と artifact のときに必須。発行物を置いた Maven リポジトリのディレクトリ
+//                               (local は確認が自分で発行した先、artifact は外から渡されたもの)
 //   ksCollectionViewVersion     取る版 (:app が読む。無ければ本体のバージョンカタログの版)
 //
 // `jp.kamusoft` の取得元は、exclusiveContent で 1 つに固定する。リポジトリごとの絞り込み
@@ -32,16 +33,18 @@ pluginManagement {
 val ksCollectionViewMode: String =
     settings.providers.gradleProperty("ksCollectionViewMode").orNull ?: "local"
 
-require(ksCollectionViewMode == "local" || ksCollectionViewMode == "published") {
-    "ksCollectionViewMode は local か published のどちらかにする: $ksCollectionViewMode"
+require(ksCollectionViewMode in setOf("local", "artifact", "published")) {
+    "ksCollectionViewMode は local・artifact・published のどれかにする: $ksCollectionViewMode"
 }
 
 val ksCollectionViewRepository: String? =
     settings.providers.gradleProperty("ksCollectionViewRepository").orNull?.takeIf { it.isNotBlank() }
 
-if (ksCollectionViewMode == "local") {
+// local と artifact は、どちらも手元のディレクトリの Maven リポジトリだけから取る。違いは、
+// そのリポジトリに誰が発行したかだけである。
+if (ksCollectionViewMode != "published") {
     requireNotNull(ksCollectionViewRepository) {
-        "ksCollectionViewMode が local のときは、発行物を置いた Maven リポジトリのディレクトリを " +
+        "ksCollectionViewMode が $ksCollectionViewMode のときは、発行物を置いた Maven リポジトリのディレクトリを " +
             "-PksCollectionViewRepository=<ディレクトリ> で渡す"
     }
     // 無いディレクトリを渡すと、Gradle は「発行物が見つからない」としか報告しない。

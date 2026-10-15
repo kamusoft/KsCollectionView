@@ -1,7 +1,14 @@
 """公開リポジトリの体裁のファイルが、決めた形を保っているかのテスト。
 
 確かめるのは、後から崩れても気付きにくい形だけにする: ライセンスの文面と名義、
-英語と日本語の 2 枚の構成の一致、案内どうしの導線、Issue のフォームの必須の項目。
+英語と日本語の 2 枚の構成の一致、案内どうしの導線、Issue のフォームの必須の項目、
+ルートの README の節の並び・画像・Skill への導線、Skill の索引の 2 枚の見出しの並び、
+利用者向けの文書の検査の結果、
+追従の記録の形、Pull Request のひな形の変更の節と書き方。
+
+利用者向けの文書の検査 (README の最小コード例・インストール例・Skill 自身の整合) は、
+今のリポジトリの実物に対して流す。Skill が源泉 (概念の文書・本体のソース) からずれている
+ことは、ここでは確かめない (源泉を変えた push を、Skill を直すまで落とし続けないため)。
 """
 
 from __future__ import annotations
@@ -11,6 +18,13 @@ import re
 import unittest
 
 import support
+
+DOCS_DIR = os.path.join(support.REPOSITORY_ROOT, "scripts", "docs")
+USER_DOCS = support.load_script("user_docs.py")
+README_EXAMPLES = support.load_script("check-readme-examples.py")
+SKILLS_CHECK = support.load_script("check-skills.py")
+SKILLS_MANIFEST = support.load_script("skills_manifest.py", DOCS_DIR)
+RELEASE_NOTES = support.load_script("build-release-notes.py", os.path.join(support.REPOSITORY_ROOT, "scripts", "release"))
 
 HEADING = re.compile(r"^(#{1,6})\s+\S")
 FENCE = re.compile(r"^\s*(```|~~~)")
@@ -55,6 +69,20 @@ def labels(form: str) -> list[str]:
     return re.findall(r"-\s+(\S+)", matched.group(1)) if matched else []
 
 
+def section_text(readme: str, title: str) -> str:
+    """README の、見出し (深さ 2) の文面が title の節の本文を返す。コードの囲みの中は含まない。"""
+    document = USER_DOCS.parse_markdown(read(readme))
+    tops = [heading for heading in document.headings if heading.level <= 2]
+    start = next(heading for heading in tops if heading.level == 2 and heading.title == title)
+    following = [heading.line for heading in tops if heading.line > start.line]
+    end = following[0] if following else float("inf")
+    return "\n".join(line for number, line in document.prose if start.line < number < end)
+
+
+def link_targets(text: str) -> list[str]:
+    return re.findall(r"\]\(([^)\s]+)\)", text)
+
+
 class LicenseTest(unittest.TestCase):
     def test_ルートにMITLicenseがあり名義がkamusoftである(self) -> None:
         text = read("LICENSE")
@@ -82,6 +110,139 @@ class ReadmeTest(unittest.TestCase):
     def test_2枚が互いを指している(self) -> None:
         self.assertIn("](README_ja.md)", read("README.md"))
         self.assertIn("](README.md)", read("README_ja.md"))
+
+
+class ReadmeSectionsTest(unittest.TestCase):
+    # README の節 (深さ 2 の見出し) の文面。この順で、これだけを持つ。
+    SECTIONS = {
+        "README.md": [
+            "Overview and key features",
+            "Screenshots",
+            "Supported platforms",
+            "Installation",
+            "Minimal code examples",
+            "Skills",
+            "Repository structure",
+            "Contributing",
+            "License",
+        ],
+        "README_ja.md": [
+            "概要と特徴",
+            "スクリーンショット",
+            "対応プラットフォーム",
+            "インストール",
+            "最小コード例",
+            "Skill",
+            "リポジトリ構成",
+            "貢献",
+            "ライセンス",
+        ],
+    }
+    SCREENSHOTS = {
+        f"assets/{platform}-{screen}.png" for platform in ("ios", "android") for screen in ("list", "grid", "grouping")
+    }
+    SKILL_LINKS = {
+        "README.md": {
+            "skills/en/kscollectionview-ios/SKILL.md",
+            "skills/en/kscollectionview-android/SKILL.md",
+            "skills/README.md",
+        },
+        "README_ja.md": {
+            "skills/ja/kscollectionview-ios/SKILL.md",
+            "skills/ja/kscollectionview-android/SKILL.md",
+            "skills/README_ja.md",
+        },
+    }
+
+    def test_2枚が9つの節をこの順で持つ(self) -> None:
+        for readme, expected in self.SECTIONS.items():
+            with self.subTest(readme=readme):
+                headings = USER_DOCS.parse_markdown(read(readme)).headings
+                self.assertEqual([heading.title for heading in headings if heading.level == 2], expected)
+                self.assertEqual([heading.level for heading in headings if heading.level == 1], [1])
+
+    def test_スクリーンショットの節が6枚の画像を指し画像が実在する(self) -> None:
+        for readme, sections in self.SECTIONS.items():
+            with self.subTest(readme=readme):
+                section = section_text(readme, sections[1])
+                images = re.findall(r'<img\s[^>]*?src="([^"]+)"', section) + [
+                    target for target in re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", section)
+                ]
+                # 6 枚を、ルートからの相対のパスで 1 回ずつ指している。
+                self.assertEqual(sorted(images), sorted(self.SCREENSHOTS))
+                for image in images:
+                    self.assertTrue(os.path.isfile(os.path.join(support.REPOSITORY_ROOT, *image.split("/"))), image)
+
+    def test_Skillへの導線が自分の言語のSkillと索引を指し先が実在する(self) -> None:
+        for readme, sections in self.SECTIONS.items():
+            with self.subTest(readme=readme):
+                targets = set(link_targets(section_text(readme, sections[5])))
+                self.assertEqual(targets, self.SKILL_LINKS[readme])
+                for target in targets:
+                    self.assertTrue(os.path.isfile(os.path.join(support.REPOSITORY_ROOT, *target.split("/"))), target)
+
+
+class SkillsIndexTest(unittest.TestCase):
+    def test_Skillの索引の2枚の見出しの深さの並びが一致する(self) -> None:
+        english = heading_levels(read("skills", "README.md"))
+        japanese = heading_levels(read("skills", "README_ja.md"))
+        self.assertGreater(len(english), 1)
+        self.assertEqual(english, japanese)
+
+
+class UserDocsCheckTest(unittest.TestCase):
+    """利用者向けの文書の 3 つの検査を、今のリポジトリの実物に流す。"""
+
+    def test_READMEの最小コード例が利用者役の画面と一致する(self) -> None:
+        violations, matched = README_EXAMPLES.check_minimal_examples(support.REPOSITORY_ROOT)
+        self.assertEqual(violations, [])
+        # README の 2 枚 × 2 つのプラットフォーム。
+        self.assertEqual(matched, 4)
+
+    def test_インストール例が利用者役の値と一致する(self) -> None:
+        violations, checked = README_EXAMPLES.check_install_examples(support.REPOSITORY_ROOT, USER_DOCS.load_rules())
+        self.assertEqual(violations, [])
+        self.assertGreater(checked, 0)
+
+    def test_READMEの例の検査が違反なしで終わる(self) -> None:
+        code, out, _ = support.run_main(README_EXAMPLES, [support.REPOSITORY_ROOT])
+        self.assertEqual(code, 0, out)
+        self.assertIn("違反なし", out)
+
+    def test_Skill自身の整合の検査が違反なしで終わる(self) -> None:
+        violations, skill_count, markdown_count = SKILLS_CHECK.check_skills(support.REPOSITORY_ROOT, USER_DOCS.load_rules())
+        self.assertEqual(violations, [])
+        # 2 つのプラットフォーム × 2 つの言語。
+        self.assertEqual(skill_count, 4)
+        self.assertGreater(markdown_count, 0)
+        code, out, _ = support.run_main(SKILLS_CHECK, [support.REPOSITORY_ROOT])
+        self.assertEqual(code, 0, out)
+        self.assertIn("違反なし", out)
+
+
+class SkillsManifestTest(unittest.TestCase):
+    """追従の記録の形。源泉の今の内容と、記録の commit が履歴にあるかは、ここでは確かめない。"""
+
+    def test_記録が決めた3つの項目を持つ(self) -> None:
+        manifest = SKILLS_MANIFEST.load_manifest(support.REPOSITORY_ROOT)
+        self.assertRegex(manifest.synced_commit, r"^[0-9a-f]{40}$")
+        self.assertGreater(len(manifest.sources), 0)
+        self.assertEqual(set(manifest.api_exclusions), {"ios", "android"})
+
+    def test_源泉が掛かる1枚か掛からない理由のどちらかを持つ(self) -> None:
+        for source in SKILLS_MANIFEST.load_manifest(support.REPOSITORY_ROOT).sources:
+            with self.subTest(source=source.path):
+                self.assertTrue(bool(source.pages) != bool(source.excluded))
+
+    def test_掛かる1枚がSkillに実在する(self) -> None:
+        skills = {"ios": "kscollectionview-ios", "android": "kscollectionview-android"}
+        for source in SKILLS_MANIFEST.load_manifest(support.REPOSITORY_ROOT).sources:
+            for platform in source.platforms:
+                for language in ("en", "ja"):
+                    for page in source.pages:
+                        path = os.path.join("skills", language, skills[platform], *page.split("/"))
+                        with self.subTest(source=source.path, page=path):
+                            self.assertTrue(os.path.isfile(os.path.join(support.REPOSITORY_ROOT, path)))
 
 
 class ContributingTest(unittest.TestCase):
@@ -151,6 +312,55 @@ class IssueFormTest(unittest.TestCase):
         self.assertRegex(config, r"(?m)^blank_issues_enabled:\s*false\s*$")
         # 外部への案内のリンクは置かない。
         self.assertRegex(config, r"(?m)^contact_links:\s*\[\]\s*$")
+
+
+class PullRequestTemplateTest(unittest.TestCase):
+    """Pull Request のひな形。変更の節の内容が、リリースノートの組み立ての材料になる (cross/ADR-0023)。"""
+
+    PATH = (".github", "pull_request_template.md")
+
+    def setUp(self) -> None:
+        self.template = read(*self.PATH)
+
+    def with_section(self, *lines: str) -> str:
+        """ひな形の変更の節の書き方の注釈の後ろに、行を書き足した本文を返す。"""
+        return self.template.rstrip("\n") + "\n" + "\n".join(lines) + "\n"
+
+    def test_変更の節が1つだけあり書き方は注釈としてノートに載らない(self) -> None:
+        self.assertEqual(self.template.splitlines().count("## Changes"), 1)
+        # 何も書き足さないままの本文は、節が空としてリリースの前に止まる (書き忘れを通さない)。
+        entries, problems = RELEASE_NOTES.parse_changes(self.template)
+        self.assertIsNone(entries)
+        self.assertEqual(len(problems), 1)
+        self.assertIn("変更の節が空", problems[0])
+
+    def test_書き方に従って書いた節は読める(self) -> None:
+        entries, problems = RELEASE_NOTES.parse_changes(self.with_section("- none"))
+        self.assertEqual((entries, problems), ([], []))
+        entries, problems = RELEASE_NOTES.parse_changes(
+            self.with_section("- feature: Add a new option.", "- fix: Fix a crash.")
+        )
+        self.assertEqual(problems, [])
+        self.assertEqual(entries, [("feature", "Add a new option."), ("fix", "Fix a crash.")])
+
+    def test_書き方に行の形と種類と変更が無いときと言語の決まりがある(self) -> None:
+        section = self.template.split("## Changes", 1)[1]
+        comment = re.search(r"<!--(.*?)-->", section, flags=re.DOTALL)
+        self.assertIsNotNone(comment)
+        guidance = comment.group(1)
+        for text in (
+            "release notes",
+            "`- <kind>: <description>`",
+            "breaking, feature, fix, docs",
+            "`- none`",
+            "in English",
+            "Do not list internal work",
+            "stops the release",
+        ):
+            with self.subTest(text=text):
+                self.assertIn(text, guidance)
+        # ひな形の種類は、組み立ての道具が読む種類と同じである。
+        self.assertEqual(list(RELEASE_NOTES.KINDS), ["breaking", "feature", "fix", "docs"])
 
 
 if __name__ == "__main__":

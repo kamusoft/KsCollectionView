@@ -60,10 +60,10 @@ lint:
     # 検査範囲。本体ソースは含めない (正当な UUID 定数があり誤検出になるため)。
     # samples は例外として含める — Xcode の実機ビルドが DEVELOPMENT_TEAM 等の
     # 開発者識別子を samples 配下のプロジェクトファイルへ書き戻すため、その捕捉が目的。
-    # skills / samples はまだ存在しない (samples は各プラットフォームの基盤フェーズ、skills は
-    # 配布・ドキュメントのフェーズで作られる予定) が、先に検査範囲へ入れておく。
+    # skills は利用者へ配る Agent Skill の置き場で、利用者の手元へコピーされるため、
+    # 個人を特定する値が混ざらないよう検査範囲に入れる。
     scope: [kasane, skills, samples]
-    allow: ["@kamusoft.jp"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
+    allow: ["@kamusoft.jp", "repo.local", "git@github.com"]      # 正当な値。@ドメインはそのドメインのメール (デモデータ) を許可
     disable: []                  # 無効化する検出群: device / developer / network / personal / secret
   internal-hosts: []             # 未公開サーバのホスト名
   doc-structure:                 # 育つ文書の構造 lint (references/doc-structure.md)。hook には登録しない

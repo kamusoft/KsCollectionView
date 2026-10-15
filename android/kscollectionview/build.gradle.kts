@@ -72,6 +72,21 @@ kotlin {
     }
 }
 
+// 発行物の元になった commit (40 桁の小文字の 16 進)。Gradle のプロパティ
+// `ksCollectionViewSourceCommit` で受け取り、POM の `scm` の `tag` に書く。
+// 渡されないときは `tag` を書かない (手元での発行のため)。形が違う値は、誤った commit を
+// 発行物に残さないよう、設定の時点で止める。
+val sourceCommitProperty = "ksCollectionViewSourceCommit"
+val sourceCommit: Provider<String> =
+    providers.gradleProperty(sourceCommitProperty).map { value ->
+        if (!Regex("[0-9a-f]{40}").matches(value)) {
+            throw GradleException(
+                "$sourceCommitProperty は 40 桁の小文字の 16 進の commit の ID で渡す (渡された値: $value)",
+            )
+        }
+        value
+    }
+
 mavenPublishing {
     // 発行するのは release の 1 種類。sources jar を付ける。javadoc jar は Maven Central が
     // 求めるので置くが、中身は空にする (IDE は sources jar からコメントを表示できる)。
@@ -121,6 +136,9 @@ mavenPublishing {
             url.set("https://github.com/kamusoft/KsCollectionView")
             connection.set("scm:git:https://github.com/kamusoft/KsCollectionView.git")
             developerConnection.set("scm:git:ssh://git@github.com/kamusoft/KsCollectionView.git")
+            // 発行物の元になった commit。公開済みの版がどの commit から作られたかを、後から
+            // POM で照らせるようにする (cross/ADR-0022)。値の形は sourceCommit が確かめる。
+            tag.set(sourceCommit)
         }
     }
 }
@@ -135,12 +153,15 @@ plugins.withId("signing") {
     }
 }
 
-// 開発中の版 (`-SNAPSHOT` で終わる版) を Maven Central へ送らない。
+// Maven Central へ送るビルドを、次のどちらかに当たるときに止める。
 //
-// 発行のプラグインは、版が `-SNAPSHOT` で終わるとき、送信先を Maven Central の snapshot の
-// リポジトリへ向ける。認証の情報がある環境で送信のタスクを実行すると、開発中の版がそのまま
-// 公開されるので、開発中の版のあいだは、送信のタスクを含むビルドを失敗させる。
-// 手元への発行 (`publishToMavenLocal` など) は止めない。
+// - 開発中の版 (`-SNAPSHOT` で終わる版): 発行のプラグインは、版が `-SNAPSHOT` で終わるとき、
+//   送信先を Maven Central の snapshot のリポジトリへ向ける。認証の情報がある環境で送信のタスクを
+//   実行すると、開発中の版がそのまま公開される。
+// - 元になった commit (`ksCollectionViewSourceCommit`) が無い: 公開した版の POM に commit が
+//   残らず、同じ版を再び公開しようとしたときに、元の commit を照らせなくなる (cross/ADR-0022)。
+//
+// 手元への発行 (`publishToMavenLocal` など) は、どちらの場合も止めない。
 //
 // 対象はタスクの名前で決める。名前に `MavenCentral` を含むタスクをすべて対象にするのは、
 // プラグインが送信のタスクを増やしたり名前を変えたりしたときに、列挙から漏れて素通りするのを
@@ -153,15 +174,29 @@ plugins.withId("signing") {
 // - 対象のタスクの実行の最初: 上の判定を通らずにタスクが動き出した場合の備え。
 val publishingVersion = version.toString()
 
-if (publishingVersion.endsWith("-SNAPSHOT")) {
-    val sendingProject = project
-    val refusal =
-        "開発中の版 ($publishingVersion) は Maven Central へ送れない。" +
-            "リリースの版を -Pversion=<版> で渡す。" +
-            "手元で発行物を確かめるときは publishToMavenLocal を使う。"
+fun sendsToMavenCentral(taskName: String): Boolean =
+    taskName.contains("MavenCentral") && taskName != "dropMavenCentralDeployment"
 
-    fun sendsToMavenCentral(taskName: String): Boolean =
-        taskName.contains("MavenCentral") && taskName != "dropMavenCentralDeployment"
+val sendingRefusals =
+    buildList {
+        if (publishingVersion.endsWith("-SNAPSHOT")) {
+            add(
+                "開発中の版 ($publishingVersion) は Maven Central へ送れない。" +
+                    "リリースの版を -Pversion=<版> で渡す。" +
+                    "手元で発行物を確かめるときは publishToMavenLocal を使う。",
+            )
+        }
+        if (!providers.gradleProperty(sourceCommitProperty).isPresent) {
+            add(
+                "元になった commit が無い発行物は Maven Central へ送れない。" +
+                    "-P$sourceCommitProperty=<commit の ID> で渡す。",
+            )
+        }
+    }
+
+if (sendingRefusals.isNotEmpty()) {
+    val sendingProject = project
+    val refusal = sendingRefusals.joinToString(" ")
 
     gradle.taskGraph.whenReady {
         val blocked = allTasks.filter { it.project == sendingProject && sendsToMavenCentral(it.name) }

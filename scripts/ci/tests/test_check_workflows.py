@@ -83,6 +83,35 @@ jobs:
         xcodebuild test
 """
 
+# リリースの workflow を模した定義。公開のジョブ (publish) だけが内容の書き込みを持つ。
+RELEASE = f"""name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@{SHA}
+
+  publish:
+    name: publish
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@{SHA}
+"""
+
 
 class CheckWorkflowsTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -220,6 +249,49 @@ class CheckWorkflowsTest(unittest.TestCase):
         text = ENTRY.replace("    timeout-minutes: 10\n", "    timeout-minutes: 10\n    permissions:\n      id-token: write\n")
         line = text.splitlines().index("      id-token: write") + 1
         self.assert_violation(text, line, "ジョブ lint: リポジトリの内容の読み取り以外の権限がある: id-token: write")
+
+    def test_リリースのworkflowの公開のジョブの内容の書き込みは通る(self) -> None:
+        self.add("release.yml", RELEASE)
+        code, stdout = self.run_check()
+        self.assertEqual(code, 0, stdout)
+        self.assertIn("permissions 2 箇所", stdout)
+
+    def test_ほかのworkflowの同じ名前のジョブの内容の書き込みは失敗する(self) -> None:
+        line = RELEASE.splitlines().index("      contents: write") + 1
+        self.assert_violation(RELEASE, line, "ジョブ publish: リポジトリの内容の読み取り以外の権限がある: contents: write")
+
+    def test_リリースのworkflowの公開以外のジョブの内容の書き込みは失敗する(self) -> None:
+        text = RELEASE.replace(
+            "    timeout-minutes: 15\n", "    timeout-minutes: 15\n    permissions:\n      contents: write\n"
+        )
+        line = text.splitlines().index("      contents: write") + 1
+        self.assert_violation(
+            text, line, "ジョブ validate: リポジトリの内容の読み取り以外の権限がある: contents: write", name="release.yml"
+        )
+
+    def test_リリースのworkflowの先頭の内容の書き込みは失敗する(self) -> None:
+        text = RELEASE.replace("permissions:\n  contents: read\n", "permissions:\n  contents: write\n")
+        line = text.splitlines().index("  contents: write") + 1
+        self.assert_violation(
+            text, line, "workflow: リポジトリの内容の読み取り以外の権限がある: contents: write", name="release.yml"
+        )
+
+    def test_公開のジョブでも内容の書き込み以外の権限は失敗する(self) -> None:
+        for permission in ("pull-requests: write", "actions: write", "id-token: write", "actions: read"):
+            with self.subTest(permission=permission):
+                text = RELEASE.replace("      contents: write\n", f"      contents: write\n      {permission}\n")
+                line = text.splitlines().index(f"      {permission}") + 1
+                self.assert_violation(
+                    text,
+                    line,
+                    f"ジョブ publish: リポジトリの内容の読み取り以外の権限がある: {permission}",
+                    name="release.yml",
+                )
+
+    def test_公開のジョブでもまとめて与える権限の指定は失敗する(self) -> None:
+        text = RELEASE.replace("    permissions:\n      contents: write\n", "    permissions: write-all\n")
+        line = text.splitlines().index("    permissions: write-all") + 1
+        self.assert_violation(text, line, "permissions: write-all", name="release.yml")
 
     def test_権限の指定が無ければ失敗する(self) -> None:
         self.assert_violation(

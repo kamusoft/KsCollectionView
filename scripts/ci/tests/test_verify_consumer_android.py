@@ -162,6 +162,15 @@ class ConsumerVerificationTestCase(unittest.TestCase):
     def mapping_path(self) -> str:
         return os.path.join(self.root, SCRIPT.MAPPING)
 
+    def given_repository(self) -> str:
+        """外から渡す Maven リポジトリのディレクトリを、使い捨てのリポジトリの外に作って返す。"""
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        repository = os.path.join(os.path.realpath(directory.name), "maven")
+        pom = os.path.join(repository, "jp", "kamusoft", "kscollectionview", "1.2.3", "kscollectionview-1.2.3.pom")
+        support.write(pom, "<project/>\n")
+        return repository
+
 
 class LocalModeTests(ConsumerVerificationTestCase):
     def test_発行と組み立てと依存の確認をこの順に行う(self) -> None:
@@ -283,6 +292,84 @@ class PublishedModeTests(ConsumerVerificationTestCase):
         self.assertIn("コード縮小の対応表が無い", result.stdout)
 
 
+class ArtifactModeTests(ConsumerVerificationTestCase):
+    def test_artifactでは発行せずに同じ組み立てと依存の確認を始める(self) -> None:
+        repository = self.given_repository()
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = self.calls()
+        # 本体のビルドルートの Gradle (発行) は呼ばれない。
+        self.assertEqual([call["build"] for call in calls], [SCRIPT.CONSUMER_BUILD, SCRIPT.CONSUMER_BUILD])
+        assemble, dependencies = calls
+        self.assertEqual(task_names(assemble["arguments"]), [":app:assembleRelease"])
+        self.assertEqual(task_names(dependencies["arguments"]), [":app:dependencies"])
+        self.assertIn("releaseRuntimeClasspath", dependencies["arguments"])
+
+    def test_利用者役は渡されたリポジトリから渡した版を取る(self) -> None:
+        repository = self.given_repository()
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for call in self.calls():
+            self.assertEqual(argument_value(call["arguments"], "-PksCollectionViewMode="), "artifact")
+            self.assertEqual(argument_value(call["arguments"], "-PksCollectionViewVersion="), "1.2.3")
+            self.assertEqual(argument_value(call["arguments"], "-PksCollectionViewRepository="), repository)
+            self.assertIsNone(argument_value(call["arguments"], LOCAL_REPOSITORY_ARGUMENT))
+
+    def test_相対のパスで渡しても絶対のパスで渡す(self) -> None:
+        repository = self.given_repository()
+        result = self.run_script("--mode", "artifact", "--repository", os.path.relpath(repository), "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for call in self.calls():
+            self.assertEqual(argument_value(call["arguments"], "-PksCollectionViewRepository="), repository)
+
+    def test_組み立てと依存の確認は切り替えによって変わらない(self) -> None:
+        def without_source(call: dict) -> list[str]:
+            return [argument for argument in call["arguments"] if not argument.startswith(SOURCE_ARGUMENT_PREFIX)]
+
+        self.assertEqual(self.run_script("--mode", "local", "--version", "1.2.3").returncode, 0)
+        local_calls = self.calls()[1:]
+        os.remove(os.path.join(self.root, "calls.jsonl"))
+        result = self.run_script("--mode", "artifact", "--repository", self.given_repository(), "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([without_source(call) for call in local_calls], [without_source(call) for call in self.calls()])
+
+    def test_artifactでも成功の条件は同じである(self) -> None:
+        repository = self.given_repository()
+        self.behave({"dependencies": {"stdout": "+--- jp.kamusoft:kscollectionview:1.2.3 -> 1.3.0\n"}})
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("指定の版 1.2.3 ではなく", result.stdout)
+
+        self.behave({"assemble": {"skip_outputs": True}})
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("コード縮小の対応表が無い", result.stdout)
+
+    def test_渡されたリポジトリを変えない(self) -> None:
+        repository = self.given_repository()
+
+        def files() -> list[str]:
+            return sorted(
+                os.path.relpath(os.path.join(current, name), repository)
+                for current, _, names in os.walk(repository)
+                for name in names
+            )
+
+        before = files()
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # 確認が終わっても、渡されたリポジトリは消されずに、同じ中身で残る。
+        self.assertEqual(files(), before)
+
+    def test_概要に渡されたリポジトリが出る(self) -> None:
+        repository = self.given_repository()
+        result = self.run_script("--mode", "artifact", "--repository", repository, "--version", "1.2.3")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("`artifact`", result.stdout)
+        self.assertIn(f"渡された Maven リポジトリ ({repository})", result.stdout)
+        self.assertIn("`jp.kamusoft:kscollectionview:1.2.3`", result.stdout)
+
+
 class ArgumentTests(ConsumerVerificationTestCase):
     def assert_nothing_started(self, result: subprocess.CompletedProcess, reason: str) -> None:
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
@@ -292,7 +379,9 @@ class ArgumentTests(ConsumerVerificationTestCase):
     def test_知らない切り替えでは何も始めない(self) -> None:
         for mode in ("dry-run", "LOCAL", "local ", ""):
             with self.subTest(mode=mode):
-                self.assert_nothing_started(self.run_script("--mode", mode), "--mode は local か published")
+                self.assert_nothing_started(
+                    self.run_script("--mode", mode), "--mode は local か artifact か published のどれか"
+                )
 
     def test_切り替えが無ければ何も始めない(self) -> None:
         self.assert_nothing_started(self.run_script(), "--mode")
@@ -305,6 +394,41 @@ class ArgumentTests(ConsumerVerificationTestCase):
             with self.subTest(version=version):
                 self.assert_nothing_started(
                     self.run_script("--mode", "published", "--version", version), "--version が必須"
+                )
+
+    def test_artifactでリポジトリを渡さなければ何も始めない(self) -> None:
+        for arguments in ((), ("--repository", ""), ("--repository", "  ")):
+            with self.subTest(arguments=arguments):
+                self.assert_nothing_started(
+                    self.run_script("--mode", "artifact", "--version", "1.2.3", *arguments), "--repository が必須"
+                )
+
+    def test_artifactで版を渡さなければ何も始めない(self) -> None:
+        repository = self.given_repository()
+        for arguments in ((), ("--version", ""), ("--version", "  ")):
+            with self.subTest(arguments=arguments):
+                self.assert_nothing_started(
+                    self.run_script("--mode", "artifact", "--repository", repository, *arguments),
+                    "--mode artifact では --version が必須",
+                )
+
+    def test_artifactでリポジトリがディレクトリでなければ何も始めない(self) -> None:
+        repository = self.given_repository()
+        pom = os.path.join(repository, "jp", "kamusoft", "kscollectionview", "1.2.3", "kscollectionview-1.2.3.pom")
+        for path in (os.path.join(repository, "missing"), pom):
+            with self.subTest(path=path):
+                self.assert_nothing_started(
+                    self.run_script("--mode", "artifact", "--repository", path, "--version", "1.2.3"),
+                    "--repository がディレクトリではない",
+                )
+
+    def test_artifact以外でリポジトリを渡すと何も始めない(self) -> None:
+        repository = self.given_repository()
+        for arguments in (("--mode", "local"), ("--mode", "published", "--version", "1.2.3")):
+            with self.subTest(arguments=arguments):
+                self.assert_nothing_started(
+                    self.run_script(*arguments, "--repository", repository),
+                    "--repository は --mode artifact でだけ渡す",
                 )
 
     def test_版に使えない文字があれば何も始めない(self) -> None:
@@ -531,10 +655,14 @@ class ConsumerDefinitionTests(unittest.TestCase):
             ),
         )
 
-    def test_localはリポジトリのディレクトリを必須にする(self) -> None:
+    def test_切り替えはlocalとartifactとpublishedの3つである(self) -> None:
+        self.assertIn('require(ksCollectionViewMode in setOf("local", "artifact", "published"))', self.settings)
+        self.assertEqual(tuple(SCRIPT.MODES), ("local", "artifact", "published"))
+
+    def test_localとartifactはリポジトリのディレクトリを必須にする(self) -> None:
         self.assertRegex(
             self.settings,
-            re.compile(r'if \(ksCollectionViewMode == "local"\) \{\s*requireNotNull\(ksCollectionViewRepository\)'),
+            re.compile(r'if \(ksCollectionViewMode != "published"\) \{\s*requireNotNull\(ksCollectionViewRepository\)'),
         )
 
     def test_既定の手元のMavenリポジトリを取得元にしない(self) -> None:
@@ -586,6 +714,44 @@ class ConsumerDefinitionTests(unittest.TestCase):
         library_settings = read_without_comments(SCRIPT.LIBRARY_BUILD, "settings.gradle.kts")
         self.assertIn('include(":kscollectionview")', library_settings)
         self.assertEqual(SCRIPT.PUBLISH_TASK, ":kscollectionview:publishToMavenLocal")
+
+
+class ConsumerScreenSourceTests(unittest.TestCase):
+    """利用者役の実物の画面のソースが、利用者のアプリのコードとしてそのまま読める形であること。"""
+
+    SOURCE_ROOT = os.path.join(SCRIPT.CONSUMER_BUILD, "app", "src", "main", "kotlin")
+
+    def read(self, *parts: str) -> str:
+        with open(os.path.join(support.REPOSITORY_ROOT, self.SOURCE_ROOT, *parts), encoding="utf-8") as f:
+            return f.read()
+
+    def test_画面のソースはpackageの宣言を持たずimportから始まる(self) -> None:
+        text = self.read("ItemListScreen.kt")
+        self.assertTrue(text.startswith("import "), text.splitlines()[0])
+        self.assertNotRegex(text, r"(?m)^\s*package\b")
+
+    def test_画面のソースはコメントを持たない(self) -> None:
+        text = self.read("ItemListScreen.kt")
+        # 文字列の中にも "//" と "/*" を持たない内容なので、現れればコメントである。
+        self.assertNotIn("//", text)
+        self.assertNotIn("/*", text)
+
+    def test_ソースは画面と入口の2つだけである(self) -> None:
+        root = os.path.join(support.REPOSITORY_ROOT, self.SOURCE_ROOT)
+        found = sorted(
+            os.path.relpath(os.path.join(current, name), root)
+            for current, _, names in os.walk(root)
+            for name in names
+            if not name.startswith(".")
+        )
+        entry = os.path.join("jp", "kamusoft", "kscollectionview", "verification", "android", "MainActivity.kt")
+        self.assertEqual(found, ["ItemListScreen.kt", entry])
+
+    def test_入口は画面を名前だけのimportで呼ぶ(self) -> None:
+        # package の宣言を持たないファイルの宣言は、package を持つファイルからは import が無いと解決できない。
+        entry = self.read("jp", "kamusoft", "kscollectionview", "verification", "android", "MainActivity.kt")
+        self.assertRegex(entry, r"(?m)^import ItemListScreen$")
+        self.assertIn("setContent { ItemListScreen() }", entry)
 
 
 if __name__ == "__main__":

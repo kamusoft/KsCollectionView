@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "syncedCommit": "bc3c83230bec730d1998557cafbc9ce4c47dc26a",
+  "sources": [
+    {"path": "kasane/concepts/core/core-model/collection-items.md", "pages": ["references/basics.md", "references/layout.md"]},
+    {"path": "kasane/concepts/core/core-model/collection-interaction.md", "pages": ["references/basics.md"]},
+    {"path": "kasane/concepts/core/core-model/collection-paging.md", "pages": ["references/paging.md"]},
+    {"path": "kasane/concepts/core/core-model/collection-reorder.md", "pages": ["references/reorder.md"]},
+    {"path": "kasane/concepts/core/core-model/image-loading.md", "pages": ["references/images.md"]},
+    {"path": "kasane/concepts/core/styling/collection-layout.md", "pages": ["references/layout.md"]},
+    {"path": "kasane/concepts/ios/architecture/collection-engine.md", "pages": ["references/basics.md", "references/layout.md"], "platforms": ["ios"]},
+    {"path": "kasane/concepts/ios/architecture/paging-engine.md", "pages": ["references/paging.md"], "platforms": ["ios"]},
+    {"path": "kasane/concepts/ios/architecture/reorder-engine.md", "pages": ["references/reorder.md"], "platforms": ["ios"]},
+    {"path": "kasane/concepts/ios/architecture/image-pipeline.md", "pages": ["references/images.md"], "platforms": ["ios"]},
+    {"path": "kasane/concepts/android/architecture/compose-wrapper.md", "pages": ["references/basics.md", "references/layout.md"], "platforms": ["android"]},
+    {"path": "kasane/concepts/android/architecture/paging-wrapper.md", "pages": ["references/paging.md"], "platforms": ["android"]},
+    {"path": "kasane/concepts/android/architecture/reorder-wrapper.md", "pages": ["references/reorder.md"], "platforms": ["android"]},
+    {"path": "kasane/concepts/android/architecture/image-pipeline.md", "pages": ["references/images.md"], "platforms": ["android"]},
+    {"path": "ios/Package.swift", "pages": ["SKILL.md"], "platforms": ["ios"]},
+    {"path": "android/gradle/libs.versions.toml", "pages": ["SKILL.md"], "platforms": ["android"]},
+    {"path": "android/kscollectionview/build.gradle.kts", "pages": ["SKILL.md"], "platforms": ["android"]},
+    {"path": "kasane/handbook/cross/public-identifiers.md", "pages": ["SKILL.md"]},
+    {"path": "verification/ios/Sources/VerificationApp/ItemListScreen.swift", "pages": ["SKILL.md"], "platforms": ["ios"]},
+    {"path": "verification/android/app/src/main/kotlin/ItemListScreen.kt", "pages": ["SKILL.md"], "platforms": ["android"]}
+  ],
+  "apiExclusions": {
+    "ios": [
+      {
+        "name": "buildBlock",
+        "reason": "テンプレートを並べて書くブロック (KsTemplateBuilder) を、コンパイラが組み立てるときに自動で呼ぶ関数。利用者は自分のコードに書かない"
+      },
+      {
+        "name": "buildExpression",
+        "reason": "テンプレートを並べて書くブロック (KsTemplateBuilder) を、コンパイラが組み立てるときに自動で呼ぶ関数。利用者は自分のコードに書かない"
+      }
+    ],
+    "android": []
+  }
+}

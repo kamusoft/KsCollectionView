@@ -41,3 +41,4 @@ Android の公開単位は、独自エンジンを持たない Compose Lazy 系�
 - 負: 公開後の識別子変更は事実上不可能なため、実装前のこの段階で誤ると是正コストが高い。
 
 出典: ../KsSettingsView/kasane/decisions/cross/0002-public-identifier-namespace.md (Context / Decision) / ../KsSettingsView/kasane/decisions/android/0016-single-module-single-maven-artifact.md (artifactId をブランド 1 トークンとする結論・groupId の是正。翻案元では status: proposed のまま) / ../KsSettingsView/kasane/handbook/cross/public-identifiers.md (Maven 座標の drift) / kasane/changes/kasane-initial-assets/exploration.md (決定事項: artifactId 先取り)
+関連: cross/ADR-0015 (SwiftPM は配信用リポジトリ `KsCollectionView-SPM` から配る。マニフェストの `name` は `KsCollectionView` のままで、利用者がマニフェストに書く package の名前は、配信用リポジトリの名前 `KsCollectionView-SPM` になる)

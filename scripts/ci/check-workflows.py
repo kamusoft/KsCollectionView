@@ -10,7 +10,9 @@
      持たない名前) は使わない。版は、名前を `-` で区切った 2 つ目より後ろの、数字と `.` だけの
      部分として読む (`ubuntu-24.04`・`xcode-27`・`macos-15-xlarge`)
   3. 権限は、リポジトリの内容の読み取りだけにする。workflow の先頭で `permissions` を明示し、
-     中身は `contents: read` だけ (または空、値が `none` の項目) にする。ジョブごとの指定も同じ
+     中身は `contents: read` だけ (または空、値が `none` の項目) にする。ジョブごとの指定も同じ。
+     例外は 1 つだけで、リリースの workflow (release.yml) の公開のジョブ (publish) は、tag と
+     Release を作るために `contents: write` を持ってよい。ほかの権限は、そのジョブでも認めない
   4. ランナーの上で step を走らせるジョブ (`runs-on` を持つジョブ) は、時間の上限
      (`timeout-minutes`) を 1 以上の整数で持つ。式で書いた上限と、整数でない値は、
      上限を確かめられないので使わない。値の大小は見ない。
@@ -56,6 +58,10 @@ PINNED_ACTION = re.compile(r"^[\w.-]+/[\w.-]+(?:/[^@\s]+)?@[0-9a-f]{40}$")
 PINNED_IMAGE = re.compile(r"^docker://\S+@sha256:[0-9a-f]{64}$")
 RUNNER_VERSION = re.compile(r"^\d+(?:\.\d+)*$")
 TIMEOUT_MINUTES = re.compile(r"^[1-9]\d*$")
+
+# リポジトリの内容の書き込み (contents: write) を持ってよい、ただ 1 つのジョブ。
+# (workflow のファイルの名前, ジョブの ID)
+CONTENTS_WRITE_JOB = ("release.yml", "publish")
 
 
 @dataclass(frozen=True)
@@ -280,10 +286,13 @@ def check_permissions(path: str, nodes: list[Node], node: Node) -> list[Problem]
         return [
             Problem(path, node.line, f"{where}: リポジトリの内容の読み取り以外の権限がある: permissions: {node.value}")
         ]
+    writable = len(node.path) == 3 and (os.path.basename(path), node.path[1]) == CONTENTS_WRITE_JOB
     problems = []
     for child in children_of(nodes, node):
         value = unquote(child.value or "")
         if value == "none" or (child.key == "contents" and value == "read"):
+            continue
+        if writable and child.key == "contents" and value == "write":
             continue
         problems.append(
             Problem(path, child.line, f"{where}: リポジトリの内容の読み取り以外の権限がある: {child.key}: {value or '(空)'}")

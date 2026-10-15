@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "allowedUrls": [
+    {
+      "role": "package",
+      "url": "https://github.com/kamusoft/KsCollectionView-SPM",
+      "note": "SwiftPM の依存に書く Package URL"
+    },
+    {
+      "role": "repository",
+      "url": "https://github.com/kamusoft/KsCollectionView",
+      "note": "本リポジトリの URL (SKILL.md の frontmatter の配布元)"
+    },
+    {
+      "role": "latest-version",
+      "url": "https://github.com/kamusoft/KsCollectionView/releases",
+      "note": "最新の版の確かめ先。仮の値 (本リポジトリの Release の一覧)。リリースの工程が別の場所に決めたときは、この値と、インストール例のある README と SKILL.md を同時に直す"
+    },
+    {
+      "role": "issue-report",
+      "url": "https://github.com/kamusoft/KsCollectionView/issues",
+      "note": "不具合の報告先"
+    }
+  ],
+  "sampleUrlPrefixes": [
+    "https://example.com/"
+  ],
+  "internalTerms": [
+    "ADR",
+    "Kasane",
+    "ksn-",
+    "デルタスペック",
+    "利用者役",
+    "VerificationApp"
+  ]
+}

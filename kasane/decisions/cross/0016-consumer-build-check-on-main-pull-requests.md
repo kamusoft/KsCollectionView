@@ -1,7 +1,7 @@
 ---
 id: 0016
 title: 配布物は、利用者と同じ書き方で参照する専用の利用者役を、main 宛ての Pull Request でビルドして確かめる
-status: proposed
+status: accepted
 date: 2026-10-09
 ---
 
@@ -54,5 +54,6 @@ Sample は利用者役に使わず、本体のソースを参照する形のま�
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-2-package-distribution/history.md (2026-10-09: 利用者の立場のビルドの確認の形 / 利用者役で確かめる範囲 / 必須の検査に足すか) / ../KsSettingsView/kasane/decisions/cross/0028-ci-triggers-by-branch-role.md (兄弟ライブラリが走らせる時点を整理した経緯)
+出典: kasane/roadmaps/v1-foundation/phases/phase-7-2-package-distribution/history.md (2026-10-09: 利用者の立場のビルドの確認の形 / 利用者役で確かめる範囲 / 必須の検査に足すか) / ../KsSettingsView/kasane/decisions/cross/0028-ci-triggers-by-branch-role.md (兄弟ライブラリが走らせる時点を整理した経緯) / kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 3〜8)
+現行照合: 2026-10-09 確認。`verification/ios/`・`verification/android/` の利用者役を、`scripts/ci/verify-consumer-ios.py`・`verify-consumer-android.py` がビルドする (Android はコード縮小あり。起動しない)。`.github/workflows/ci.yml` が Pull Request で起動したときだけ再利用 workflow 2 本を呼び、`main` の保護の必須の検査に `consumer-ios / verify`・`consumer-android / verify` が入っている。Sample は本体のソースを参照する形のまま。判定: 維持
 関連: cross/ADR-0010 (リリースの節目) / cross/ADR-0013 (検証 CI で Simulator・エミュレータを使わない決定) / cross/ADR-0014 (検証 CI の構成と検査の名前の固定) / cross/ADR-0015 (SwiftPM の配布物の置き場所)

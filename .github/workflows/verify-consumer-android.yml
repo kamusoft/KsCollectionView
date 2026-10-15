@@ -5,13 +5,18 @@
 # 現れることを確かめる。本体と Sample のテストは verify-android.yml が確かめる。Sample は本体の
 # ソースを直接参照するので、配布物だけが壊れたことには、ここでしか気付けない。
 #
-# 配布物をどこから取るかは、入力 mode で決まる。組み立てと成功の条件は、どちらでも同じである。
+# 配布物をどこから取るかは、入力 mode で決まる。組み立てと成功の条件は、どれでも同じである。
 # - local: 今の android/ を、一時のディレクトリの Maven リポジトリへ発行し、そこだけから取る。
 #   version が空なら、本体のバージョンカタログの版を使う
+# - artifact: 同じ run の artifact (名前を入力 artifact に渡す) を取り込み、その Maven リポジトリ
+#   だけから、version に渡した版を取る。発行はしない。artifact の中身は、Maven リポジトリの
+#   ルート (その下に jp/kamusoft/kscollectionview/<版>/ がある) とする
 # - published: version に渡した版を、Maven Central だけから取る
 #
 # 準備から確認までは scripts/ci/verify-consumer-android.py が行う。入力が範囲の外
-# (知らない mode・published で version が無い) のときも、スクリプトが何も始めずに失敗で終わる。
+# (知らない mode・published か artifact で version が無い) のときも、スクリプトが何も始めずに
+# 失敗で終わる。artifact の名前の過不足だけは、取り込みの前に Check inputs が確かめる
+# (名前が空のまま取り込むと、run のすべての artifact を取り込むため)。
 #
 # エミュレータは使わず、利用者役を起動しない (cross/ADR-0013)。認証の情報と署名の鍵は受け取らず、
 # 何も書き込まない。
@@ -21,11 +26,16 @@ on:
   workflow_call:
     inputs:
       mode:
-        description: "配布物をどこから取るか (local | published)"
+        description: "配布物をどこから取るか (local | artifact | published)"
         type: string
         required: true
       version:
-        description: "取る版 (published では必須。local で空なら本体のバージョンカタログの版)"
+        description: "取る版 (published と artifact では必須。local で空なら本体のバージョンカタログの版)"
+        type: string
+        required: false
+        default: ""
+      artifact:
+        description: "取り込む artifact の名前 (artifact では必須。ほかの切り替えでは渡さない)"
         type: string
         required: false
         default: ""
@@ -38,11 +48,29 @@ jobs:
     name: verify
     # ランナーは版を指定した名前で選ぶ。最新を指す名前は、指す実体が予告なく入れ替わる。
     runs-on: ubuntu-24.04
-    # 既定の 360 分は長すぎる。手元での所要時間は 25 秒ほど (依存の取得が済んだ状態) で、
-    # ランナーでの所要時間を見て決め直す前の暫定の値である。
+    # 既定の 360 分は長すぎる。ランナーでの所要時間は 3 分ほど (依存のキャッシュが無い状態) で、
+    # 外部の依存の取得の遅れを見込んだ上限を置く。既存の 2 つの検証の上限と揃えてある。
     timeout-minutes: 15
 
     steps:
+      # artifact の名前の過不足を、ほかの準備より前に確かめる。取り込みの step は、名前が空だと
+      # run のすべての artifact を取り込むので、取り込みの前にここで止める。
+      # 入力は、式を本文に直に埋めずに、環境変数を通して渡す (値がシェルの構文として読まれない)。
+      - name: Check inputs
+        env:
+          KS_MODE: ${{ inputs.mode }}
+          KS_ARTIFACT: ${{ inputs.artifact }}
+        run: |
+          set -euo pipefail
+          if [ "${KS_MODE}" = "artifact" ] && [ -z "${KS_ARTIFACT}" ]; then
+            echo "::error::mode が artifact のときは、取り込む artifact の名前を入力 artifact に渡す"
+            exit 1
+          fi
+          if [ "${KS_MODE}" != "artifact" ] && [ -n "${KS_ARTIFACT}" ]; then
+            echo "::error::入力 artifact は、mode が artifact のときだけ渡す (mode: ${KS_MODE})"
+            exit 1
+          fi
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -110,12 +138,23 @@ jobs:
             exit 1
           fi
 
+      # artifact のときだけ、同じ run の artifact を取り込む。名前を渡した 1 つの artifact は、
+      # 中身が path の直下に展開される。
+      - name: Download artifact
+        if: ${{ inputs.mode == 'artifact' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.artifact }}
+          path: ${{ runner.temp }}/consumer-artifact/maven
+
       # 入力は、式を本文に直に埋めずに、環境変数を通して渡す (値がシェルの構文として読まれない)。
-      # version が空のときは空の文字列が渡り、スクリプトは渡していないのと同じに扱う。
+      # version と KS_REPOSITORY が空のときは空の文字列が渡り、スクリプトは渡していないのと同じに扱う。
+      # KS_REPOSITORY は、artifact のときだけ、上で取り込んだディレクトリを指す。
       # 合否はスクリプトの終了コードで決まる。後ろに別のコマンドをつなぐと、つないだ側の
       # 終了コードが step の合否になるので、つながない。
       - name: Verify consumer
         env:
           KS_MODE: ${{ inputs.mode }}
           KS_VERSION: ${{ inputs.version }}
-        run: python3 scripts/ci/verify-consumer-android.py --mode "${KS_MODE}" --version "${KS_VERSION}"
+          KS_REPOSITORY: ${{ inputs.mode == 'artifact' && format('{0}/consumer-artifact/maven', runner.temp) || '' }}
+        run: python3 scripts/ci/verify-consumer-android.py --mode "${KS_MODE}" --version "${KS_VERSION}" --repository "${KS_REPOSITORY}"
