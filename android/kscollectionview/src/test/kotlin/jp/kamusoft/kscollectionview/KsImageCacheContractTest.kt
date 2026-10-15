@@ -21,10 +21,12 @@ import coil3.network.NetworkFetcher
 import coil3.network.NetworkRequest
 import coil3.network.NetworkResponse
 import coil3.network.NetworkResponseBody
+import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.Options
 import coil3.request.SuccessResult
 import coil3.request.allowHardware
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import okio.Buffer
@@ -41,6 +43,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
@@ -58,14 +61,24 @@ import java.util.concurrent.atomic.AtomicInteger
 @OptIn(ExperimentalCoilApi::class, DelicateCoilApi::class)
 internal class KsImageCacheContractTest {
 
-    /** 取得の回数を数え、常に同じ 1 枚分のデータを返すネットワーク層。 */
+    /**
+     * 取得の回数を数え、同じ 1 枚分のデータを返すネットワーク層。応答を保留したり、応答の代わりに
+     * 失敗させたりする口を持つ。
+     */
     private class CountingNetworkClient : NetworkClient {
         // 取得は取得用のスレッドで走るため、数え上げはスレッド間で見える形にする。
         private val count = AtomicInteger(0)
 
-        /** true の間は応答を保留する。取り消しと完了が競る順序を作るための口。 */
+        /**
+         * true の間は応答を保留する。取り消しと完了が競る順序を作るための口。
+         * 要求を出した直後の状態を確かめるテストも、取得がその時点で終わっていないことをこれで保証する。
+         */
         @Volatile
         var isHeld: Boolean = false
+
+        /** true のとき、保留が解けた後に応答を返さずに失敗する。失敗した取得を作るための口。 */
+        @Volatile
+        var fails: Boolean = false
 
         val requestCount: Int get() = count.get()
 
@@ -77,6 +90,7 @@ internal class KsImageCacheContractTest {
             while (isHeld) {
                 delay(1)
             }
+            if (fails) throw IOException("取得に失敗した (テスト用の応答)")
             val body = NetworkResponseBody(Buffer().write(ByteArray(64) { it.toByte() }))
             return body.use { block(NetworkResponse(body = it)) }
         }
@@ -121,6 +135,9 @@ internal class KsImageCacheContractTest {
     /** 成功した要求の取得元。出し直した要求の完了を待つために記録する。 */
     private val succeededData = CopyOnWriteArrayList<Any>()
 
+    /** 失敗した要求の取得元。先読みが成功ではなく失敗で終わったことを確かめるために記録する。 */
+    private val failedData = CopyOnWriteArrayList<Any>()
+
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
@@ -130,6 +147,7 @@ internal class KsImageCacheContractTest {
         decodes.set(0)
         startedRequests.clear()
         succeededData.clear()
+        failedData.clear()
         loader = ImageLoader.Builder(context)
             .eventListener(object : EventListener() {
                 override fun onStart(request: ImageRequest) {
@@ -138,6 +156,10 @@ internal class KsImageCacheContractTest {
 
                 override fun onSuccess(request: ImageRequest, result: SuccessResult) {
                     succeededData += request.data
+                }
+
+                override fun onError(request: ImageRequest, result: ErrorResult) {
+                    failedData += request.data
                 }
             })
             .memoryCache { MemoryCache.Builder().maxSizeBytes(4L * 1024 * 1024).build() }
@@ -786,9 +808,12 @@ internal class KsImageCacheContractTest {
         val index = KsImageMemoryIndex.shared
         val memory = requireNotNull(loader.memoryCache)
 
+        // 要求を出した直後の状態を確かめる間は、取得を終わらせない。
+        network.isHeld = true
         KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
         assertTrue("要求を出した時点で取得中になっていません", index.hasFetchInFlight(identifier, memory))
 
+        network.isHeld = false
         awaitCondition(
             description = "完了しても取得中から外れない",
             actual = { "inFlight=${index.fetchesInFlightCount}" },
@@ -803,8 +828,10 @@ internal class KsImageCacheContractTest {
     @Test
     fun cancelledMemoryPrefetchLeavesInFlightImmediately() {
         val target = url("in-flight-cancelled")
+        // 取り消す前に取得が終わらないよう、取得を保留しておく。
+        network.isHeld = true
         val handle = KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
-        assertEquals(1, KsImageMemoryIndex.shared.fetchesInFlightCount)
+        assertEquals("要求を出した時点で取得中になっていません", 1, KsImageMemoryIndex.shared.fetchesInFlightCount)
 
         handle.dispose()
 
@@ -814,18 +841,51 @@ internal class KsImageCacheContractTest {
         assertEquals("取り消しの通知で数が崩れました", 0, KsImageMemoryIndex.shared.fetchesInFlightCount)
     }
 
-    /** 失敗した先読みは、失敗の時点で取得中から外れる。 */
+    /**
+     * 失敗した先読みは、失敗の時点で取得中から外れる。
+     *
+     * 失敗は保留を解いた後に起こす。保留しないと、取得用のスレッドが要求を出した呼び出しより先に
+     * 失敗し終えることがあり、要求の直後の数が実行機の混み具合で変わる (その順番で失敗した場合は
+     * [memoryPrefetchThatFailsBeforeEnqueueReturnsIsNotLeftInFlight] が確かめる)。
+     */
     @Test
     fun failedMemoryPrefetchLeavesInFlight() {
-        // 取得層の無い形式の URL は失敗する。
-        val target = "ks-unsupported://images.example.com/in-flight-failed.jpg"
+        val target = url("in-flight-failed")
+        network.isHeld = true
+        network.fails = true
         KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
-        assertEquals(1, KsImageMemoryIndex.shared.fetchesInFlightCount)
+        assertEquals("要求を出した時点で取得中になっていません", 1, KsImageMemoryIndex.shared.fetchesInFlightCount)
 
+        network.isHeld = false
         awaitCondition(
             description = "失敗しても取得中から外れない",
-            actual = { "inFlight=${KsImageMemoryIndex.shared.fetchesInFlightCount}" },
-        ) { KsImageMemoryIndex.shared.fetchesInFlightCount == 0 }
+            actual = { "inFlight=${KsImageMemoryIndex.shared.fetchesInFlightCount} failed=$failedData" },
+        ) { failedData.contains(target) && KsImageMemoryIndex.shared.fetchesInFlightCount == 0 }
+        assertFalse("失敗した先読みが成功として扱われました", succeededData.contains(target))
+    }
+
+    /**
+     * 要求を出した呼び出しから戻る前に失敗し終えた先読みも、取得中に残らない。
+     *
+     * 取得用のスレッドが呼び出し元より先に失敗し終えると、失敗の通知は要求を出す呼び出しの中で届く。
+     * その順番を確実に作るため、取得を呼び出し元のスレッドでその場で走らせるローダーを使い、
+     * 取得層の無い形式の URL で失敗させる。
+     */
+    @Test
+    fun memoryPrefetchThatFailsBeforeEnqueueReturnsIsNotLeftInFlight() {
+        val target = "ks-unsupported://images.example.com/in-flight-failed-inline.jpg"
+        val inlineLoader = loader.newBuilder().fetcherCoroutineContext(Dispatchers.Unconfined).build()
+        SingletonImageLoader.setUnsafe(inlineLoader)
+        try {
+            KsCoilImageLoading(context).enqueue(KsPrefetchRequest(target), KsPrefetchDestination.Memory)
+
+            assertTrue("失敗が要求を出した呼び出しの中で届いていません", failedData.contains(target))
+            assertEquals("呼び出しの中で失敗した先読みが取得中に残りました", 0, KsImageMemoryIndex.shared.fetchesInFlightCount)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals("失敗の後の通知で数が崩れました", 0, KsImageMemoryIndex.shared.fetchesInFlightCount)
+        } finally {
+            inlineLoader.shutdown()
+        }
     }
 
     /** ディスクまでの先読みは表示を遅らせる対象にしないため、取得中として数えない。 */
