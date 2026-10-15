@@ -35,8 +35,6 @@ The "built with" column is the toolchain used to build the library, not the mini
 
 ## Installation
 
-KsCollectionView has not been published yet, so the declarations below cannot be resolved at this time. They show how the dependency will be declared once the first version is released.
-
 The declarations write the version as the placeholder `{version}`. Replace it with the version you want to use; left as it is, dependency resolution fails. To find the latest version, see the [releases](https://github.com/kamusoft/KsCollectionView/releases) of this repository.
 
 ### iOS

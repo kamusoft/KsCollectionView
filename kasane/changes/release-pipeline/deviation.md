@@ -27,3 +27,5 @@
 - 蒸留時に反映: handbook — リリースの手順に、`scripts/release/place-spm-snapshot.py` (確かめた写しを置く・2 回の tree の照合) と `scripts/release/check-ci-skipped-changes.py` (事前の確認で検証 CI の成功を代える判定) を書く (草稿には書いてある)
 - 蒸留時に反映: handbook — リリースの手順へ移すとき、事前の確認の「run が無い」の読み直しを push した直後に限ると書き (Skill の文面と揃える)、artifact が実行の権限を保たないことの書き方を「失敗したとき」の表と「確かめていないこと」の表で揃える (review-003.md の Suggestion 2 件)
 - 蒸留時に反映: handbook — リリースの手順の、GitHub の設定を変えた直後の確かめ方に「直後の読み直しで食い違ったら、少し (20 秒ほど) 待って読み直す」を足す (tasks 9.1 で、変更の直後の読み直しが古い値を返した。evidence/github-spm-repository-001.md)
+- [付随修正] .agents/skills/release/SKILL.md・drafts/release-procedure.md: Pull Request の本文の変更の節の後ろに行を足すときは `## ` で始まる見出し (`## Notes` など) を置く (`###` などでは節が終わらない) の 1 文を足し、草稿のリリースの Pull Request の本文の例の末尾に `## Notes` を足した (見出しの水準は review-004 の指摘で明示した)。理由: 準備の Pull Request (tasks 10.2) を出す前に本文をリリースノートの組み立ての読み方で読むと、本文の末尾に付ける署名の行が変更の節の読めない行になり、リリースが validate で止まる形だった。Skill が Pull Request を作るときも同じ形になる (2026-10-15)
+- 蒸留時に反映: handbook — cross/user-docs-writing.md の、README に「まだ公開していない」を書く旨の記述 (244 行あたり) を、初回のリリースの後の形 (公開済みとして書く。spec user-readme) に直す (review-004.md の確認で見つかった)
