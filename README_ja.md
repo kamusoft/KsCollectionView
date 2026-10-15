@@ -35,8 +35,6 @@ KsCollectionView は、iOS の SwiftUI と Android の Jetpack Compose で使え
 
 ## インストール
 
-KsCollectionView はまだ公開していないため、以下の宣言は現時点では解決できません。最初の版を公開した後の、依存の書き方を示しています。
-
 宣言では、版をプレースホルダ `{version}` で書いています。使う版に置き換えてください。そのままでは依存の解決に失敗します。最新の版は、このリポジトリの [Releases](https://github.com/kamusoft/KsCollectionView/releases) で確かめられます。
 
 ### iOS
