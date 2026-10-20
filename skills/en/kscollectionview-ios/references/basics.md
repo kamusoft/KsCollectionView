@@ -245,8 +245,8 @@ What the library guarantees:
 
 Rules:
 
-- `.touchFeedback(color:)` paints the color over the whole cell exactly as given, including its opacity. An opaque color hides the row while it is pressed, so pass a translucent color. To show no feedback, pass `.clear`.
-- On Android the same setting uses only the hue of the color and the standard Android touch effect (the ripple) decides the strength, so the same color value does not look identical on the two platforms. A translucent color gives a similar look on both.
+- `.touchFeedback(color:)` paints the color over the whole cell exactly as given, including its opacity. An opaque color hides the row while it is pressed, so pass a translucent color. To show no feedback, pass `.clear`. `.onItemTap` and `.onItemLongTap` are still called as usual, so this is the way to turn off only the feedback when your row draws its own selected look.
+- On Android the same setting uses only the hue of the color and the standard Android touch effect (the ripple) decides the strength, so the same color value does not look identical on the two platforms. A translucent color gives a similar look on both. A fully transparent color shows no feedback on Android either.
 
 ## Scroll from code
 
