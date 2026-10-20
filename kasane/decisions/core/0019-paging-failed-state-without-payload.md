@@ -41,5 +41,5 @@ date: 2026-09-27
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 状態の契約の細部 — 失敗の中身 / 2026-09-27: 標準の表示部品 — 項目が 1 件もない画面の再試行)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-5-paging-state-machine/history.md (2026-09-26: 状態の契約の細部 — 失敗の中身 / 2026-09-27: 標準の表示部品 — 項目が 1 件もない画面の再試行)
 関連: core/ADR-0005 (5 状態の外形。本 ADR は ADR-0005 の未決「failed にエラー内容を持たせるか」を決める)

@@ -38,5 +38,5 @@ date: 2026-09-29
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — 行き先の表し方) / kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md (iOS 27 の SwiftUI の並べ替え)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — 行き先の表し方) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/artifacts/platform-reorder-research-2026-09-29.md (iOS 27 の SwiftUI の並べ替え)
 関連: core/ADR-0026 (置いたときに 1 回知らせる) / core/ADR-0027 (その場で受け入れたかを返す) / core/ADR-0029 (グループをまたぐ移動) / core/ADR-0007 (スクロール命令は ID で指す) / core/ADR-0003 (位置ベースの状態モデルを却下)

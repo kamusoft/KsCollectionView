@@ -1,0 +1,33 @@
+修正前後の押し比べ (A/B) — 2026-10-20
+
+環境: 作業専用の Android 16 エミュレータ (API 36 google_apis・Pixel 7 の構成、1080x2400)。確かめた後に削除した。
+比べた版:
+- 修正前: 修正を入れていない版 (ライブラリと Sample の main のコードは develop の 95d3fb9 と同じ)
+- 修正後: 同じ版に、この change の差分 (KsCollectionView.kt と KsCollectionViewInteractionTest.kt) を当てたもの
+Sample の仮の書き換え (両方のビルドに同じものを入れ、確かめた後に戻した):
+- ListDemoScreen.kt の touchFeedbackColor を Color.Transparent にした
+- 最後の操作を読むための Text「最後の操作: ...」を一覧の上に 1 行足した (このため一覧は 63px 下にずれている)
+
+手順 (リストの画面):
+1. 押す前を撮る (list-transparent-idle.png)
+2. Cherry の行に指を下ろす (input motionevent DOWN 700 1005) → 0.3 秒後に撮る → 指を上げる
+   修正前 → list-transparent-pressed-before.png、修正後 → list-transparent-pressed-after.png
+3. Banana の行をタップする (input tap 700 820) → 「最後の操作」を読む
+4. Durian の行を 1 秒長押しする (input swipe 700 1190 700 1190 1000) → 「最後の操作」を読む
+
+結果:
+| 観測点 | 修正前 | 修正後 |
+|---|---|---|
+| 押している間の灰色の帯 | 出る (Cherry の行の全体が灰色) | 出ない (押す前と画素の差が 0) |
+| タップの知らせ | 「Banana をタップ」 | 「Banana をタップ」 |
+| 長押しの知らせ | 「Durian を長押し」 | 「Durian を長押し」 |
+
+画素 (Cherry の行の文字の無い右側 (600,925)-(1060,1090)、75,900 画素):
+- 押す前: 修正前・修正後とも全部 (255,255,255)
+- 押している間・修正前: 75,900 画素すべて白以外。平均 (230.9,230.9,230.9)、最も多い色は (229,229,229)
+- 押している間・修正後: 全部 (255,255,255)
+- 画面の全体 (ステータスバーより下) の押す前との差: 修正前 197,638 画素 (Cherry の行の中だけ)、修正後 0 画素
+
+修正後の撮影も、指を下ろしている間に撮れている。同じ操作で長押しの知らせ (「Cherry を長押し」) が届いたため。
+
+list-transparent-pressed-compare.png: Cherry の行を切り出して上から並べた画像。押す前 / 修正前の押している間 / 修正後の押している間

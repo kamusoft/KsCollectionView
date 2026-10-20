@@ -41,5 +41,5 @@ amended-by: 0021
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-4-sections-grouping/history.md (2026-09-24: 差分のアニメーションの見比べ (提案作成時) / 端を表示中の端への挿入 (提案作成後)) / kasane/changes/archive/2026-09-26-sections-grouping/design.md (Decision 16: 端を表示中の端への挿入) / kasane/changes/archive/2026-09-26-sections-grouping/deviation.md (Decision 16 の iOS の実装 / tasks 3.10 の末尾側)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-4-sections-grouping/history.md (2026-09-24: 差分のアニメーションの見比べ (提案作成時) / 端を表示中の端への挿入 (提案作成後)) / kasane/changes/archive/2026-09-26-sections-grouping/design.md (Decision 16: 端を表示中の端への挿入) / kasane/changes/archive/2026-09-26-sections-grouping/deviation.md (Decision 16 の iOS の実装 / tasks 3.10 の末尾側)
 関連: core/ADR-0003 (差分とアニメーションはライブラリの責務) / android/ADR-0006 (Android の末尾への挿入では同じフレームに位置を要求しない)

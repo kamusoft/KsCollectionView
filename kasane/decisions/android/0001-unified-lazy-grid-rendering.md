@@ -43,4 +43,4 @@ Compose Foundation の現状 (2026-09 時点、公式リファレンスで確認
 - 1 列グリッドのスクロール性能が `LazyColumn` から 10% を超えて劣化したとき (handbook/android/performance-verification.md の相対基準)
 - `LazyColumn` 固有の補助 API (`fillParentMax*`・snap fling) を DSL に載せる必要が出たとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ラッパー構成) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/design.md (Decision 1・2) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/performance-measurement.md (1 列リストの計測) / core/ADR-0006 / ios/ADR-0003
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: ラッパー構成) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/design.md (Decision 1・2) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/performance-measurement.md (1 列リストの計測) / core/ADR-0006 / ios/ADR-0003

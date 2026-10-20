@@ -39,5 +39,5 @@ date: 2026-09-01
 - 正: phase-4 で「セクションごとに layout 値を付与する」拡張が同じ語彙で乗る
 - 負: Android ラッパーは layout 値によって内部 Composable (`LazyColumn` / `LazyVerticalGrid`) を切り替えるため、切替時の状態引き継ぎ (スクロール位置) を実装で担保する必要がある
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: レイアウト指定の DSL) / kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: レイアウト) / core/ADR-0001 / core/ADR-0002 / ios/ADR-0003
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: レイアウト指定の DSL) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: レイアウト) / core/ADR-0001 / core/ADR-0002 / ios/ADR-0003
 関連: core/ADR-0015 (グループごとの layout 値は持たない。グループは 1 つの layout 値の中で並ぶ)

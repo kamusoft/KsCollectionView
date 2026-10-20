@@ -57,6 +57,9 @@ LP = _load_sibling()
 DEFAULT_SCOPE = ["kasane/concepts", "kasane/handbook", "kasane/roadmaps"]
 # index.md / log.md / rules.md は目次・履歴・定義表であり、項目の列挙が正しい形なので対象外
 SKIP_NAMES = {"index.md", "log.md", "rules.md"}
+# autopilot-*.md (ksn-autopilot の自律判断ログ・状態表・報告書と、継続の実行で改名した前回の報告書) も
+# 1 件 1 行などの決まった形の記録なので対象外。--paths でファイルを直に渡しても読み飛ばす
+SKIP_PREFIXES = ("autopilot-",)
 # 1 ファイルあたりに表示する違反の件数 (--verbose で解除)
 SHOW_PER_FILE = 3
 # 全体実行で読み飛ばす凍結済みの roadmap の置き場と、凍結済みとみなすフェーズ状態
@@ -320,17 +323,19 @@ def frozen_dirs(root: str) -> set[str]:
 
 
 def is_target_name(fn: str) -> bool:
-    return fn.endswith(".md") and fn not in SKIP_NAMES
+    return fn.endswith(".md") and fn not in SKIP_NAMES and not fn.startswith(SKIP_PREFIXES)
 
 
 def targets(root: str, paths: list[str] | None, scope: list[str],
             excludes: list[str]) -> tuple[list[str], int]:
-    """検査対象 (リポジトリ相対) と、全体実行で読み飛ばした凍結済み文書の件数を返す。"""
+    """検査対象 (リポジトリ相対) と、読み飛ばした件数 (全体実行は凍結済みの文書、--paths は対象外の名前) を返す。"""
     if paths:
         # ディレクトリは走査して展開し、不在パスは例外 (main で exit 2) — 無言の「違反なし」を出さない。
-        # 明示指定なので凍結済みの roadmap も読み飛ばさない
-        return [rel for rel in LP.expand_paths(root, paths, (".md",), SKIP_NAMES)
-                if not LP.is_excluded(rel, excludes)], 0
+        # 明示指定なので凍結済みの roadmap も読み飛ばさない。対象外の名前はファイル直指定でも読み飛ばす
+        expanded = [rel for rel in LP.expand_paths(root, paths, (".md",), SKIP_NAMES)
+                    if not LP.is_excluded(rel, excludes)]
+        kept = [rel for rel in expanded if is_target_name(os.path.basename(rel))]
+        return kept, len(expanded) - len(kept)
     frozen = frozen_dirs(root)
     found: list[str] = []
     skipped = 0
@@ -437,8 +442,11 @@ def main(argv: list[str]) -> int:
                 print(f"  {rel}: {w}")
 
     if not by_file and not stats:
-        print("構造 lint: 違反なし")
-    if skipped:
+        print("構造 lint: 違反なし" if target_list else "構造 lint: 検査対象なし")
+    if skipped and paths:
+        print(("\n" if by_file else "") +
+              f"対象外: 決まった形の記録の {skipped} ファイル (index.md / log.md / rules.md / autopilot-*.md)")
+    elif skipped:
         print(("\n" if by_file else "") +
               f"対象外: もう育たない roadmap の {skipped} ファイル (archive 済み・completed / dropped / promoted の"
               f"フェーズ。検査するなら --paths で指定する)")
@@ -493,6 +501,10 @@ def selftest() -> int:
                 f"## Alternatives Considered\n\n{alts}\n## Consequences\n\n- 正: a\n- 負: b\n\n"
                 f"## Revisit When\n\n- 前提が崩れたとき\n")
 
+    # ksn-autopilot の記録は決まった形なので、上限を超えても検出しない
+    files["kasane/roadmaps/live/autopilot-log.md"] = bad
+    files["kasane/roadmaps/live/autopilot-report-2026-01-01.md"] = bad
+
     files["kasane/decisions/core/0001-bloated-proposed.md"] = adr("proposed", True)
     files["kasane/decisions/core/0002-bloated-accepted.md"] = adr("accepted", True)
     files["kasane/decisions/core/0003-lean-proposed.md"] = adr("proposed", False)
@@ -523,6 +535,7 @@ def selftest() -> int:
         check("phase-1-done/" not in out, "completed のフェーズは検出しない")
         check("phase-2-drop/" not in out, "dropped のフェーズは検出しない")
         check("3 ファイル" in out, "読み飛ばした件数を表示する")
+        check("autopilot-" not in out, "autopilot-*.md は検出しない")
 
         print("[--paths の明示指定]")
         code, out = run("--paths", "kasane/roadmaps/archive")
@@ -530,6 +543,10 @@ def selftest() -> int:
         code, out = run("--paths", "kasane/roadmaps/live/phases/phase-1-done/agenda.md")
         check(code == 1 and "phase-1-done/agenda.md" in out, "completed のフェーズを指定すれば検出する",
               f"exit {code}")
+
+        code, out = run("--paths", "kasane/roadmaps/live/autopilot-log.md")
+        check(code == 0 and "検査対象なし" in out and "対象外: 決まった形の記録の 1 ファイル" in out,
+              "autopilot-*.md はファイル直指定でも読み飛ばす", f"exit {code}")
 
         print("[ADR の決定の粒度]")
         code, out = run("--paths", "kasane/decisions")

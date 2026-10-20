@@ -27,4 +27,4 @@ SwiftUI DSL ラッパーの内部構成を決める必要があった。先行�
 - 正: スクロール命令の順序保証が apply completion と素直に接続する
 - 負: 部分操作 (単一セル差し替え等) を狙い撃ちで最適化する経路がなく、常に snapshot 再構築を通る。性能問題が実測で出た場合に最適化層の後付けが必要になる
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: SwiftUI DSL ラッパー) / core/ADR-0003 / core/ADR-0007 / ios/ADR-0001
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: SwiftUI DSL ラッパー) / core/ADR-0003 / core/ADR-0007 / ios/ADR-0001

@@ -4,7 +4,7 @@
 
 先行フェーズの change で確かめられなかったこと、決めなかったことのうち、簡易起票になっていないものを集めた。ロードマップ v1-foundation の phase-7-4 (リリースの手順) の議論で、オーナーの決定により「初回リリースの基準と片付ける範囲」をロードマップの論点から外した (2026-10-14)。外したままでは、ロードマップを archive した後に誰も追わなくなるので、追跡が切れないようにここに積む。どれも、それぞれの change の完了判定では扱わないと決めた範囲で、実害は確かめていない。
 
-出どころの一覧は、phase-7-4 の agenda の「ロードマップの外へ出したもの」(`kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/agenda.md`。ロードマップの archive 後は `kasane/roadmaps/archive/*-v1-foundation/` の下)。
+出どころの一覧は、phase-7-4 の agenda の「ロードマップの外へ出したもの」(`kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/agenda.md`。ロードマップの archive 後は `kasane/roadmaps/archive/*-v1-foundation/` の下)。
 
 ### 性能 (phase-2・phase-3 の申し送り)
 
@@ -24,6 +24,15 @@
 - コード縮小を有効にした Android の利用者役は、手元で 1 回起動して一覧が表示されることを確かめた。リリースの節目ごとに起動を確かめる決まりにするかは、決めていない (`kasane/changes/archive/2026-10-09-package-distribution/`)
 - Android の利用する側の下限は、minSdk と compileSdk だけを示している。Android Gradle Plugin と Kotlin の下限を、ビルドして確かめて README と Skill に載せるか。Compose Foundation が本ライブラリを通して届くかも、同じときに確かめる (`kasane/changes/archive/2026-10-10-user-docs/`)
 - 利用者向け Skill のコード例は、コンパイルとビルドまでで確かめた。実行時の動きは確かめていない (同上)
+
+### release-pipeline から (2026-10-15)
+
+変更 `release-pipeline` (初回のリリース 0.1.0-beta.1。記録は `kasane/changes/archive/2026-10-15-release-pipeline/`) で、確かめきれなかったこと:
+
+- リリースの Skill (`.agents/skills/release/`) を実物で使って、事前の確認・確認のメッセージ 1 回・Pull Request のマージ・起動・見守りが手順の文書のとおりに進むこと。初回は手順の草稿で行い、Skill は使っていない。2 回目のリリースが最初の実地になる
+- 共同作業者でないアカウントで、配信用リポジトリに Issue・Pull Request を作れないこと (設定の値と、サインインしない状態の Issue の画面が 404 になることまでは確かめた)
+- `develop` から起動した run の、Environment `release` を指定したジョブが保護で止まること (リリースの workflow は `validate` が先に止めるので、正規の起動では起きない。確かめるには一時の workflow が要る)
+- secret の検査 (gitleaks) の指紋の形が、commit の前の走査と検証 CI の走査で違うか (`.gitleaksignore` に足した指紋が両方に効くか)。最初の本物の誤検出のときに確かめる
 
 ## 検討した選択肢 (却下案と理由を含む)
 

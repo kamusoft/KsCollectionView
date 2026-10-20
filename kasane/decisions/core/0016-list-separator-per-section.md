@@ -39,5 +39,5 @@ iOS の内部の塊の境目には線を出さない (ios/ADR-0009)。
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-4-sections-grouping/history.md (2026-09-24: セクション境界の見た目 — 区切り線) / kasane/changes/archive/2026-09-26-sections-grouping/design.md (Decision 7: 区切り線の上線の判定)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-4-sections-grouping/history.md (2026-09-24: セクション境界の見た目 — 区切り線) / kasane/changes/archive/2026-09-26-sections-grouping/design.md (Decision 7: 区切り線の上線の判定)
 関連: core/ADR-0015 (グループの値でグループを宣言する) / ios/ADR-0009 (塊の境界を見た目に出さない) / ios/ADR-0010 (塊をグループごとに区切る)

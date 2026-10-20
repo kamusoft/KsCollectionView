@@ -1,7 +1,7 @@
 ---
 id: 0021
 title: すべてのプラットフォームに 1 つの版を付け、本リポジトリと配信用リポジトリに同じ版の文字列の tag を付ける
-status: proposed
+status: accepted
 date: 2026-10-14
 ---
 
@@ -43,5 +43,5 @@ tag は、版の文字列そのもの (接頭辞なし) にする。本リポジ
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (1. ADR 3 枚 / 4. 版と tag の対応) / ../KsSettingsView/kasane/decisions/cross/0019-lockstep-single-version.md (Decision・却下した案) / ../KsSettingsView/kasane/decisions/cross/0020-release-dispatch-tag-last-version-injection.md (tag の表記)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/history.md (2026-10-14: 版の付け方と、兄弟ライブラリの踏襲による決定) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-7-4-release-pipeline/artifacts/kssettingsview-release-research-2026-10-14.md (1. ADR 3 枚 / 4. 版と tag の対応) / ../KsSettingsView/kasane/decisions/cross/0019-lockstep-single-version.md (Decision・却下した案) / ../KsSettingsView/kasane/decisions/cross/0020-release-dispatch-tag-last-version-injection.md (tag の表記) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 1)
 関連: cross/ADR-0003 (Maven の座標) / cross/ADR-0015 (SwiftPM の配信用リポジトリ) / cross/ADR-0018 (インストール例の版の印と、最新の版の確かめ先)

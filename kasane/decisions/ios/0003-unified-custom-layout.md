@@ -26,5 +26,5 @@ layout 値 1 つで list / 固定列 / adaptive / 向き別列数を宣言する
 - 負: 将来スワイプアクション等のシステム list 機能を提供したくなった場合は自前実装になる (ただし Compose 側にもシステム提供はなく、対称提供するならどのみち自前)
 - 負: 区切り線の描画・インセット処理をライブラリが両プラットフォームで自前保守する
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: レイアウト) / core/ADR-0006 / ios/ADR-0001
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: レイアウト) / core/ADR-0006 / ios/ADR-0001
 関連: ios/ADR-0009 (1 つの配列を固定件数の塊に分け、自前 compositional セクションを複数並べる。単一 sectionProvider は塊の位置を見て余白・行間・ヘッダー / フッターを切り替える)

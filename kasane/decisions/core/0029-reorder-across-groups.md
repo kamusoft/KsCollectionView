@@ -32,5 +32,5 @@ D&D 並べ替え機能で、グループを宣言した一覧の項目をグル�
 
 - 前提 (Context) が崩れたとき。空のグループを表示できるようにグループの宣言を改めるときは、空のグループへの移動を併せて見直す
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — グループをまたぐ移動)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — グループをまたぐ移動)
 関連: core/ADR-0015 (グループの値による宣言、空のグループは出せない) / core/ADR-0026 (ライブラリは配列を書き換えない) / core/ADR-0028 (行き先のグループの値を知らせる) / core/ADR-0011 (不正入力の扱い)

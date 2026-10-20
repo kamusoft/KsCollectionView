@@ -29,4 +29,4 @@ core/ADR-0001 は「同じ書き味の対称性は公開 DSL の層で担保す�
 - 正: modifier・状態管理・非同期処理はプラットフォーム標準のまま使えるため、ネイティブ開発者に違和感がなく、標準の進化を自動で享受する
 - 負: 命名・宣言構造の設計時に常に両プラットフォームの制約を同時に満たす必要があり、片方だけなら自然な API を諦める場面が生じる
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 対称性の粒度) / core/ADR-0001
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: 対称性の粒度) / core/ADR-0001

@@ -268,4 +268,4 @@ Android のライブラリは `InitializationProvider` に相乗りしてアプ�
 - [Android 画像の先読みと KsImage の実現](../../android/architecture/image-pipeline.md) — 先読み窓、表示要求の鍵、画面に出る時点の引き当てのやり直し、アプリケーションコンテキストの捕捉
 - core/ADR-0036 (既定の表示の色はライト / ダーク 2 組)、core/ADR-0008 (DSL 外形)、core/ADR-0013 (先読みの幅と許容範囲の引き当て)、core/ADR-0014 (任意キー)
 - core/ADR-0012 (ローダーの直接依存と共有キャッシュ・iOS のディスクキャッシュの明示的な有効化)、core/ADR-0002 (記法差)、core/ADR-0011 (不正入力)、android/ADR-0005 (アプリケーションコンテキストの捕捉)
-- [dsl-samples](../../../roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) のシナリオ 5 — 利用形の全体 (先読みの要素が URL だった時点の形)
+- [dsl-samples](../../../roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/artifacts/dsl-samples.md) のシナリオ 5 — 利用形の全体 (先読みの要素が URL だった時点の形)

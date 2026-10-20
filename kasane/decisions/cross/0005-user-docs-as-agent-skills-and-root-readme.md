@@ -49,4 +49,4 @@ KsCollectionView の公開後の主要読者は、AI エージェントを併用
 - 負: 派生物の追従を担う仕組みが未決のため、それが決まるまでは源泉と `skills/` のずれを人手で防ぐ必要がある。
 - 負: Agent Skills 標準は多言語の慣行が未標準化であり、標準の進化に応じて 2 言語規約の見直しが必要になり得る。
 
-出典: ../KsSettingsView/kasane/decisions/cross/0022-user-docs-as-agent-skills.md (Decision / Alternatives) / ../KsSettingsView/kasane/decisions/cross/0023-readme-root-only-and-developer-knowledge-in-concepts.md (README 集約・開発者向け知識の配置) / kasane/changes/kasane-initial-assets/exploration.md (ADR 候補 4) / kasane/roadmaps/v1-foundation/roadmap.md (前提 / 制約: skills/ 方式の踏襲)
+出典: ../KsSettingsView/kasane/decisions/cross/0022-user-docs-as-agent-skills.md (Decision / Alternatives) / ../KsSettingsView/kasane/decisions/cross/0023-readme-root-only-and-developer-knowledge-in-concepts.md (README 集約・開発者向け知識の配置) / kasane/changes/kasane-initial-assets/exploration.md (ADR 候補 4) / kasane/roadmaps/archive/2026-10-15-v1-foundation/roadmap.md (前提 / 制約: skills/ 方式の踏襲)

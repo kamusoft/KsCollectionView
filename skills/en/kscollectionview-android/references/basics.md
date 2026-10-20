@@ -247,7 +247,8 @@ What the library guarantees:
 Rules:
 
 - `touchFeedbackColor` sets only the hue of the ripple. The strength is decided by the standard ripple, so the opacity of the color you pass has no effect: an opaque color and a translucent one look the same while pressed.
-- On iOS the same setting paints the color over the whole cell exactly as given, including its opacity, so the same color value does not look identical on the two platforms. A translucent color gives a similar look on both.
+- To show no feedback, pass a fully transparent color (opacity exactly 0, such as `Color.Transparent`). The list then shows no ripple, and no focus highlight either when an item is selected with a keyboard or a similar device. `onItemTap` and `onItemLongTap` are still called as usual, so this is the way to turn off only the feedback when your row draws its own selected look. A color that is almost but not fully transparent (opacity above 0) still gets the ripple at the standard strength. `Color.Unspecified` means that no color is given, so it is not treated as transparent and gives the standard ripple.
+- On iOS the same setting paints the color over the whole cell exactly as given, including its opacity, so the same color value does not look identical on the two platforms. A translucent color gives a similar look on both. A fully transparent color shows no feedback on iOS either.
 
 ## Scroll from code
 

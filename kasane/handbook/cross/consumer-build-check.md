@@ -3,9 +3,9 @@ kind: guide
 applies-when:
   always: false
   paths: ["scripts/ci/verify-consumer-*.py", "verification/**", ".github/workflows/verify-consumer-*.yml"]
-  tasks: [利用者の立場のビルドの確認を手元で流す, 利用者の立場のビルドの確認の失敗の調査, 利用者役・確認のスクリプト・確認の workflow の変更, 利用者役の画面のソース (README の最小コード例の元) の変更]
+  tasks: [利用者の立場のビルドの確認を手元で流す, 利用者の立場のビルドの確認の失敗の調査, 利用者役・確認のスクリプト・確認の workflow の変更, 利用者役の画面のソース (README の最小コード例の元) の変更, リリースの workflow の利用者役 (consumer・smoke) の失敗の調査]
 title: 利用者の立場のビルドの確認
-description: 配布物を利用者と同じ書き方で取る利用者役の形 (画面のソースは README の最小コード例と同じ内容)、手元での流し方、検証 CI での走り方、失敗したときの見方、確かめた範囲と確かめていないこと、変えるときの注意
+description: 配布物を利用者と同じ書き方で取る利用者役の形 (画面のソースは README の最小コード例と同じ内容)、3 つの切り替え (local・artifact・published)、手元での流し方、検証 CI とリリースの workflow での走り方、失敗したときの見方、確かめた範囲と確かめていないこと、変えるときの注意
 timestamp: 2026-10-10
 ---
 
@@ -47,12 +47,15 @@ Android の入口 (`MainActivity.kt`。利用者役のアプリの package の�
 
 ### 切り替え
 
-配布物をどこから取るかを、切り替えで決める。ビルドと成功の条件は、どちらの切り替えでも同じである。
+配布物をどこから取るかを、切り替えで決める。ビルドと成功の条件は、どの切り替えでも同じである。
 
-| 切り替え | iOS | Android |
-|---|---|---|
-| `local` (公開の前の成果物) | 今の `ios/` から一時のディレクトリに写しを作り、パスで参照する | 今の `android/` を一時のディレクトリの Maven リポジトリへ発行し、`jp.kamusoft` をそこだけから取る |
-| `published` (公開済みの配布物) | 配信用リポジトリの URL ([公開識別子と配布座標](public-identifiers.md) の Package URL) を、版の完全一致で参照する。写しは作らない | `jp.kamusoft` を Maven Central だけから取る。発行はしない |
+| 切り替え | 使う所 | iOS | Android |
+|---|---|---|---|
+| `local` (今のソースから作る) | 検証 CI・手元 | 今の `ios/` から一時のディレクトリに写しを作り、パスで参照する | 今の `android/` を一時のディレクトリの Maven リポジトリへ発行し、`jp.kamusoft` をそこだけから取る |
+| `artifact` (工程が組み立てた配布物) | リリースの workflow の公開の前 (`consumer-ios`・`consumer-android`) | 渡された写しのディレクトリを、絶対パスで参照する。写しは作らない。ディレクトリの名前は `KsCollectionView-SPM` でなければならない (SwiftPM はパスの末尾の名前を package の名前として扱う) | 渡された Maven リポジトリだけから、渡した版を取る。発行はしない |
+| `published` (公開済みの配布物) | リリースの workflow の公開の後 (`smoke-ios`・`smoke-android`) | 配信用リポジトリの URL ([公開識別子と配布座標](public-identifiers.md) の Package URL) を、版の完全一致で参照する。写しは作らない | `jp.kamusoft` を Maven Central だけから取る。発行はしない |
+
+`artifact` は、工程が実際に公開する成果物を、公開の前に確かめるための切り替えである。`local` は利用者役が自分で作り直すので、工程の組み立ての誤り (版の渡し漏れ・写しの入れ漏れ) を見逃す。
 
 `verification/ios/` に `Package.swift` は無い。マニフェストは、確認のスクリプトが、ひな形 (`Package.swift.template`) に参照の行を差し込んで、一時のディレクトリにだけ書く。
 
@@ -67,8 +70,10 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 
 | 引数 | 意味 |
 |---|---|
-| `--mode local` / `--mode published` | 切り替え。必須 |
-| `--version <版>` | 取る版 (例: `1.2.3`)。`published` では必須。iOS の `local` では使わない。Android の `local` で渡さなければ、バージョンカタログの版 (`android/gradle/libs.versions.toml` の `kscollectionview`) になる。空の文字列は、渡していないのと同じに扱う |
+| `--mode local` / `--mode artifact` / `--mode published` | 切り替え。必須 |
+| `--version <版>` | 取る版 (例: `1.2.3`)。`published` と、Android の `artifact` では必須。iOS の `local` と `artifact` では使わない。Android の `local` で渡さなければ、バージョンカタログの版 (`android/gradle/libs.versions.toml` の `kscollectionview`) になる。空の文字列は、渡していないのと同じに扱う |
+| `--snapshot <ディレクトリ>` (iOS) | `artifact` で参照する写しのディレクトリ。`artifact` では必須で、ほかの切り替えでは渡さない。名前は `KsCollectionView-SPM` で、ルートにマニフェスト (`Package.swift`) を持つこと |
+| `--repository <ディレクトリ>` (Android) | `artifact` で取る Maven リポジトリのディレクトリ (その下に `jp/kamusoft/kscollectionview/<版>/` がある)。`artifact` では必須で、ほかの切り替えでは渡さない |
 
 版に使える文字は、英数字と `.`・`+`・`_`・`-` で、先頭は英数字に限る (`0.1.0-SNAPSHOT` は通り、`v` で始まる `v1.2.3` も通る。先頭が `-` のものや、引用符などほかの文字を含むものは引数の誤りになる)。スクリプトが見るのは文字だけで、その版が実在するかは見ない。
 
@@ -76,7 +81,7 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 |---:|---|
 | 0 | 確認が成功した |
 | 1 | 準備 (写しの作成・発行)・ビルド・確認のどれかが失敗した |
-| 2 | 引数の誤り (知らない切り替え・`published` で版が無い・版に使えない文字)。何も始めていない |
+| 2 | 引数の誤り。何も始めていない。当たるのは、知らない切り替え・`published` (Android は `artifact` も) で版が無い・版に使えない文字・`artifact` で写しかリポジトリが無い (iOS は、名前が違う・マニフェストが無い・パスに引用符か逆斜線がある)・`artifact` 以外で写しかリポジトリを渡した、のどれか |
 
 | プラットフォーム | 必要なもの |
 |---|---|
@@ -89,6 +94,19 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 
 手元の所要時間 (2026-10-09、依存の取得が済んだ状態): iOS は 30 秒ほど (毎回、何も無い状態からビルドする)。Android は、利用者役のビルドの出力が無い状態で 23 秒ほど、残っている状態で 5 秒ほどである。
 
+### 切り替え artifact を手元で流す
+
+手元で `artifact` を流すときは、写しと発行物を先に作り、そのディレクトリを渡す。`<作業用>` は、リポジトリの外の一時のディレクトリである。
+
+```bash
+python3 scripts/distribution/sync-spm-snapshot.py <作業用>/artifact-ios/KsCollectionView-SPM
+python3 scripts/ci/verify-consumer-ios.py --mode artifact --snapshot <作業用>/artifact-ios/KsCollectionView-SPM
+(cd android && ./gradlew -Dmaven.repo.local=<作業用>/artifact-android/maven -Pversion=<版> :kscollectionview:publishToMavenLocal)
+python3 scripts/ci/verify-consumer-android.py --mode artifact --repository <作業用>/artifact-android/maven --version <版>
+```
+
+手元の所要時間 (2026-10-15、依存の取得が済んだ状態): 写しの準備は 1 秒未満、iOS の確認は 26 秒ほど。発行物の準備は 2 秒ほど、Android の確認は 18 秒ほど (利用者役のビルドの出力が残っていてコード縮小が走らないときは 2 秒ほど)。発行していない版を渡すと、Android の確認は `Could not find jp.kamusoft:kscollectionview:<版>` で終了コード 1 になる。
+
 ### Android の利用者役を Gradle や IDE から直接開くとき
 
 確認は、スクリプトを通して流すのが基本である。スクリプトが、発行と、下のプロパティの受け渡しをすべて行う。
@@ -97,8 +115,8 @@ ANDROID_HOME=<Android SDK の場所> python3 scripts/ci/verify-consumer-android.
 
 | プロパティ | 値 | 渡さないとき |
 |---|---|---|
-| `ksCollectionViewMode` | `local` か `published` | `local` になる。ほかの値は失敗する |
-| `ksCollectionViewRepository` | 発行物を置いた Maven リポジトリのディレクトリ | `local` では必須で、無いと失敗する。実在しないディレクトリを渡しても失敗する。`published` では使わない |
+| `ksCollectionViewMode` | `local`・`artifact`・`published` のどれか | `local` になる。ほかの値は失敗する |
+| `ksCollectionViewRepository` | 発行物を置いた Maven リポジトリのディレクトリ (`local` は確認が自分で発行した先、`artifact` は外から渡されたもの) | `local` と `artifact` では必須で、無いと失敗する。実在しないディレクトリを渡しても失敗する。`published` では使わない |
 | `ksCollectionViewVersion` | 取る版 | バージョンカタログの版になる |
 
 Android SDK の場所は、ほかのビルドと同じく `ANDROID_HOME` か `verification/android/local.properties` で渡す。
@@ -107,11 +125,13 @@ Android SDK の場所は、ほかのビルドと同じく `ANDROID_HOME` か `ve
 
 検証 CI では、`consumer-ios / verify`・`consumer-android / verify` の 2 つの検査として、`main` 宛ての Pull Request のときだけ走る。入口 (`.github/workflows/ci.yml`) が、再利用 workflow (`verify-consumer-ios.yml`・`verify-consumer-android.yml`) を、切り替えを `local` にして、版を渡さずに呼ぶ。走る時点の全体と、検査の名前は [検証 CI](verification-ci.md) にある。
 
-workflow は、手元と同じスクリプトを `--mode "${KS_MODE}" --version "${KS_VERSION}"` の形で 1 行で呼ぶ。入口が渡すのは `local` と空の版なので、上の手元のコマンドと同じ動きになる。認証の情報と署名の鍵は受け取らない。
+workflow は、入力に切り替え (`mode`、必須)・版 (`version`)・取り込む artifact の名前 (`artifact`) を取る。手元と同じスクリプトを、iOS は `--mode "${KS_MODE}" --version "${KS_VERSION}" --snapshot "${KS_SNAPSHOT}"`、Android は `--snapshot` の代わりに `--repository "${KS_REPOSITORY}"` の形で 1 行で呼ぶ。入口が渡すのは `local` と空の版で、写しとリポジトリも空になるので、上の手元のコマンドと同じ動きになる。認証の情報と署名の鍵は受け取らない。
+
+`artifact` のときだけ、step `Download artifact` が同じ run の artifact を取り込み、そのディレクトリをスクリプトに渡す。名前を渡した 1 つの artifact は、中身が取り込み先の直下に展開される。artifact の中身は、iOS は配信用リポジトリのルートに置くのと同じ写し (ルートに `Package.swift`・`Sources/`・`Tests/`・`LICENSE`・`README.md`)、Android は Maven リポジトリのルートである。最初の step `Check inputs` は、`artifact` で名前が空のとき、`artifact` 以外で名前を渡したときに、ほかの準備より前に止める (名前が空のまま取り込むと、run のすべての artifact を取り込むため)。
 
 ### consumer-ios / verify
 
-step は、Checkout・Select Xcode・Show toolchain・Verify consumer の 4 つである。行うことは次のとおり。
+step は、Check inputs・Checkout・Select Xcode・Show toolchain・Download artifact (`artifact` のときだけ)・Verify consumer の 6 つである。検証 CI での行うことは次のとおり。
 
 1. workflow の `KS_XCODE_VERSION` で決めた版 (2026-10-09 時点で 27.0) の Xcode を選ぶ。無ければ、ビルドを始める前に失敗で終わる
 2. 今の `ios/` から、配信用リポジトリのルートに置くのと同じ写しを、一時のディレクトリに作る
@@ -123,7 +143,7 @@ step は、Checkout・Select Xcode・Show toolchain・Verify consumer の 4 つ�
 
 ### consumer-android / verify
 
-step は、Checkout・Setup JDK・Cache Gradle dependencies・Show toolchain・Ensure Android SDK platform・Verify consumer の 6 つである。行うことは次のとおり。
+step は、Check inputs・Checkout・Setup JDK・Cache Gradle dependencies・Show toolchain・Ensure Android SDK platform・Download artifact (`artifact` のときだけ)・Verify consumer の 8 つである。検証 CI での行うことは次のとおり。
 
 1. JDK 21 を入れ、コンパイル対象の Android SDK がランナーに無ければ取得する
 2. 今の `android/` の本体を、一時のディレクトリの Maven リポジトリへ発行する
@@ -147,6 +167,12 @@ step は、Checkout・Setup JDK・Cache Gradle dependencies・Show toolchain・E
 | ビルド | Simulator 向けが約 1 分 5 秒 (Nuke の取得を含む)、実機向けが約 37 秒 | 利用者役のリリースの組み立てが 1 分 26 秒 |
 | 確認の結果 | 2 つのビルドとも `** BUILD SUCCEEDED **` | 実行時の依存に `jp.kamusoft:kscollectionview:0.1.0-SNAPSHOT` が現れた |
 | そのほか | step `Verify consumer` は 1 分 43 秒 | コンパイル対象の SDK (Platform 36) はランナーにあり、SDK を取得する側の処理は動いていない。キャッシュは復元されず (`Cache not found`)、終わりに保存された (`Cache saved`) |
+
+### リリースの workflow での走り方
+
+リリースの workflow は、同じ 2 本の workflow を、公開の前に `artifact` で (`consumer-ios`・`consumer-android`)、公開の後に `published` で (`smoke-ios`・`smoke-android`) 呼ぶ。`artifact` で取り込むのは、同じ run の `package-ios`・`package-android` が作った artifact (`spm-snapshot`・`android-maven`) である。手順は [リリースの手順](release-procedure.md) にある。
+
+初回のリリース (2026-10-15) では、4 つとも成功した。所要時間は、`consumer-ios / verify` 1 分 30 秒・`consumer-android / verify` 2 分 20 秒・`smoke-ios / verify` 1 分 26 秒・`smoke-android / verify` 2 分 4 秒だった。`smoke-ios` は tag を付けた配信用リポジトリの写しを SwiftPM で解決し、`smoke-android` は Maven Central から発行物を取った。
 
 ### 時間の上限
 
@@ -201,7 +227,7 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 
 コード縮小で不整合が出たときは、利用者役の側に規則を足して通さない。配布物に規則を同梱するかの判断になるので、オーナー (リポジトリの持ち主である開発者) に諮る。利用者役には、本ライブラリのための規則を書かない。書くと、配布物に規則が足りないことが隠れる。
 
-### 検証 CI の上で落ちたとき
+### ランナーの上で落ちたとき (検証 CI・リリースの workflow)
 
 落ちた step の記録に、上の出力がそのまま出る。成功したときは、実行の結果のページの概要に、切り替えと確かめたものが出る。
 
@@ -211,6 +237,8 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 | `consumer-ios / verify` | Verify consumer | 写しの作成・利用者役の準備・2 つのビルドのどれかが失敗した。上の「iOS」の表で切り分ける |
 | `consumer-android / verify` | Ensure Android SDK platform | コンパイル対象の SDK の版を読めない、`ANDROID_HOME` が無い、SDK を取得できない、のどれか (`android / verify` の同じ名前の step と同じ) |
 | `consumer-android / verify` | Verify consumer | 本体の発行・利用者役の組み立て・対応表の確認・依存の確認のどれかが失敗した。上の「Android」の表で切り分ける |
+| 両方 (リリースの workflow から呼んだとき) | Check inputs | 切り替えと artifact の名前の組み合わせが違う。呼ぶ側 (`release.yml`) の渡し方の誤りである |
+| 両方 (リリースの workflow から呼んだとき) | Download artifact | 渡した名前の artifact が、同じ run に無い。組み立てのジョブ (`package-ios`・`package-android`) が置いたかを見る |
 
 `ios / verify` や `android / verify` が成功していて、こちらだけが落ちたときは、本体ではなく配布物の側を疑う。iOS は、配布物の形 (写しに入るファイル・マニフェストがルートで成り立つこと) か、利用者役の側である。Android は、公開の設定・発行物の依存の宣言・コード縮小である。
 
@@ -237,11 +265,10 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 
 ### 確かめていないこと
 
-2026-10-10 時点で確かめていないことは、次のとおり。
+2026-10-10 時点で確かめていないことは、次のとおり。`published` での取得とビルドは、初回のリリース (2026-10-15) のランナーの上で確かめた (上の「リリースの workflow での走り方」)。手元では流していない。
 
 | 確かめていないこと | 分かっていること |
 |---|---|
-| `published` での取得とビルド | 配信用リポジトリも公開物もまだ無く、取得は 1 度も実行していない。確かめたのは、参照の書き方・その行を持つマニフェストを SwiftPM が読めること・準備を飛ばして同じビルドを始めることまでである。最初のリリースで確かめる |
 | 利用者役が触らない API についての、配布物の依存の宣言の漏れ | 利用者役が確かめられるのは、最小の利用例が触る API に限られる。公開 API に現れる型を増やしたら、[配布物の形と作り方](package-distribution.md) の「依存の範囲」の突き合わせをやり直す |
 | ランナーの上で失敗する実行 | 見ていない。ランナーの上で確かめたのは、2 つが 1 回ずつ成功したことである |
 | 2 回目からの所要時間とばらつき、保存したキャッシュが次の実行で復元されること | 測れたのは、キャッシュが無い状態の最初の 1 回だけである。キャッシュは、保存されるところまでを確かめた |
@@ -256,8 +283,8 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 | 変えるもの | 守ること |
 |---|---|
 | 入口のジョブ (`consumer-ios`・`consumer-android`) の条件 | Pull Request で起動したときだけ走る条件を外さない。外すと、`develop` への push のたびに macOS のランナーを起こす。条件は、呼ばれる側ではなく入口のジョブに付ける |
-| 確認の workflow の入力 | 切り替えと版の 2 つだけにする。リリースの workflow (2026-10-09 時点ではまだ無く、作る予定) が、同じ workflow を切り替えを変えて呼ぶ前提である。入力の検査は workflow の step に書かず、スクリプトに持たせてある |
-| 確認の workflow の step | 足す・名前を変えるときは、スクリプトのテスト (`scripts/ci/tests/test_workflow_files.py`) が持つ step の一覧も直す。iOS は 4 つ、Android は 6 つの step に決めてある。スクリプトのテストは、手元では `python3 scripts/ci/run-tests.py` で流す ([検証 CI](verification-ci.md) の「手元で確かめる」) |
+| 確認の workflow の入力 | 切り替え・版・artifact の名前の 3 つだけにする。リリースの workflow が、同じ workflow を切り替えを変えて呼ぶ。入力の検査は、artifact の名前の過不足 (`Check inputs`) を除いて、workflow の step に書かず、スクリプトに持たせてある |
+| 確認の workflow の step | 足す・名前を変えるときは、スクリプトのテスト (`scripts/ci/tests/test_workflow_files.py`) が持つ step の一覧も直す。iOS は 6 つ、Android は 8 つの step に決めてある。スクリプトのテストは、手元では `python3 scripts/ci/run-tests.py` で流す ([検証 CI](verification-ci.md) の「手元で確かめる」) |
 | 確認の step (`Verify consumer`) | 後ろに別のコマンドをつながない。つないだ側の終了コードが step の合否になる。スクリプトのテストが、つないでいないことを確かめる |
 | Xcode の版・JDK の版 | 既存の検証の workflow と、確認の workflow で、同時に上げる。値がずれると、スクリプトのテストが落ちる。Xcode の版を上げるときは、マニフェストの宣言も同時に上げる ([配布物の形と作り方](package-distribution.md)) |
 | iOS の `Select Xcode` の step、Android のコンパイル対象の SDK を確かめる step | 既存の検証の workflow と同じ本文であることを、テストが確かめる。直すときは両方を直す |
@@ -286,5 +313,6 @@ Simulator 向けのビルドの失敗の原因は 4 つ考えられる。出力�
 - [利用者向け Skill と README の書き方](user-docs-writing.md) — 最小コード例を、利用者役の画面のファイルと同じにする決まり
 - [利用者向け Skill の追従](user-skill-refresh.md) — 画面のファイルを変えた後に、`SKILL.md` の例を直す流れ
 - [ブランチの運用と GitHub の設定](branch-and-github-settings.md) — 必須の検査を参照する保護の値と、検査が止まったときの進め方
+- [リリースの手順](release-procedure.md) — 利用者役を `artifact` と `published` で呼ぶリリースの workflow
 
-出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 3〜7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ios.md・consumer-android.md (利用者役・確認のスクリプト・失敗の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ci-workflows.md (確認の workflow の形・手元での確認) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (ランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 4) / kasane/changes/archive/2026-10-10-user-docs/evidence/consumer-screen-source.md (書き直した形・`local` の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-use.md (作業用の写しで流すときの `local.properties`)
+出典: kasane/changes/archive/2026-10-09-package-distribution/design.md (Decision 3〜7) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ios.md・consumer-android.md (利用者役・確認のスクリプト・失敗の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-09-package-distribution/evidence/consumer-ci-workflows.md (確認の workflow の形・手元での確認) / kasane/changes/archive/2026-10-09-package-distribution/evidence/public-repository-checks.md (ランナーの上での実行・時間の上限) / kasane/changes/archive/2026-10-10-user-docs/design.md (Decision 4) / kasane/changes/archive/2026-10-10-user-docs/evidence/consumer-screen-source.md (書き直した形・`local` の確認・コード縮小の後の起動) / kasane/changes/archive/2026-10-10-user-docs/evidence/dist-use.md (作業用の写しで流すときの `local.properties`) / kasane/changes/archive/2026-10-15-release-pipeline/design.md (Decision 8) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/consumer-artifact-local-001.md (`artifact` の手元の確認) / kasane/changes/archive/2026-10-15-release-pipeline/evidence/github-release-run-001.md (リリースの workflow の上での実行)

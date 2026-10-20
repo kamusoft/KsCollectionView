@@ -49,4 +49,4 @@ Android 実装は同じ位置・太さ・色・描画順で描き、Sample の�
 - セクション/グループ化機能でセクション境界の区切り線規則を決めるとき (「全セルの下端に線」との重なりの解消)
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: 論点 5 セルの装飾と入力) / kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (list の区切り線 4 件、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/design.md (Decision 3) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md (区切り線の描画順、2026-09-05) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/adr-alignment.md / core/ADR-0006 / ios/ADR-0003
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-3-android-wrapper-foundation/history.md (2026-09-04: 論点 5 セルの装飾と入力) / kasane/changes/archive/2026-09-04-ios-engine-foundation/deviation.md (list の区切り線 4 件、2026-09-02) / kasane/changes/archive/2026-09-04-ios-engine-foundation/design.md (Decision 3) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/deviation.md (区切り線の描画順、2026-09-05) / kasane/changes/archive/2026-09-05-android-wrapper-foundation/evidence/adr-alignment.md / core/ADR-0006 / ios/ADR-0003

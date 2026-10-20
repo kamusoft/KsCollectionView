@@ -30,4 +30,4 @@ date: 2026-09-01
 - 負: VM 所有ではVM がライブラリ型に依存する。KMP 共有 VM からは利用者が interface + expect/actual を1枚挟んで絶縁する必要がある (両プラットフォーム同形なので変換は機械的)
 - 負: 「データ反映後実行」の順序保証は phase-2 / phase-3 のエンジン実装に要件として乗る
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: スクロール制御) / core/ADR-0001 / core/ADR-0002 / core/ADR-0003
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: スクロール制御) / core/ADR-0001 / core/ADR-0002 / core/ADR-0003

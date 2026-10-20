@@ -6,7 +6,7 @@
 
 - [x] 1.1 vanniktech 0.37.0 のソースと Central Portal の公式の文書で、次を確かめて記録する: `publishToMavenCentral` が検証の決着を待つか / 自動で公開する設定の既定 / 送信の ID の取り出し方 / Publisher API で状態を照会・公開を指示・取り下げる呼び方と認証 / 公開済みの判定と公開済みの POM の取り方 / Gradle の POM の `scm` に commit を書く API。結果で design の Decision 3 の未決を決め、deviation.md に書く (→ Requirement: 公開の順序 / 同じ版での再実行)
 - [x] 1.2 GitHub の公式の文書で、`workflow_dispatch` の入力・`concurrency` の待ち・Environment の deployment branch policy・最新の Release の選ばれ方 (`--latest` とプレリリース) を確かめて記録する (→ Requirement: リリースの起動 / 1 本ずつ流れる / secret の渡し方 / 公開の後の確認)
-- [ ] 1.3 オーナーに、署名の鍵と Central Portal の認証の情報を兄弟ライブラリと共通にするか本ライブラリ用に作るかと、名前空間 `jp.kamusoft` で本ライブラリの座標を公開できるかを確かめてもらう (design の Open Questions)
+- [x] 1.3 オーナーに、署名の鍵と Central Portal の認証の情報を兄弟ライブラリと共通にするか本ライブラリ用に作るかと、名前空間 `jp.kamusoft` で本ライブラリの座標を公開できるかを確かめてもらう (design の Open Questions)
 
 ## 2. リリースの道具 (`scripts/release/`)
 
@@ -66,6 +66,6 @@
 - [x] 10.4 `develop` から本番の起動を試し、最初のジョブで止まることを確かめる (→ Requirement: リリースの起動)
 - [x] 10.5 README 2 枚の「まだ公開していない」の 1 文を外す。配信用 README のひな形が、ルートの README と食い違っていないかを確かめる (→ Requirement: インストール例)
 - [x] 10.6 #1・#2 の本文に、変更の節 (`- none`) を書き足す (→ Requirement: リリースノートの組み立て)
-- [ ] 10.7 リリースの Pull Request を `develop` から `main` へ出し、変更の節 (初回の内容) を書いて、必須の検査が通ったらマージする
-- [ ] 10.8 `main` から dry-run を起動し、リリースノートの組み立てまで通ることを確かめる (→ Requirement: リリースノートの組み立て)
-- [ ] 10.9 `main` から版 `0.1.0-beta.1` で本番を起動し、公開の後の確認まで通ることを確かめる。step の順・配信用リポジトリと本リポジトリの tag・Release の属性・最新の Release・Maven Central の公開と POM の commit を証跡に残す (→ Requirement: 公開の順序 / 公開の後の確認)
+- [x] 10.7 リリースの Pull Request を `develop` から `main` へ出し、変更の節 (初回の内容) を書いて、必須の検査が通ったらマージする
+- [x] 10.8 `main` から dry-run を起動し、リリースノートの組み立てまで通ることを確かめる (→ Requirement: リリースノートの組み立て)
+- [x] 10.9 `main` から版 `0.1.0-beta.1` で本番を起動し、公開の後の確認まで通ることを確かめる。step の順・配信用リポジトリと本リポジトリの tag・Release の属性・最新の Release・Maven Central の公開と POM の commit を証跡に残す (→ Requirement: 公開の順序 / 公開の後の確認)

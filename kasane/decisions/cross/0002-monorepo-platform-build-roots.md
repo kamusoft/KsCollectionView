@@ -33,4 +33,4 @@ KMP / CMP 対応は本ライブラリの非ゴールであり、両プラット�
 - 負: リポジトリルートから両プラットフォームを一括ビルドする共通入口を持たないため、ビルド・テストの手順がプラットフォームごとに分かれる。
 - 負: 対称性の検証は人および CI の責務として別途設計する必要がある (ビルドシステムは何も強制しない)。
 
-出典: ../KsSettingsView/kasane/decisions/cross/0001-monorepo-platform-build-roots.md (Context / Decision / Alternatives) / kasane/changes/kasane-initial-assets/exploration.md (ADR 候補 1) / kasane/roadmaps/v1-foundation/roadmap.md (前提 / 制約: リポジトリ構成)
+出典: ../KsSettingsView/kasane/decisions/cross/0001-monorepo-platform-build-roots.md (Context / Decision / Alternatives) / kasane/changes/kasane-initial-assets/exploration.md (ADR 候補 1) / kasane/roadmaps/archive/2026-10-15-v1-foundation/roadmap.md (前提 / 制約: リポジトリ構成)

@@ -49,4 +49,4 @@ KsCollectionView(items, template = { it.kind }) {
 - 負: キーの有限性を静的に強制できない (誤用で再利用が無効化する余地。ドキュメントで担保)
 - 負: 実行時に未登録のキー値がアイテムに現れうる。扱いは「debug ビルドは assertion で即停止、release ビルドは最小高の空セル + 警告ログで落とさない」とする (該当アイテムの非表示は、静かに消えて気づけず件数整合も崩すため不採用)
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: テンプレート種別の宣言方法) / kasane/roadmaps/v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: テンプレートマッピング (a)) / core/ADR-0002 / core/ADR-0003
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-1-symmetric-dsl-spec/history.md (2026-09-01: テンプレート種別の宣言方法) / kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-2-ios-engine-foundation/history.md (2026-09-01: テンプレートマッピング (a)) / core/ADR-0002 / core/ADR-0003

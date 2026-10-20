@@ -35,5 +35,5 @@ date: 2026-09-29
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: ドラッグ中の配列の差し替え) / kasane/changes/archive/2026-10-01-drag-reorder/second-opinion-spec-001.md (Major 1・Minor 1: 受け入れた後の待ち方と、戻してから最新を当てる順番)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: ドラッグ中の配列の差し替え) / kasane/changes/archive/2026-10-01-drag-reorder/second-opinion-spec-001.md (Major 1・Minor 1: 受け入れた後の待ち方と、戻してから最新を当てる順番)
 関連: core/ADR-0026 (仮の並びはライブラリが持つ) / core/ADR-0027 (受け入れと戻し方。確定前に届いた配列の扱いをこの ADR が決める) / core/ADR-0028 (行き先は項目で表す) / core/ADR-0020・core/ADR-0022 (ページングの発火と頼み方)

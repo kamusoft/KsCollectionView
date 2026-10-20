@@ -31,5 +31,5 @@ date: 2026-09-29
 
 - 前提 (Context) が崩れたとき
 
-出典: kasane/roadmaps/v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — 項目ごとの可否と置き先の制限)
+出典: kasane/roadmaps/archive/2026-10-15-v1-foundation/phases/phase-6-drag-reorder/history.md (2026-09-29: 動かせる範囲 — 項目ごとの可否と置き先の制限)
 関連: core/ADR-0026 (仮の並びはライブラリが持つ) / core/ADR-0027 (置いた後の受け入れ) / core/ADR-0028 (行き先の形) / core/ADR-0029 (グループをまたぐ移動)
