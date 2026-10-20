@@ -225,6 +225,84 @@ internal class KsCollectionViewInteractionTest {
         composeTestRule.waitForIdle()
     }
 
+    /**
+     * 完全に透明な色 (不透明度がちょうど 0) を指定すると、押下しても項目のフィードバックは始まらない。
+     * フィードバックを出さないときも、タップと長押しの知らせはそれぞれのコールバックへ届く。
+     *
+     * 差し替え口に記録用の表現を入れても押下が記録されないことで、項目にフィードバックが
+     * 付いていないことを確かめる。
+     */
+    @Test
+    fun fullyTransparentFeedbackColorShowsNoFeedbackButDeliversTaps() {
+        val indication = RecordingIndication()
+        KsTapFeedback.indicationOverride = indication
+        var tapped: TestItem? = null
+        var longTapped: TestItem? = null
+        val items = testItems(5)
+        setTapContent(
+            items = items,
+            onItemTap = { tapped = it },
+            onItemLongTap = { longTapped = it },
+            touchFeedbackColor = Color.Transparent,
+        )
+
+        // 押下し続けても、項目のフィードバックは始まらない。押下のフィードバックは遅延して始まるため時間を進める。
+        onItem("item-2").performTouchInput { down(center) }
+        composeTestRule.mainClock.advanceTimeBy(300)
+        composeTestRule.waitForIdle()
+        assertTrue(
+            "完全に透明な色では押下しても項目のフィードバックが始まらない (実測 ${indication.presses})",
+            indication.presses.isEmpty(),
+        )
+        onItem("item-2").performTouchInput { up() }
+        composeTestRule.waitForIdle()
+        assertEquals("フィードバックを出さなくてもタップは届く", items[2], tapped)
+
+        onItem("item-3").performTouchInput { longClick() }
+        composeTestRule.waitForIdle()
+        assertEquals("フィードバックを出さなくても長押しは届く", items[3], longTapped)
+        assertTrue(
+            "長押しでも項目のフィードバックは始まらない (実測 ${indication.presses})",
+            indication.presses.isEmpty(),
+        )
+    }
+
+    /** ほとんど透明な色 (不透明度が 0 より大きい色) を指定したときは、押下で項目のフィードバックが始まる。 */
+    @Test
+    fun nearlyTransparentFeedbackColorStillShowsFeedback() {
+        assertPressStartsFeedback(Color(0x01FF0000))
+    }
+
+    /** 色の指定が無いことを表す `Color.Unspecified` は透明の扱いにせず、押下で項目のフィードバックが始まる。 */
+    @Test
+    fun unspecifiedFeedbackColorStillShowsFeedback() {
+        assertPressStartsFeedback(Color.Unspecified)
+    }
+
+    /** 指定した色で項目を押下したとき、項目のフィードバックが始まることを確かめる。 */
+    private fun assertPressStartsFeedback(touchFeedbackColor: Color) {
+        val indication = RecordingIndication()
+        KsTapFeedback.indicationOverride = indication
+        var tapped: TestItem? = null
+        val items = testItems(5)
+        setTapContent(
+            items = items,
+            onItemTap = { tapped = it },
+            touchFeedbackColor = touchFeedbackColor,
+        )
+
+        onItem("item-2").performTouchInput { down(center) }
+        composeTestRule.mainClock.advanceTimeBy(300)
+        composeTestRule.waitForIdle()
+        assertTrue(
+            "押下で項目のフィードバックが始まる (色 $touchFeedbackColor、実測 ${indication.presses})",
+            indication.presses.any { it is PressInteraction.Press },
+        )
+        onItem("item-2").performTouchInput { up() }
+        composeTestRule.waitForIdle()
+        assertEquals(items[2], tapped)
+    }
+
     // ---- スクロール制御 ----
 
     /** 配列に無い ID への命令は何も起こさず、警告ログを残す。 */

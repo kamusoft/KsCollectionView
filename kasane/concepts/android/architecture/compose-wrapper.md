@@ -76,7 +76,7 @@ list も grid も同じ `LazyVerticalGrid` で描き、list は `GridCells.Fixed
 | `KsGroupHeaderKey` / `KsRootSlotKey` | グループの見出しとルートのヘッダー / フッターの lazy のキー。ライブラリ内部の `Parcelable` で包み、項目の `key` と衝突させない (後述) |
 | `KsGroupSpacing` / `ksItemSpacing` | 行間・見出しの下の間隔・グループ間の間隔を、項目の上下の余白として置く (後述) |
 | `ksListSeparator` (`KsListSeparator.kt`) | list のときだけ、各項目の前面 (`drawWithContent` で content 描画後) にグループの先頭行の上端と全項目の下端の線を全幅 1dp で描く。見出しが無ければ上端の線は最初のグループだけ (core/ADR-0016)。色は `listSeparatorColor` 未指定なら `KsListSeparatorDefaults` の既定の色 (ライト用とダーク用の 2 つ。core/ADR-0036) |
-| 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003)。並べ替えのスイッチが有効の間は `onItemLongTap` をハンドラに数えず、`onLongClick` も渡さない |
+| 項目のタップ | `onItemTap` / `onItemLongTap` のいずれかがあるときだけ `combinedClickable` で包む。indication は material3 の ripple (android/ADR-0003)。完全に透明な色を指定されたときは indication を付けない (core/ADR-0038)。並べ替えのスイッチが有効の間は `onItemLongTap` をハンドラに数えず、`onLongClick` も渡さない |
 | `ksAnimatedHeight` (`KsAnimatedHeight.kt`) | 行の高さ変化を補間し、補間中は content を現在の高さで測り直して描画を切り取る (android/ADR-0004)。content は上端固定・水平中央 (`Alignment.TopCenter` 相当。ios/ADR-0007 の規則) |
 | `ksAnimateItem` / `KsAnimatedItemBox` / `KsFullSpanBox` | 項目・グループの見出し・ルートのヘッダー / フッターに `animateItem` を付け、配列の差し替えによる移動と出入りをアニメーションで見せる (android/ADR-0006。後述)。並べ替えで持ち上げた項目は配置のアニメーションを外し、pin でコンポジションに留める |
 | `KsPositionKeeper` / `KsAppearingItems` (`KsAppearingItems.kt`) | 配列の差し替えと列数の変化の直前の配置から、端を表示中の端への挿入と、固定中の見出しの下の項目の位置を補う。末尾への挿入で表示範囲の外に足された項目は、最初に配置されたときにフェードさせる (後述) |

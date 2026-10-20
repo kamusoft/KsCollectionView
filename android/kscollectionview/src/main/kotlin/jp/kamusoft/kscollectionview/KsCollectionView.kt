@@ -51,6 +51,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.layout
@@ -100,7 +101,12 @@ internal object KsPagingProbe {
     internal var lastVisibleIndex: Int? = null
 }
 
-/** テストからタップのフィードバックの発火を観測するための差し替え口。 */
+/**
+ * テストからタップのフィードバックの発火を観測するための差し替え口。
+ *
+ * 差し替えるのは標準の波紋の代わりだけで、完全に透明な色を指定して反応を出さない場合は差し替えても
+ * 反応を出さない。
+ */
 internal object KsTapFeedback {
     internal var indicationOverride: Indication? = null
 }
@@ -137,7 +143,11 @@ internal object KsTapFeedback {
  * @param onItemLongTap 要素が長押しされたときに呼ばれるラムダ。[reorder] のスイッチが有効の間は呼ばれない
  * @param touchFeedbackColor タップ中のフィードバック (波紋) の色。省略すると標準の色を使う。使われるのは
  *   渡した色の色みだけで、濃さは標準の波紋が決める (渡した色の不透明度は濃さに効かない)。iOS 版は渡した色を
- *   不透明度を含めてそのまま塗るため、両プラットフォームで近い見え方にするには半透明の色を渡す
+ *   不透明度を含めてそのまま塗るため、両プラットフォームで近い見え方にするには半透明の色を渡す。
+ *   完全に透明な色 (`Color.Transparent` など、不透明度がちょうど 0 の色) を渡すと、押したときの反応を
+ *   出さない。キーボードなどで項目を選んだときのフォーカスの表示も出ない。iOS 版も透明な色は見えないため、
+ *   両プラットフォームで反応が消える。ほとんど透明な色 (不透明度が 0 より大きい色) では、標準の濃さの波紋が
+ *   出る。反応を出さないときも、[onItemTap] と [onItemLongTap] は呼ばれる
  * @param listSeparators リストの区切り線を表示するかどうか。グリッドでは表示しない
  * @param listSeparatorColor 区切り線の色。指定した色はそのまま使う (表示モードで別の色に差し替えない)。
  *   省略するとライブラリ既定の色を使う。既定の色はライト用とダーク用の 2 つがあり、画面の構成の夜間モード
@@ -452,7 +462,18 @@ public fun <Item> KsCollectionView(
     val defaultIndication = remember(touchFeedbackColor) {
         if (touchFeedbackColor != null) ripple(color = touchFeedbackColor) else ripple()
     }
-    val tapIndication = KsTapFeedback.indicationOverride ?: defaultIndication
+    // 完全に透明な色 (不透明度がちょうど 0) が指定されたときだけは波紋に渡さず、反応を出さない。
+    // 波紋は不透明度を捨てて標準の濃さで塗るため、渡すと透明のつもりの色が灰色の帯として出る
+    // (core/ADR-0038)。ほとんど透明な色は波紋に渡す。`Color.Unspecified` は色の指定が
+    // 無いことを表す値なので、透明の扱いにせず波紋に渡す。タップと長押しの知らせはこの判定と関係なく届く。
+    val suppressesFeedback = touchFeedbackColor != null &&
+        touchFeedbackColor.isSpecified &&
+        touchFeedbackColor.alpha == 0f
+    val tapIndication: Indication? = if (suppressesFeedback) {
+        null
+    } else {
+        KsTapFeedback.indicationOverride ?: defaultIndication
+    }
 
     // 縦スクロールインジケータ。表示の濃さとスクロール位置は描画フェーズでだけ読む。
     // 一覧に重ねた表示 (差し替えた次のページの読み込み中) から始めたドラッグも、一覧のスクロールとして
