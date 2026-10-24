@@ -9,6 +9,7 @@ import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Indication
 import androidx.compose.foundation.OverscrollEffect
+import androidx.compose.foundation.clipScrollableContainer
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.rememberOverscrollEffect
@@ -680,6 +681,10 @@ public fun <Item> KsCollectionView(
             overscrollEffect = overscrollEffect,
             modifier = Modifier
                 .fillMaxSize()
+                // 配列の差し替えで消えていく項目を、LazyVerticalGrid は自分の切り取りより外側で、前の配置の
+                // 位置のまま描く。端で一部隠れていた行が一覧の枠の上下へはみ出さないよう、外側にも同じ縦の
+                // 切り取りを掛ける (横は Compose と同じく影の分だけ広げるので、左右の見え方は変わらない)。
+                .clipScrollableContainer(Orientation.Vertical)
                 // 並べ替えの長押しとドラッグは一覧全体で受ける。指の位置を一覧の座標で持ち、ドラッグ中に
                 // 項目が入れ替わっても指の位置がずれないようにするため。
                 .then(

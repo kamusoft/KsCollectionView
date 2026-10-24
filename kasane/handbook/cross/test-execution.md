@@ -103,6 +103,8 @@ Robolectric の既定 (legacy graphics モード) では一部の描画処理が
 
 NATIVE モードは実 Skia を動かすため起動コストが増えるが、区切り線の色・タップフィードバックの伝播・content の配置はこれ無しでは検証層に載らないため採用する。ヒープは既定では足りず、`testOptions` で `maxHeapSize = "2g"` を与えている。
 
+NATIVE モードでも、View をソフトウェアの Canvas に描いて画素を読む方法 (`readPixels` など) は、`drawLayer` で直接描かれる層 (配列の差し替えで消えていく項目など) を描かない。そうした表示を画素で確かめるアサーションは、修正前でも通ってしまう。**`drawLayer` で直接描かれる表示を確かめるテストは、`PixelCopy` で画面を読み、テストの間だけ `robolectric.pixelCopyRenderMode=hardware` を設定する** (例: `KsDisappearingItemsClipTest`)。配置の層 (`placeWithLayer`・`animateItem` の配置) の中身と透明度は、ソフトウェアの Canvas でも読める (2026-10-24 に既存のテスト 9 件で確かめた)。
+
 ### Android: 端末をつないで走らせるテスト
 
 Android 本体には、端末の上でしか確かめられないテストがある (`android/kscollectionview/src/androidTest/`)。2026-10-08 時点では `KsImageDeviceDecodeTest` の 4 件で、画像のデコードが画素をグラフィックス側に置いたときの振る舞いを確かめる。JVM 上のテスト環境では、画素は常にソフトウェア側に置かれるので、この経路はユニットテストでは踏めない ([実行時挙動の検証規約](runtime-behavior-verification.md) の「実行環境で実体が変わる資源」に当たる)。
